@@ -28,13 +28,8 @@ export default function Signup() {
       return;
     }
 
-<<<<<<< HEAD
     // ⏳ Wait a moment to ensure session is fully established
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-=======
-    // ✅ Wait for the session to finalize before using the user ID
->>>>>>> c00f915 (fix: wait for session before inserting user profile)
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const { data: sessionData } = await supabase.auth.getSession();
     const auth_user_id = sessionData?.session?.user?.id;
 
@@ -49,10 +44,7 @@ export default function Signup() {
 
     if (insertRes.error) {
       console.error('Insert error:', insertRes.error);
-      setMessage(
-        'Signup succeeded, but failed to create profile: ' +
-          insertRes.error.message
-      );
+      setMessage('Signup succeeded, but failed to create profile: ' + insertRes.error.message);
     } else {
       setMessage('✅ Signup successful! Check your email for confirmation.');
     }
