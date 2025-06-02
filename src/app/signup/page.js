@@ -28,9 +28,14 @@ export default function Signup() {
       return;
     }
 
-    const auth_user_id = data?.user?.id;
+    // ⏳ Wait a moment to ensure session is fully established
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const auth_user_id = sessionData?.session?.user?.id;
+
     if (!auth_user_id) {
-      setMessage('Signup succeeded but user ID was not returned.');
+      setMessage('Signup succeeded but user session is not yet active.');
       return;
     }
 
