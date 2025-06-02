@@ -28,9 +28,13 @@ export default function Signup() {
       return;
     }
 
+<<<<<<< HEAD
     // ⏳ Wait a moment to ensure session is fully established
     await new Promise(resolve => setTimeout(resolve, 500));
 
+=======
+    // ✅ Wait for the session to finalize before using the user ID
+>>>>>>> c00f915 (fix: wait for session before inserting user profile)
     const { data: sessionData } = await supabase.auth.getSession();
     const auth_user_id = sessionData?.session?.user?.id;
 
