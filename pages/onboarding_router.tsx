@@ -15,7 +15,6 @@ export default function OnboardingRouter() {
   useEffect(() => {
     (async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
-
       if (!user || error) {
         router.push('/login');
         return;
