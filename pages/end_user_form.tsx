@@ -18,6 +18,7 @@ export default function EndUserForm() {
   const [orgName, setOrgName] = useState('');
   const [message, setMessage] = useState('');
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -25,7 +26,7 @@ export default function EndUserForm() {
         router.push('/login');
       } else {
         setSessionUser(user);
-        setEmail(user.email);
+        setEmail(user.email || ''); // ✅ FIX: Prevents TS error
       }
     })();
   }, []);
