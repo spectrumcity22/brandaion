@@ -6,11 +6,11 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [loggedIn, setLoggedIn] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -38,7 +38,9 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body className="min-h-screen font-sans bg-white text-black">
         <nav className="fixed top-0 left-0 w-full bg-black text-white flex items-center justify-between px-6 py-4 shadow-md z-50">
-          <div className="text-xl font-bold">BrandAION</div>
+          <Link href="/" className="text-xl font-bold hover:text-green-400">
+            BrandAION
+          </Link>
           <div className="flex space-x-6 text-sm font-medium">
             {!loggedIn ? (
               <>
@@ -47,10 +49,12 @@ export default function RootLayout({ children }) {
               </>
             ) : (
               <>
-                <Link href="/dashboard" className="hover:text-green-400">Dashboard</Link>
-                <Link href="/end_user_form" className="hover:text-green-400">End User Form</Link>
-                <Link href="/organisation_form" className="hover:text-green-400">Client Organisation</Link>
+                <Link href="/onboarding_router" className="hover:text-green-400">Dashboard</Link>
+                <Link href="/end_user_form" className="hover:text-green-400">Profile</Link>
+                <Link href="/organisation_form" className="hover:text-green-400">Organization</Link>
+                <Link href="/select_package" className="hover:text-green-400">Packages</Link>
                 <Link href="/invoice_confirmation" className="hover:text-green-400">Invoice</Link>
+                <Link href="/schedule" className="hover:text-green-400">Schedule</Link>
                 <button onClick={handleLogout} className="hover:text-red-400">Log Out</button>
               </>
             )}
