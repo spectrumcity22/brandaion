@@ -31,34 +31,24 @@ export default function OrganisationForm() {
         return;
       }
 
-      // ✅ Pull org ID from localStorage OR query string
-      const id = localStorage.getItem('organisation_id') ||
-                 new URLSearchParams(window.location.search).get('org_id');
+      const { data: org, error } = await supabase
+        .from('client_organisation')
+        .select('id, organisation_name')
+        .eq('auth_user_id', user.id)
+        .single();
 
-      if (!id) {
-        setMessage('❌ No organisation context found. Please go back.');
+      if (!error && org) {
+        setOrgId(org.id);
+        setOrgName(org.organisation_name);
+      } else {
+        setMessage('❌ No organisation found for this user.');
         return;
       }
 
-      setOrgId(id);
-      loadOrgName(id);
       loadIndustries();
       loadMarkets();
     })();
   }, []);
-
-  const loadOrgName = async (id: string) => {
-    const { data, error } = await supabase
-      .from('client_organisation')
-      .select('organisation_name')
-      .eq('id', id)
-      .single();
-    if (!error && data) {
-      setOrgName(data.organisation_name);
-    } else {
-      setMessage('❌ Failed to fetch organisation. Please restart the flow.');
-    }
-  };
 
   const loadIndustries = async () => {
     const { data } = await supabase.from('industries').select();
