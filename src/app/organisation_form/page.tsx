@@ -3,25 +3,43 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import type { User } from '@supabase/supabase-js';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+interface Industry {
+  id: string;
+  name: string;
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+}
+
+interface Market {
+  id: string;
+  name: string;
+}
+
 export default function OrganisationForm() {
   const router = useRouter();
+  const [sessionUser, setSessionUser] = useState<User | null>(null);
   const [orgName, setOrgName] = useState('');
   const [orgId, setOrgId] = useState('');
   const [orgUrl, setOrgUrl] = useState('');
   const [linkedinUrl, setLinkedinUrl] = useState('');
-  const [industries, setIndustries] = useState<any[]>([]);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
-  const [markets, setMarkets] = useState<any[]>([]);
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [markets, setMarkets] = useState<Market[]>([]);
   const [industryId, setIndustryId] = useState('');
   const [subcategoryId, setSubcategoryId] = useState('');
   const [marketId, setMarketId] = useState('');
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -30,7 +48,9 @@ export default function OrganisationForm() {
         router.push('/login');
         return;
       }
+      setSessionUser(user);
 
+      // Get organization details
       const { data: org, error } = await supabase
         .from('client_organisation')
         .select('id, organisation_name')
@@ -45,46 +65,35 @@ export default function OrganisationForm() {
         return;
       }
 
-      loadIndustries();
-      loadMarkets();
+      // Load reference data
+      await Promise.all([
+        loadIndustries(),
+        loadMarkets()
+      ]);
     })();
-  }, []);
+  }, [router]);
 
   const loadIndustries = async () => {
-    const { data } = await supabase.from('industries').select();
+    const { data } = await supabase.from('industries').select('*');
     if (data) setIndustries(data);
   };
 
   const loadMarkets = async () => {
-    const { data } = await supabase.from('markets').select();
+    const { data } = await supabase.from('markets').select('*');
     if (data) setMarkets(data);
   };
 
-  const loadSubcategories = async (industryId: string) => {
+  const loadSubcategories = async (selectedIndustryId: string) => {
     const { data } = await supabase
       .from('subcategories')
-      .select()
-      .eq('industry_id', industryId);
+      .select('*')
+      .eq('industry_id', selectedIndustryId);
     if (data) setSubcategories(data);
   };
 
   const handleSubmit = async () => {
-    setMessage('Submitting...');
-
-    const { data: { user }, error: sessionError } = await supabase.auth.getUser();
-    if (!user || sessionError) {
+    if (!sessionUser) {
       setMessage('❌ You must be logged in.');
-      return;
-    }
-
-    const { data: endUser, error: endUserError } = await supabase
-      .from('end_users')
-      .select('id')
-      .eq('auth_user_id', user.id)
-      .single();
-
-    if (endUserError || !endUser) {
-      setMessage('❌ End user record not found.');
       return;
     }
 
@@ -93,34 +102,54 @@ export default function OrganisationForm() {
       return;
     }
 
-    const { error: updateError } = await supabase
-      .from('client_organisation')
-      .update({
-        organisation_url: orgUrl,
-        linkedin_url: linkedinUrl,
-        industry_id: industryId,
-        subcategory_id: subcategoryId,
-        headquarters_market_id: marketId,
-        end_user_id: endUser.id,
-        is_active: true
-      })
-      .eq('id', orgId);
+    setIsSubmitting(true);
+    setMessage('Submitting...');
 
-    if (updateError) {
-      setMessage('❌ Failed to update organisation: ' + updateError.message);
-    } else {
+    try {
+      // Get the end user record using auth_user_id
+      const { data: endUser, error: endUserError } = await supabase
+        .from('end_users')
+        .select('id')
+        .eq('auth_user_id', sessionUser.id)
+        .single();
+
+      if (endUserError || !endUser) {
+        throw new Error('End user record not found');
+      }
+
+      // Update the organization
+      const { error: updateError } = await supabase
+        .from('client_organisation')
+        .update({
+          organisation_url: orgUrl,
+          linkedin_url: linkedinUrl,
+          industry_id: industryId,
+          subcategory_id: subcategoryId,
+          headquarters_market_id: marketId,
+          end_user_id: endUser.id,
+          is_active: true
+        })
+        .eq('auth_user_id', sessionUser.id); // Using auth_user_id for matching
+
+      if (updateError) throw updateError;
+
       setMessage('✅ Organisation updated successfully!');
       setTimeout(() => router.push('/dashboard'), 1000);
+    } catch (err: any) {
+      setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-black text-white pt-24 flex flex-col items-center min-h-screen">
-      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg w-full max-w-md text-center">
+    <div className="w-full max-w-md mx-auto">
+      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
         <h2 className="text-xl font-bold mb-4">Define Your Organisation</h2>
         <div className="text-sm text-gray-400 mb-4">
           {orgName ? `📛 Organisation: ${orgName}` : '🔄 Loading organisation...'}
         </div>
+        
         <input
           type="url"
           placeholder="Organisation Website URL"
@@ -135,6 +164,7 @@ export default function OrganisationForm() {
           onChange={(e) => setLinkedinUrl(e.target.value)}
           className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
         />
+        
         <select
           value={industryId}
           onChange={(e) => {
@@ -150,6 +180,7 @@ export default function OrganisationForm() {
             </option>
           ))}
         </select>
+        
         <select
           value={subcategoryId}
           onChange={(e) => setSubcategoryId(e.target.value)}
@@ -162,6 +193,7 @@ export default function OrganisationForm() {
             </option>
           ))}
         </select>
+        
         <select
           value={marketId}
           onChange={(e) => setMarketId(e.target.value)}
@@ -174,14 +206,21 @@ export default function OrganisationForm() {
             </option>
           ))}
         </select>
+
         <button
           onClick={handleSubmit}
-          className="w-full py-3 bg-green-500 hover:bg-green-600 text-black font-bold rounded-lg transition"
+          disabled={isSubmitting}
+          className={`w-full py-3 font-bold rounded-lg transition ${
+            isSubmitting
+              ? 'bg-gray-600 text-white cursor-not-allowed'
+              : 'bg-green-500 hover:bg-green-600 text-black'
+          }`}
         >
-          Submit
+          {isSubmitting ? 'Submitting...' : 'Submit'}
         </button>
-        <div className="text-sm text-red-400 mt-4">{message}</div>
+
+        <div className="text-sm mt-4 text-center text-red-400">{message}</div>
       </div>
     </div>
   );
-}
+} 
