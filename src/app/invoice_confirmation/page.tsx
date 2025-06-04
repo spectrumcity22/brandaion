@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
@@ -9,18 +9,7 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-interface Invoice {
-  id: string;
-  package_tier: string;
-  package_status: string;
-  amount_paid: number;
-  faq_pairs_pm: number;
-  faq_per_batch: number;
-  stripe_session_id?: string;
-  created_at: string;
-}
-
-export default function InvoiceConfirmation() {
+function InvoiceConfirmationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -157,5 +146,31 @@ export default function InvoiceConfirmation() {
         </div>
       </div>
     </div>
+  );
+}
+
+interface Invoice {
+  id: string;
+  package_tier: string;
+  package_status: string;
+  amount_paid: number;
+  faq_pairs_pm: number;
+  faq_per_batch: number;
+  stripe_session_id?: string;
+  created_at: string;
+}
+
+export default function InvoiceConfirmation() {
+  return (
+    <Suspense fallback={
+      <div className="w-full max-w-md mx-auto">
+        <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+          <p className="text-gray-400">Please wait while we load your invoice details...</p>
+        </div>
+      </div>
+    }>
+      <InvoiceConfirmationContent />
+    </Suspense>
   );
 } 
