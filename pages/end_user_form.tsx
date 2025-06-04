@@ -57,6 +57,7 @@ export default function EndUserForm() {
       if (!existingUser) {
         const { error: insertError } = await supabase.from('end_users').insert({
           auth_user_id,
+          email: sessionUser.email || '', // ✅ Injecting email
           first_name: firstName,
           last_name: lastName,
           org_name: orgName,
@@ -67,6 +68,7 @@ export default function EndUserForm() {
         const { error: updateError } = await supabase
           .from('end_users')
           .update({
+            email: sessionUser.email || '', // ✅ Injecting email
             first_name: firstName,
             last_name: lastName,
             org_name: orgName,
