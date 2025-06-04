@@ -31,7 +31,10 @@ export default function OrganisationForm() {
         return;
       }
 
-      const id = localStorage.getItem('organisation_id');
+      // ✅ Pull org ID from localStorage OR query string
+      const id = localStorage.getItem('organisation_id') ||
+                 new URLSearchParams(window.location.search).get('org_id');
+
       if (!id) {
         setMessage('❌ No organisation context found. Please go back.');
         return;
