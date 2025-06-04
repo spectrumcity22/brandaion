@@ -122,7 +122,7 @@ export default function OrganisationForm() {
       if (updateError) throw updateError;
 
       setMessage('✅ Organisation updated successfully!');
-      setTimeout(() => router.push('/dashboard'), 1000);
+      setTimeout(() => router.push('/select_package'), 1000);
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {
