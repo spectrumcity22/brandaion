@@ -57,7 +57,7 @@ export default function Dashboard() {
     <div className="w-full max-w-md mx-auto">
       <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
         <h1 className="text-2xl font-bold mb-4">Checking your account...</h1>
-        <p className="text-gray-400">We're getting things ready for you...</p>
+        <p className="text-gray-400">We&apos;re getting things ready for you...</p>
       </div>
     </div>
   );
