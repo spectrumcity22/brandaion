@@ -106,17 +106,6 @@ export default function OrganisationForm() {
     setMessage('Submitting...');
 
     try {
-      // Get the end user record using auth_user_id
-      const { data: endUser, error: endUserError } = await supabase
-        .from('end_users')
-        .select('id')
-        .eq('auth_user_id', sessionUser.id)
-        .single();
-
-      if (endUserError || !endUser) {
-        throw new Error('End user record not found');
-      }
-
       // Update the organization
       const { error: updateError } = await supabase
         .from('client_organisation')
@@ -126,7 +115,6 @@ export default function OrganisationForm() {
           industry_id: industryId,
           subcategory_id: subcategoryId,
           headquarters_market_id: marketId,
-          end_user_id: endUser.id,
           is_active: true
         })
         .eq('auth_user_id', sessionUser.id); // Using auth_user_id for matching
