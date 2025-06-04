@@ -57,7 +57,7 @@ export default function EndUserForm() {
       if (!existingUser) {
         const { error: insertError } = await supabase.from('end_users').insert({
           auth_user_id,
-          email: sessionUser.email || '', // ✅ Injecting email
+          email: sessionUser.email || '',
           first_name: firstName,
           last_name: lastName,
           org_name: orgName,
@@ -68,7 +68,7 @@ export default function EndUserForm() {
         const { error: updateError } = await supabase
           .from('end_users')
           .update({
-            email: sessionUser.email || '', // ✅ Injecting email
+            email: sessionUser.email || '',
             first_name: firstName,
             last_name: lastName,
             org_name: orgName,
@@ -105,8 +105,8 @@ export default function EndUserForm() {
   };
 
   return (
-    <div className="bg-black text-white pt-24 flex flex-col items-center min-h-screen">
-      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg w-full max-w-md text-center">
+    <div className="w-full max-w-md mx-auto">
+      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
         <h2 className="text-xl font-bold mb-4">Complete Your BrandAION Profile</h2>
 
         {email && (
@@ -153,4 +153,4 @@ export default function EndUserForm() {
       </div>
     </div>
   );
-}
+} 
