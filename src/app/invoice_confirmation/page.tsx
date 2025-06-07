@@ -52,11 +52,18 @@ function InvoiceConfirmationContent() {
     setCreatingSchedule(true);
     setMessage('Creating your schedule...');
 
+    console.log('Creating schedule for invoice:', invoice);
+
     try {
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+
       const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/invoices-to-schedule', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
           invoice_id: invoice.id,
@@ -64,13 +71,17 @@ function InvoiceConfirmationContent() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create schedule');
+        const errorData = await response.json();
+        console.error('Schedule creation failed:', errorData);
+        throw new Error(errorData.error || 'Failed to create schedule');
       }
 
       const data = await response.json();
+      console.log('Schedule created successfully:', data);
       setMessage('✅ Schedule created successfully!');
       setTimeout(() => router.push('/schedule'), 1500);
     } catch (error) {
+      console.error('Error creating schedule:', error);
       setMessage('❌ Failed to create schedule. Please try again.');
       setCreatingSchedule(false);
     }
