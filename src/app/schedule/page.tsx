@@ -87,15 +87,16 @@ export default function Schedule() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
-      // Use the first schedule as the product source
-      const s = schedule[0];
-      // Fetch the user's organisation_id
+      const userId = session.user.id;
+      // Fetch the user's organisation_id using the session user id
       const { data: org, error: orgError } = await supabase
         .from('client_organisation')
         .select('id')
-        .eq('auth_user_id', s.auth_user_id)
+        .eq('auth_user_id', userId)
         .single();
       if (orgError || !org) throw new Error('No organisation found for this user');
+      // Use the first schedule as the product source
+      const s = schedule[0];
       const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/products-upsert', {
         method: 'POST',
         headers: {
