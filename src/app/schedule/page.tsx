@@ -192,4 +192,3 @@ export default function Schedule() {
     </div>
   );
 } 
-} 
