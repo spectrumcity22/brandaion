@@ -21,7 +21,7 @@ interface Schedule {
 
 export default function Schedule() {
   const router = useRouter();
-  const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [schedule, setSchedule] = useState<Schedule[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -33,7 +33,7 @@ export default function Schedule() {
         return;
       }
 
-      // Step 1: Get the end_user_id for this user
+      // Get the end_user_id for this user
       const { data: endUser, error: endUserError } = await supabase
         .from('end_users')
         .select('id')
@@ -46,18 +46,19 @@ export default function Schedule() {
         return;
       }
 
-      // Step 2: Query the schedule table using endUser.id
+      // Fetch all schedule rows for this end user, ordered by batch_date
       const { data, error: scheduleError } = await supabase
         .from('schedule')
         .select('*')
-        .eq('auth_user_id', endUser.id);
+        .eq('auth_user_id', endUser.id)
+        .order('batch_date', { ascending: true });
 
       if (scheduleError) {
         setError('Failed to load schedule. Please try again later.');
       } else if (data && data.length > 0) {
-        setSchedule(data[0]);
+        setSchedule(data); // set as an array
       } else {
-        setSchedule(null);
+        setSchedule([]);
       }
       setLoading(false);
     })();
@@ -93,7 +94,7 @@ export default function Schedule() {
     );
   }
 
-  if (!schedule) {
+  if (!schedule || schedule.length === 0) {
     return (
       <div className="w-full max-w-md mx-auto">
         <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
@@ -112,17 +113,18 @@ export default function Schedule() {
         <div className="space-y-6">
           <div className="text-left">
             <h2 className="text-lg font-semibold mb-2">FAQ Details</h2>
-            <p className="text-gray-400">Pairs per month: {schedule.faq_pairs_pm}</p>
-            <p className="text-gray-400">Pairs per batch: {schedule.faq_per_batch}</p>
+            <p className="text-gray-400">Pairs per month: {schedule[0].total_faq_pairs}</p>
+            <p className="text-gray-400">Pairs per batch: {schedule[0].batch_faq_pairs}</p>
           </div>
 
           <div className="text-left">
             <h2 className="text-lg font-semibold mb-2">Batch Dates</h2>
             <div className="space-y-2">
-              <p className="text-gray-400">Batch 1: {formatDate(schedule.batch_1_date)}</p>
-              <p className="text-gray-400">Batch 2: {formatDate(schedule.batch_2_date)}</p>
-              <p className="text-gray-400">Batch 3: {formatDate(schedule.batch_3_date)}</p>
-              <p className="text-gray-400">Batch 4: {formatDate(schedule.batch_4_date)}</p>
+              {schedule.slice(0, 4).map((s, idx) => (
+                <p className="text-gray-400" key={s.id}>
+                  Batch {idx + 1}: {formatDate(s.batch_date)}
+                </p>
+              ))}
             </div>
           </div>
         </div>
