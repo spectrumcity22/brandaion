@@ -11,12 +11,17 @@ const supabase = createBrowserClient(
 
 interface Schedule {
   id: string;
-  batch_1_date: string;
-  batch_2_date: string;
-  batch_3_date: string;
-  batch_4_date: string;
-  faq_pairs_pm: number;
-  faq_per_batch: number;
+  auth_user_id: string;
+  organisation_id: string;
+  unique_batch_cluster: string;
+  unique_batch_id: string;
+  batch_date: string;
+  batch_faq_pairs: number;
+  total_faq_pairs: number;
+  sent_for_processing: boolean;
+  inserted_at: string;
+  organisation: string;
+  user_email: string;
 }
 
 export default function Schedule() {
