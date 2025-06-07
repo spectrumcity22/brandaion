@@ -30,7 +30,7 @@ function InvoiceConfirmationContent() {
         .from('invoices')
         .select('*')
         .eq('auth_user_id', user.id)
-        .order('created_at', { ascending: false })
+        .order('inserted_at', { ascending: false })
         .limit(1);
 
       if (fetchError || !invoices?.[0]) {
@@ -113,8 +113,8 @@ function InvoiceConfirmationContent() {
             <h2 className="text-lg font-semibold mb-2">Payment Details</h2>
             <div className="space-y-2 text-gray-400">
               <p>Package: {invoice.package_tier}</p>
-              <p>Amount Paid: ${(invoice.amount_paid / 100).toFixed(2)}</p>
-              <p>Date: {new Date(invoice.created_at).toLocaleDateString()}</p>
+              <p>Amount Paid: ${(invoice.amount_cents / 100).toFixed(2)}</p>
+              <p>Date: {new Date(invoice.inserted_at).toLocaleDateString()}</p>
             </div>
           </div>
 
@@ -151,13 +151,19 @@ function InvoiceConfirmationContent() {
 
 interface Invoice {
   id: string;
+  user_email: string;
+  auth_user_id: string;
+  amount_cents: number;
+  stripe_payment_id: string;
+  billing_period_start: string;
+  billing_period_end: string;
+  paid_at: string;
+  status: string;
   package_tier: string;
-  package_status: string;
-  amount_paid: number;
   faq_pairs_pm: number;
   faq_per_batch: number;
-  stripe_session_id?: string;
-  created_at: string;
+  inserted_at: string;
+  sent_to_schedule: boolean;
 }
 
 export default function InvoiceConfirmation() {
