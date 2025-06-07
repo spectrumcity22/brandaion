@@ -36,13 +36,14 @@ export default function Schedule() {
       const { data, error: scheduleError } = await supabase
         .from('schedule')
         .select('*')
-        .eq('auth_user_id', user.id)
-        .single();
+        .eq('auth_user_id', user.id);
 
       if (scheduleError) {
         setError('Failed to load schedule. Please try again later.');
-      } else if (data) {
-        setSchedule(data);
+      } else if (data && data.length > 0) {
+        setSchedule(data[0]);
+      } else {
+        setSchedule(null);
       }
 
       setLoading(false);
