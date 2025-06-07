@@ -89,6 +89,13 @@ export default function Schedule() {
       if (!session) throw new Error('No session found');
       // Use the first schedule as the product source
       const s = schedule[0];
+      // Fetch the user's organisation_id
+      const { data: org, error: orgError } = await supabase
+        .from('client_organisation')
+        .select('id')
+        .eq('auth_user_id', s.auth_user_id)
+        .single();
+      if (orgError || !org) throw new Error('No organisation found for this user');
       const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/products-upsert', {
         method: 'POST',
         headers: {
@@ -96,9 +103,10 @@ export default function Schedule() {
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
+          organisation_id: org.id,
+          product_name: s.organisation, // or s.product_name if available
           id: s.unique_batch_cluster, // or another unique id
           market: s.organisation, // or s.market if available
-          product_name: s.organisation, // or s.product_name if available
           description: '', // fill as needed
           keywords: '', // fill as needed
           url: '', // fill as needed
