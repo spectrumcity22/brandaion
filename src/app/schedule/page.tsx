@@ -34,7 +34,7 @@ export default function Schedule() {
       }
 
       const { data, error: scheduleError } = await supabase
-        .from('schedules')
+        .from('schedule')
         .select('*')
         .eq('auth_user_id', user.id)
         .single();
