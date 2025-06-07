@@ -33,10 +33,24 @@ export default function Schedule() {
         return;
       }
 
+      // Step 1: Get the end_user_id for this user
+      const { data: endUser, error: endUserError } = await supabase
+        .from('end_users')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (endUserError || !endUser) {
+        setError('No end user found for this account.');
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Query the schedule table using endUser.id
       const { data, error: scheduleError } = await supabase
         .from('schedule')
         .select('*')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', endUser.id);
 
       if (scheduleError) {
         setError('Failed to load schedule. Please try again later.');
@@ -45,7 +59,6 @@ export default function Schedule() {
       } else {
         setSchedule(null);
       }
-
       setLoading(false);
     })();
   }, [router]);
