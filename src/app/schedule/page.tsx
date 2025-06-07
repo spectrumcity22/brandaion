@@ -122,6 +122,7 @@ export default function Schedule() {
         setProductMessage('❌ Failed to create product: ' + errorData.error);
       } else {
         setProductMessage('✅ Product created successfully!');
+        setTimeout(() => router.push('/client_products'), 1200);
       }
     } catch (err: any) {
       setProductMessage('❌ Error: ' + err.message);
