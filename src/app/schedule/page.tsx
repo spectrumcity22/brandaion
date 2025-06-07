@@ -29,6 +29,8 @@ export default function Schedule() {
   const [schedule, setSchedule] = useState<Schedule[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [productMessage, setProductMessage] = useState('');
+  const [creatingProduct, setCreatingProduct] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -76,6 +78,47 @@ export default function Schedule() {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  const handleCreateProduct = async () => {
+    if (!schedule || schedule.length === 0) return;
+    setCreatingProduct(true);
+    setProductMessage('Creating product...');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+      // Use the first schedule as the product source
+      const s = schedule[0];
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/products-upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          id: s.unique_batch_cluster, // or another unique id
+          market: s.organisation, // or s.market if available
+          product_name: s.organisation, // or s.product_name if available
+          description: '', // fill as needed
+          keywords: '', // fill as needed
+          url: '', // fill as needed
+          brand_name: s.organisation,
+          category: '', // fill as needed
+          organisation: s.organisation,
+          schema_json: {}, // fill as needed
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        setProductMessage('❌ Failed to create product: ' + errorData.error);
+      } else {
+        setProductMessage('✅ Product created successfully!');
+      }
+    } catch (err: any) {
+      setProductMessage('❌ Error: ' + err.message);
+    } finally {
+      setCreatingProduct(false);
+    }
   };
 
   if (loading) {
@@ -134,6 +177,19 @@ export default function Schedule() {
           </div>
         </div>
       </div>
+      {Array.isArray(schedule) && schedule.length > 0 && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={handleCreateProduct}
+            disabled={creatingProduct}
+            className={`px-6 py-2 rounded-lg font-bold transition ${creatingProduct ? 'bg-gray-600 text-white cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+          >
+            {creatingProduct ? 'Creating Product...' : 'Create Product'}
+          </button>
+          {productMessage && <div className="mt-2 text-sm">{productMessage}</div>}
+        </div>
+      )}
     </div>
   );
+} 
 } 
