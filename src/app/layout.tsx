@@ -55,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/select_package" className="hover:text-green-400">Packages</Link>
                 <Link href="/invoice_confirmation" className="hover:text-green-400">Invoice</Link>
                 <Link href="/schedule" className="hover:text-green-400">Schedule</Link>
+                <Link href="/client_products" className="hover:text-green-400">Products</Link>
                 <button onClick={handleLogout} className="hover:text-red-400">Log Out</button>
               </>
             )}
