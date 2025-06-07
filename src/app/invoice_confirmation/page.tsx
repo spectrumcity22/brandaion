@@ -53,7 +53,7 @@ function InvoiceConfirmationContent() {
     setMessage('Creating your schedule...');
 
     try {
-      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/create_schedule_batches', {
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/invoices-to-schedule', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
