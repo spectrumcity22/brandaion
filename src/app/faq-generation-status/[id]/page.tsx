@@ -1,34 +1,44 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 
 interface FAQPair {
   id: string;
+  construct_faq_pair_id: string;
   question: string;
   answer: string | null;
   status: string;
-  construct_faq_pair_id: string;
+  created_at: string;
 }
 
-export default function FAQPairDetail({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: {
+    id: string;
+  };
+}
+
+export default function FAQPairDetail({ params }: PageProps) {
   const [faqPairs, setFaqPairs] = useState<FAQPair[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const supabase = createClientComponentClient();
   const router = useRouter();
+  const { id } = params;
 
   useEffect(() => {
-    const fetchFAQPairs = async () => {
+    // Fetch FAQ pairs
+    const fetchFaqPairs = async () => {
       const { data, error } = await supabase
         .from('client_faq_pairs')
         .select('*')
-        .eq('construct_faq_pair_id', params.id)
+        .eq('construct_faq_pair_id', id)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -40,29 +50,22 @@ export default function FAQPairDetail({ params }: { params: { id: string } }) {
       setLoading(false);
     };
 
-    fetchFAQPairs();
+    fetchFaqPairs();
 
     // Set up real-time subscription
     const channel = supabase
-      .channel('client_faq_pairs_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
+      .channel('faq_pairs_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
           schema: 'public', 
           table: 'client_faq_pairs',
-          filter: `construct_faq_pair_id=eq.${params.id}`
+          filter: `construct_faq_pair_id=eq.${id}`
         }, 
         (payload) => {
-          setFaqPairs(current => {
-            const newPairs = [...current];
-            const index = newPairs.findIndex(p => p.id === payload.new.id);
-            if (index >= 0) {
-              newPairs[index] = payload.new as FAQPair;
-            } else {
-              newPairs.push(payload.new as FAQPair);
-            }
-            return newPairs;
-          });
+          console.log('Change received!', payload);
+          fetchFaqPairs();
         }
       )
       .subscribe();
@@ -70,11 +73,11 @@ export default function FAQPairDetail({ params }: { params: { id: string } }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, params.id]);
+  }, [supabase, id]);
 
   const handleAnswerChange = (id: string, answer: string) => {
-    setFaqPairs(current =>
-      current.map(pair =>
+    setFaqPairs(prev => 
+      prev.map(pair => 
         pair.id === id ? { ...pair, answer } : pair
       )
     );
@@ -86,7 +89,7 @@ export default function FAQPairDetail({ params }: { params: { id: string } }) {
       const updates = faqPairs.map(pair => ({
         id: pair.id,
         answer: pair.answer,
-        status: pair.answer ? 'completed' : 'pending'
+        status: pair.answer ? 'answered' : 'pending'
       }));
 
       const { error } = await supabase
@@ -95,7 +98,7 @@ export default function FAQPairDetail({ params }: { params: { id: string } }) {
 
       if (error) throw error;
     } catch (error) {
-      console.error('Error saving FAQ pairs:', error);
+      console.error('Error saving answers:', error);
     } finally {
       setSaving(false);
     }
@@ -113,34 +116,48 @@ export default function FAQPairDetail({ params }: { params: { id: string } }) {
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">FAQ Questions</h1>
-        <div className="space-x-4">
-          <Button variant="outline" onClick={() => router.back()}>
-            Back
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Save Changes
-          </Button>
+        <Button 
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Answers'
+          )}
+        </Button>
+      </div>
+
+      {faqPairs.length === 0 ? (
+        <Alert>
+          <AlertDescription>
+            No questions found for this FAQ pair.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <div className="space-y-6">
+          {faqPairs.map((pair) => (
+            <Card key={pair.id}>
+              <CardHeader>
+                <CardTitle>{pair.question}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={pair.answer || ''}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => 
+                    handleAnswerChange(pair.id, e.target.value)
+                  }
+                  placeholder="Enter your answer here..."
+                  className="min-h-[100px]"
+                />
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </div>
-      
-      <div className="grid gap-6">
-        {faqPairs.map((faqPair) => (
-          <Card key={faqPair.id}>
-            <CardHeader>
-              <CardTitle className="text-lg">{faqPair.question}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Enter your answer here..."
-                value={faqPair.answer || ''}
-                onChange={(e) => handleAnswerChange(faqPair.id, e.target.value)}
-                className="min-h-[100px]"
-              />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      )}
     </div>
   );
 } 
