@@ -1,0 +1,1 @@
+{"type":"invoice.paid","data":{"object":{"id":"in_test_123","customer":"cus_test_123","customer_email":"test@example.com","amount_paid":5000,"currency":"usd","status":"paid","lines":{"data":[{"description":"1 × Pro Package","amount":5000,"metadata":{"faq_pairs_pm":"20","faq_per_batch":"5"}}]}}}}
