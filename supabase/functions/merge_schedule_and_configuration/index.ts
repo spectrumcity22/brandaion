@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import { verifyJwt } from 'https://esm.sh/@supabase/supabase-js@2.39.3/dist/module/lib/jwt';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -27,9 +26,12 @@ serve(async (req: Request) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { payload, error: jwtError } = await verifyJwt(token, supabaseServiceKey);
     
-    if (jwtError) {
+    // Verify the token using Supabase auth
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError);
       throw new Error('Invalid JWT token');
     }
 
@@ -48,7 +50,7 @@ serve(async (req: Request) => {
     }
 
     // Verify that the auth_user_id matches the JWT token
-    if (payload.sub !== auth_user_id) {
+    if (user.id !== auth_user_id) {
       throw new Error('auth_user_id does not match JWT token');
     }
 
