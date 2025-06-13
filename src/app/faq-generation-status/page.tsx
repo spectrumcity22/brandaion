@@ -1,19 +1,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 interface FAQPair {
   id: string;
-  generation_status: string;
-  error_message: string | null;
-  created_at: string;
-  batch_faq_pairs: number;
+  ai_request_for_questions: string;
   ai_response_questions: string | null;
+}
+
+interface RealtimePayload {
+  schema: string;
+  table: string;
+  commit_timestamp: string;
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: FAQPair;
+  old: FAQPair;
+  errors: null | string[];
 }
 
 export default function FAQGenerationStatus() {
@@ -23,7 +31,8 @@ export default function FAQGenerationStatus() {
   const router = useRouter();
 
   useEffect(() => {
-    const fetchFAQPairs = async () => {
+    // Fetch FAQ pairs
+    const fetchFaqPairs = async () => {
       const { data, error } = await supabase
         .from('construct_faq_pairs')
         .select('*')
@@ -38,25 +47,27 @@ export default function FAQGenerationStatus() {
       setLoading(false);
     };
 
-    fetchFAQPairs();
+    fetchFaqPairs();
 
     // Set up real-time subscription
     const channel = supabase
       .channel('faq_pairs_changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'construct_faq_pairs' 
-        }, 
-        (payload) => {
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'construct_faq_pairs'
+        },
+        (payload: RealtimePayload) => {
+          console.log('Change received!', payload);
           setFaqPairs(current => {
             const newPairs = [...current];
             const index = newPairs.findIndex(p => p.id === payload.new.id);
             if (index >= 0) {
-              newPairs[index] = payload.new as FAQPair;
+              newPairs[index] = payload.new;
             } else {
-              newPairs.unshift(payload.new as FAQPair);
+              newPairs.push(payload.new);
             }
             return newPairs;
           });
@@ -69,44 +80,6 @@ export default function FAQGenerationStatus() {
     };
   }, [supabase]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
-      case 'failed':
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
-      case 'pending':
-        return <Clock className="h-5 w-5 text-yellow-500" />;
-      default:
-        return <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'Completed';
-      case 'failed':
-        return 'Failed';
-      case 'pending':
-        return 'Pending';
-      case 'generating_questions':
-        return 'Generating Questions';
-      case 'questions_generated':
-        return 'Questions Generated';
-      case 'generating_answers':
-        return 'Generating Answers';
-      default:
-        return status;
-    }
-  };
-
-  const handleViewQuestions = (faqPair: FAQPair) => {
-    if (faqPair.generation_status === 'questions_generated' || faqPair.generation_status === 'completed') {
-      router.push(`/faq-generation-status/${faqPair.id}`);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -117,45 +90,46 @@ export default function FAQGenerationStatus() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8">FAQ Generation Status</h1>
-      
-      <div className="grid gap-6">
-        {faqPairs.map((faqPair) => (
-          <Card 
-            key={faqPair.id}
-            className={`cursor-pointer hover:bg-accent/50 transition-colors ${
-              (faqPair.generation_status === 'questions_generated' || faqPair.generation_status === 'completed') 
-                ? 'cursor-pointer' 
-                : 'cursor-not-allowed'
-            }`}
-            onClick={() => handleViewQuestions(faqPair)}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Batch {faqPair.batch_faq_pairs} FAQs
-              </CardTitle>
-              <div className="flex items-center space-x-2">
-                {getStatusIcon(faqPair.generation_status)}
-                <span className="text-sm font-medium">
-                  {getStatusText(faqPair.generation_status)}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">
-                Created: {new Date(faqPair.created_at).toLocaleString()}
-              </div>
-              {faqPair.error_message && (
-                <Alert variant="destructive" className="mt-4">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{faqPair.error_message}</AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">FAQ Generation Status</h1>
       </div>
+
+      {faqPairs.length === 0 ? (
+        <Alert>
+          <AlertDescription>
+            No FAQ pairs found.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <div className="space-y-6">
+          {faqPairs.map((pair) => (
+            <Card key={pair.id}>
+              <CardHeader>
+                <CardTitle>FAQ Pair {pair.id}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold mb-2">Request:</h3>
+                    <p className="text-gray-600">{pair.ai_request_for_questions}</p>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-2">Response:</h3>
+                    <p className="text-gray-600">
+                      {pair.ai_response_questions || 'Waiting for response...'}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => router.push(`/faq-generation-status/${pair.id}`)}
+                  >
+                    View Details
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 } 
