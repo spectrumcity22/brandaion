@@ -7,21 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface FAQPair {
   id: string;
   ai_request_for_questions: string;
   ai_response_questions: string | null;
-}
-
-interface RealtimePayload {
-  schema: string;
-  table: string;
-  commit_timestamp: string;
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-  new: FAQPair;
-  old: FAQPair;
-  errors: null | string[];
 }
 
 export default function FAQGenerationStatus() {
@@ -53,24 +44,26 @@ export default function FAQGenerationStatus() {
     const channel = supabase
       .channel('faq_pairs_changes')
       .on(
-        'postgres_changes',
+        'postgres_changes' as any,
         {
           event: '*',
           schema: 'public',
           table: 'construct_faq_pairs'
         },
-        (payload: RealtimePayload) => {
+        (payload: any) => {
           console.log('Change received!', payload);
-          setFaqPairs(current => {
-            const newPairs = [...current];
-            const index = newPairs.findIndex(p => p.id === payload.new.id);
-            if (index >= 0) {
-              newPairs[index] = payload.new;
-            } else {
-              newPairs.push(payload.new);
-            }
-            return newPairs;
-          });
+          if (payload.new) {
+            setFaqPairs(current => {
+              const newPairs = [...current];
+              const index = newPairs.findIndex(p => p.id === payload.new.id);
+              if (index >= 0) {
+                newPairs[index] = payload.new;
+              } else {
+                newPairs.push(payload.new);
+              }
+              return newPairs;
+            });
+          }
         }
       )
       .subscribe();
