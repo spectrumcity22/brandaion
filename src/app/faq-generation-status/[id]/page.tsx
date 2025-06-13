@@ -1,9 +1,10 @@
 import FAQDetail from './FAQDetail';
 
-export default function FAQPairDetail({
+export default async function FAQPairDetail({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  return <FAQDetail id={params.id} />;
+  const resolvedParams = await params;
+  return <FAQDetail id={resolvedParams.id} />;
 } 
