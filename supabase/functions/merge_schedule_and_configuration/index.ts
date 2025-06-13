@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { verifyJwt } from 'https://esm.sh/@supabase/supabase-js@2.39.3/dist/module/lib/jwt';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -19,6 +20,19 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Verify JWT token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header');
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { payload, error: jwtError } = await verifyJwt(token, supabaseServiceKey);
+    
+    if (jwtError) {
+      throw new Error('Invalid JWT token');
+    }
+
     // Parse the request body
     let body;
     try {
@@ -31,6 +45,11 @@ serve(async (req: Request) => {
     const { auth_user_id } = body;
     if (!auth_user_id) {
       throw new Error('auth_user_id is required');
+    }
+
+    // Verify that the auth_user_id matches the JWT token
+    if (payload.sub !== auth_user_id) {
+      throw new Error('auth_user_id does not match JWT token');
     }
 
     console.log('Processing merge for auth_user_id:', auth_user_id);
