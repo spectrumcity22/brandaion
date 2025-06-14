@@ -14,6 +14,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [loggedIn, setLoggedIn] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [batchesOpen, setBatchesOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -50,15 +53,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             ) : (
               <>
                 <Link href="/onboarding_router" className="hover:text-green-400">Dashboard</Link>
-                <Link href="/review-questions" className="hover:text-green-400">Review Questions</Link>
-                <Link href="/end_user_form" className="hover:text-green-400">Profile</Link>
-                <Link href="/organisation_form" className="hover:text-green-400">Organization</Link>
-                <Link href="/select_package" className="hover:text-green-400">Packages</Link>
-                <Link href="/invoice_confirmation" className="hover:text-green-400">Invoice</Link>
-                <Link href="/schedule" className="hover:text-green-400">Schedule</Link>
                 <Link href="/client_products" className="hover:text-green-400">Products</Link>
-                <Link href="/client_product_persona_form" className="hover:text-green-400">Persona Form</Link>
-                <Link href="/client_configuration_form" className="hover:text-green-400">Configure AI</Link>
+                {/* Account Dropdown */}
+                <div className="relative" onMouseEnter={() => setAccountOpen(true)} onMouseLeave={() => setAccountOpen(false)}>
+                  <button className="hover:text-green-400">Account ▾</button>
+                  {accountOpen && (
+                    <div className="absolute left-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/end_user_form" className="block px-4 py-2 hover:bg-gray-200">Profile</Link>
+                      <Link href="/organisation_form" className="block px-4 py-2 hover:bg-gray-200">Organization</Link>
+                      <Link href="/invoice_confirmation" className="block px-4 py-2 hover:bg-gray-200">Invoice</Link>
+                    </div>
+                  )}
+                </div>
+                {/* Configuration Dropdown */}
+                <div className="relative" onMouseEnter={() => setConfigOpen(true)} onMouseLeave={() => setConfigOpen(false)}>
+                  <button className="hover:text-green-400">Configuration ▾</button>
+                  {configOpen && (
+                    <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200">Persona Form</Link>
+                      <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200">Configure AI</Link>
+                    </div>
+                  )}
+                </div>
+                {/* Batches Dropdown */}
+                <div className="relative" onMouseEnter={() => setBatchesOpen(true)} onMouseLeave={() => setBatchesOpen(false)}>
+                  <button className="hover:text-green-400">Batches ▾</button>
+                  {batchesOpen && (
+                    <div className="absolute left-0 mt-2 w-56 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/schedule" className="block px-4 py-2 hover:bg-gray-200">Schedule</Link>
+                      <Link href="/review-questions" className="block px-4 py-2 hover:bg-gray-200">Review Questions</Link>
+                      <span className="block px-4 py-2 text-gray-400 cursor-not-allowed">Review Answers (coming soon)</span>
+                    </div>
+                  )}
+                </div>
                 <button onClick={handleLogout} className="hover:text-red-400">Log Out</button>
               </>
             )}
