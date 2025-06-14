@@ -153,7 +153,7 @@ export default function ClientConfigurationForm() {
 
       console.log('CORS preflight successful, making POST request...');
 
-      // Then make the actual POST request
+      // Then make the actual POST request to merge_schedule_and_configuration
       const webhookResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "POST",
         headers: {
@@ -182,7 +182,37 @@ export default function ClientConfigurationForm() {
         return;
       }
 
-      setMessage("✅ Configuration saved and merge triggered!");
+      // Now call the generate_faq_questions webhook
+      console.log('Calling generate_faq_questions webhook...');
+      const generateResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_faq_questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "x-client-info": "supabase-js/2.39.3",
+          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        },
+        body: JSON.stringify({ auth_user_id: user.id }),
+      });
+
+      const generateData = await generateResponse.json();
+      console.log('Generate FAQ response:', {
+        status: generateResponse.status,
+        statusText: generateResponse.statusText,
+        data: generateData
+      });
+
+      if (!generateResponse.ok) {
+        console.error("Generate FAQ error details:", {
+          status: generateResponse.status,
+          statusText: generateResponse.statusText,
+          data: generateData
+        });
+        setMessage("✅ Configuration saved and merged, but failed to generate FAQ questions");
+        return;
+      }
+
+      setMessage("✅ Configuration saved, merged, and FAQ questions generated!");
       
       // Wait for 2 seconds to show the success message before redirecting
       await new Promise(resolve => setTimeout(resolve, 2000));

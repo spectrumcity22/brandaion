@@ -25,6 +25,17 @@ serve(async (req: Request) => {
       throw new Error(`Invoice not found: ${invoiceError?.message}`);
     }
 
+    // Get end_user record to get the correct id
+    const { data: endUser, error: endUserError } = await supabase
+      .from('end_users')
+      .select('id')
+      .eq('auth_user_id', invoice.auth_user_id)
+      .single();
+
+    if (endUserError || !endUser) {
+      throw new Error(`End user not found: ${endUserError?.message}`);
+    }
+
     // Get organisation_id from client_organisation
     const { data: org, error: orgError } = await supabase
       .from('client_organisation')
@@ -52,14 +63,16 @@ serve(async (req: Request) => {
       batchDate.setDate(batchDate.getDate() + (batchInterval * i));
       
       scheduleRecords.push({
-        auth_user_id: invoice.auth_user_id,
+        auth_user_id: endUser.id,  // Use end_users.id instead of auth_user_id
         organisation_id: org.id,
         unique_batch_cluster: batchClusterId,
         unique_batch_id: crypto.randomUUID(),
         batch_date: batchDate.toISOString().split('T')[0], // Convert to YYYY-MM-DD format
         batch_faq_pairs: invoice.faq_per_batch,
         total_faq_pairs: invoice.faq_pairs_pm,
-        sent_for_processing: false
+        sent_for_processing: false,
+        organisation: invoice.organisation,
+        user_email: invoice.user_email
       });
     }
 

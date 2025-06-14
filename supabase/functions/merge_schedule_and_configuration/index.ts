@@ -84,7 +84,7 @@ serve(async (req: Request) => {
     const { data: schedules, error: scheduleError } = await supabase
       .from('schedule')
       .select('*')
-      .eq('auth_user_id', endUser.id)  // Use end_user.id instead of auth_user_id
+      .eq('auth_user_id', endUser.id)  // Use end_users.id instead of auth_user_id
       .eq('sent_for_processing', false);
 
     if (scheduleError) {
@@ -132,16 +132,33 @@ serve(async (req: Request) => {
     const { error: updateError } = await supabase
       .from('schedule')
       .update({ sent_for_processing: true })
-      .eq('auth_user_id', endUser.id)  // Use end_user.id instead of auth_user_id
+      .eq('auth_user_id', endUser.id)  // Use end_users.id instead of auth_user_id
       .eq('sent_for_processing', false);
 
     if (updateError) {
       throw new Error(`Failed to update schedule rows: ${updateError.message}`);
     }
 
+    // 5. Trigger the generate_faq_questions function
+    const generateResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_faq_questions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+        "x-client-info": "supabase-js/2.39.3",
+        "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      },
+      body: JSON.stringify({ auth_user_id: auth_user_id }),
+    });
+
+    if (!generateResponse.ok) {
+      console.error("Failed to trigger FAQ generation:", await generateResponse.text());
+      // Don't throw error here, as the FAQ pairs were still created successfully
+    }
+
     return new Response(JSON.stringify({ 
       success: true,
-      message: 'FAQ pairs constructed and schedule updated successfully'
+      message: 'FAQ pairs constructed, schedule updated, and generation triggered'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200

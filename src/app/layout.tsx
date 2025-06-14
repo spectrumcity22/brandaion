@@ -58,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/client_products" className="hover:text-green-400">Products</Link>
                 <Link href="/client_product_persona_form" className="hover:text-green-400">Persona Form</Link>
                 <Link href="/client_configuration_form" className="hover:text-green-400">Configure AI</Link>
+                <Link href="/review-questions" className="hover:text-green-400">Review Questions</Link>
                 <button onClick={handleLogout} className="hover:text-red-400">Log Out</button>
               </>
             )}
