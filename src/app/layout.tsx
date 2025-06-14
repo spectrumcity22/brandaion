@@ -2,7 +2,7 @@
 import "./globals.css";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 const supabase = createBrowserClient(
@@ -17,6 +17,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [accountOpen, setAccountOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [batchesOpen, setBatchesOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const configRef = useRef<HTMLDivElement>(null);
+  const batchesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -27,8 +31,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       setLoggedIn(!!session?.user);
     });
 
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        accountRef.current && !accountRef.current.contains(event.target as Node) &&
+        configRef.current && !configRef.current.contains(event.target as Node) &&
+        batchesRef.current && !batchesRef.current.contains(event.target as Node)
+      ) {
+        setOpenDropdown(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       listener?.subscription.unsubscribe();
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -53,35 +68,50 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             ) : (
               <>
                 <Link href="/onboarding_router" className="hover:text-green-400">Dashboard</Link>
-                <Link href="/client_products" className="hover:text-green-400">Products</Link>
                 {/* Account Dropdown */}
-                <div className="relative" onMouseEnter={() => setAccountOpen(true)} onMouseLeave={() => setAccountOpen(false)}>
-                  <button className="hover:text-green-400">Account ▾</button>
-                  {accountOpen && (
+                <div ref={accountRef} className="relative">
+                  <button
+                    className="hover:text-green-400"
+                    onClick={() => setOpenDropdown(openDropdown === 'account' ? null : 'account')}
+                  >
+                    Account ▾
+                  </button>
+                  {openDropdown === 'account' && (
                     <div className="absolute left-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
-                      <Link href="/end_user_form" className="block px-4 py-2 hover:bg-gray-200">Profile</Link>
-                      <Link href="/organisation_form" className="block px-4 py-2 hover:bg-gray-200">Organization</Link>
-                      <Link href="/invoice_confirmation" className="block px-4 py-2 hover:bg-gray-200">Invoice</Link>
+                      <Link href="/end_user_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Profile</Link>
+                      <Link href="/organisation_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Organization</Link>
+                      <Link href="/invoice_confirmation" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Invoice</Link>
                     </div>
                   )}
                 </div>
                 {/* Configuration Dropdown */}
-                <div className="relative" onMouseEnter={() => setConfigOpen(true)} onMouseLeave={() => setConfigOpen(false)}>
-                  <button className="hover:text-green-400">Configuration ▾</button>
-                  {configOpen && (
+                <div ref={configRef} className="relative">
+                  <button
+                    className="hover:text-green-400"
+                    onClick={() => setOpenDropdown(openDropdown === 'config' ? null : 'config')}
+                  >
+                    Configuration ▾
+                  </button>
+                  {openDropdown === 'config' && (
                     <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
-                      <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200">Persona Form</Link>
-                      <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200">Configure AI</Link>
+                      <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Persona Form</Link>
+                      <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Configure AI</Link>
+                      <Link href="/client_products" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Products</Link>
                     </div>
                   )}
                 </div>
                 {/* Batches Dropdown */}
-                <div className="relative" onMouseEnter={() => setBatchesOpen(true)} onMouseLeave={() => setBatchesOpen(false)}>
-                  <button className="hover:text-green-400">Batches ▾</button>
-                  {batchesOpen && (
+                <div ref={batchesRef} className="relative">
+                  <button
+                    className="hover:text-green-400"
+                    onClick={() => setOpenDropdown(openDropdown === 'batches' ? null : 'batches')}
+                  >
+                    Batches ▾
+                  </button>
+                  {openDropdown === 'batches' && (
                     <div className="absolute left-0 mt-2 w-56 bg-white text-black rounded shadow-lg z-50">
-                      <Link href="/schedule" className="block px-4 py-2 hover:bg-gray-200">Schedule</Link>
-                      <Link href="/review-questions" className="block px-4 py-2 hover:bg-gray-200">Review Questions</Link>
+                      <Link href="/schedule" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Schedule</Link>
+                      <Link href="/review-questions" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Questions</Link>
                       <span className="block px-4 py-2 text-gray-400 cursor-not-allowed">Review Answers (coming soon)</span>
                     </div>
                   )}
