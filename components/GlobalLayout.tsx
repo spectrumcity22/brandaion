@@ -44,6 +44,7 @@ export default function GlobalLayout({ children }: { children: React.ReactNode }
           ) : (
             <>
               <Link href="/dashboard" className="hover:text-green-400">Dashboard</Link>
+              <Link href="/review-questions" className="hover:text-green-400">Review Questions</Link>
               <Link href="/end_user_form" className="hover:text-green-400">End User Form</Link>
               <Link href="/organisation_form" className="hover:text-green-400">Client Organisation</Link>
               <Link href="/invoice_confirmation" className="hover:text-green-400">Invoice</Link>
