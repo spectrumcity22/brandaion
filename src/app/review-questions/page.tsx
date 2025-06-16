@@ -18,7 +18,7 @@ import {
 interface ReviewQuestion {
   id: string;
   construct_faq_pair_id: string;
-  question_text: string;
+  ai_response_questions: string;
   status: 'pending' | 'approved' | 'edited';
   edited_question: string | null;
 }
@@ -71,7 +71,7 @@ export default function ReviewQuestions() {
       if (error) throw error;
 
       setQuestions(questions.map(q => 
-        q.id === id ? { ...q, question_text: newQuestion } : q
+        q.id === id ? { ...q, ai_response_questions: newQuestion } : q
       ));
     } catch (error) {
       console.error('Error updating question:', error);
@@ -170,7 +170,7 @@ export default function ReviewQuestions() {
               fullWidth
               multiline
               rows={2}
-              value={question.edited_question || question.question_text}
+              value={question.edited_question || question.ai_response_questions}
               onChange={(e) => handleQuestionEdit(question.id, e.target.value)}
               label="Question"
               variant="outlined"
