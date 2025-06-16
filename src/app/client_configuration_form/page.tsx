@@ -100,7 +100,10 @@ export default function ClientConfigurationForm() {
         throw new Error(`Failed to save configuration: ${configError.message}`);
       }
 
-      setProcessingStatus('Configuration saved, merging with schedule...');
+      setProcessingStatus('Configuration saved. Waiting 5 seconds before merging...');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
+
+      setProcessingStatus('Merging with schedule...');
 
       // Get the session for the webhook call
       const { data: { session } } = await supabase.auth.getSession();
@@ -125,76 +128,8 @@ export default function ClientConfigurationForm() {
         throw new Error(`Merge failed: ${mergeData.error || 'Unknown error'}`);
       }
 
-      setProcessingStatus('Configuration merged. Starting question generation...');
-
-      // Call open_ai_request_questions directly
-      const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
-          "x-client-info": "supabase-js/2.39.3",
-          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        },
-        body: JSON.stringify({ auth_user_id: user.id }),
-      });
-
-      const questionsData = await questionsResponse.json();
-      if (!questionsResponse.ok) {
-        throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
-      }
-
-      setProcessingStatus('Questions generation started. Checking status...');
-
-      // Poll for status changes
-      let attempts = 0;
-      const maxAttempts = 30;
-      const pollInterval = 2000; // 2 seconds
-
-      while (attempts < maxAttempts) {
-        const { data: pairs, error: statusError } = await supabase
-          .from('construct_faq_pairs')
-          .select('generation_status, error_message')
-          .eq('auth_user_id', user.id)
-          .in('generation_status', ['pending', 'completed', 'error']);
-
-        if (statusError) {
-          throw new Error(`Failed to check status: ${statusError.message}`);
-        }
-
-        if (!pairs || pairs.length === 0) {
-          setProcessingStatus('No FAQ pairs found. Please try again.');
-          break;
-        }
-
-        const hasError = pairs.some(p => p.generation_status === 'error');
-        const allCompleted = pairs.every(p => p.generation_status === 'completed');
-        const stillPending = pairs.some(p => p.generation_status === 'pending');
-
-        if (hasError) {
-          const errorPair = pairs.find(p => p.generation_status === 'error');
-          throw new Error(`Question generation failed: ${errorPair?.error_message || 'Unknown error'}`);
-        }
-
-        if (allCompleted) {
-          setProcessingStatus('Questions generated successfully! Redirecting...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          router.push('/review-questions');
-          break;
-        }
-
-        if (stillPending) {
-          setProcessingStatus(`Still generating questions... (${attempts + 1}/${maxAttempts})`);
-          await new Promise(resolve => setTimeout(resolve, pollInterval));
-          attempts++;
-        }
-      }
-
-      if (attempts >= maxAttempts) {
-        setProcessingStatus('Question generation is taking longer than expected. You can check the review page for updates.');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        router.push('/review-questions');
-      }
+      setMessage("✅ Configuration saved and merged successfully!");
+      router.push('/review-questions');
     } catch (error) {
       console.error('Error:', error);
       setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
@@ -203,157 +138,129 @@ export default function ClientConfigurationForm() {
     }
   };
 
-  const handleGenerateQuestions = async () => {
-    setIsGenerating(true);
-    setProcessingStatus('Generating questions...');
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No session found');
-      }
-
-      console.log('Making CORS preflight request for questions...');
-      const preflightResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
-        method: "OPTIONS",
-        headers: {
-          "Access-Control-Request-Method": "POST",
-          "Access-Control-Request-Headers": "authorization, x-client-info, apikey, content-type",
-        },
-      });
-
-      if (!preflightResponse.ok) {
-        throw new Error('CORS preflight failed');
-      }
-
-      const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
-          "x-client-info": "supabase-js/2.39.3",
-          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        },
-        body: JSON.stringify({ auth_user_id: user.id }),
-      });
-
-      const questionsData = await questionsResponse.json();
-      if (!questionsResponse.ok) {
-        throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
-      }
-
-      setProcessingStatus('Questions are being generated. Redirecting to review page...');
-      
-      // Wait a moment to show the status
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Redirect to review questions page
-      router.push('/review-questions');
-    } catch (error) {
-      console.error('Error:', error);
-      setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   if (!user) {
     return <div className="text-center p-8">Loading...</div>;
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-8">
-      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg">
-        <h2 className="text-xl font-bold mb-4">Configure AI Request</h2>
-        <form className="space-y-4">
-          <div>
-            <label className="block text-gray-400 mb-1">Brand</label>
-            <select
-              name="brand_id"
-              value={form.brand_id || ""}
-              onChange={handleChange}
-              className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white"
-              required
-            >
-              <option value="">Select Brand</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-400 mb-1">Product</label>
-            <select
-              name="product_id"
-              value={form.product_id || ""}
-              onChange={handleChange}
-              className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white"
-              required
-            >
-              <option value="">Select Product</option>
-              {products.map(p => <option key={p.id} value={p.id}>{p.product_name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-400 mb-1">Persona</label>
-            <select
-              name="persona_id"
-              value={form.persona_id || ""}
-              onChange={handleChange}
-              className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white"
-              required
-            >
-              <option value="">Select Persona</option>
-              {personas.map(p => <option key={p.id} value={p.id}>{p.persona_name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-400 mb-1">Market</label>
-            <select
-              name="market_id"
-              value={form.market_id || ""}
-              onChange={handleChange}
-              className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white"
-              required
-            >
-              <option value="">Select Market</option>
-              {markets.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-gray-400 mb-1">Audience</label>
-            <select
-              name="audience_id"
-              value={form.audience_id || ""}
-              onChange={handleChange}
-              className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white"
-              required
-            >
-              <option value="">Select Audience</option>
-              {audiences.map(a => <option key={a.id} value={a.id}>{a.target_audience}</option>)}
-            </select>
-          </div>
-          <div className="space-y-4">
-            <button
-              type="submit"
-              className="w-full p-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-bold transition"
-              disabled={isProcessing || !form.brand_id || !form.product_id || !form.persona_id || !form.market_id || !form.audience_id}
-            >
-              {isProcessing ? 'Saving...' : 'Save Configuration'}
-            </button>
+    <div className="max-w-4xl mx-auto p-8">
+      <h1 className="text-2xl font-bold mb-6">Client Configuration</h1>
+      
+      {message && (
+        <div className={`p-4 mb-4 rounded ${message.includes('❌') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+          {message}
+        </div>
+      )}
 
-            <button
-              type="button"
-              onClick={handleGenerateQuestions}
-              className="w-full p-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition"
-              disabled={isGenerating || !mergeComplete}
-            >
-              {isGenerating ? 'Generating...' : 'Generate Questions'}
-            </button>
-          </div>
-          
-          {message && <div className="mt-2 text-green-400">{message}</div>}
-          {processingStatus && <div className="mt-2 text-blue-400">{processingStatus}</div>}
-        </form>
-      </div>
+      {processingStatus && (
+        <div className="p-4 mb-4 bg-blue-100 text-blue-700 rounded">
+          {processingStatus}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Brand</label>
+          <select
+            name="brand_id"
+            value={form.brand_id || ''}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          >
+            <option value="">Select a brand</option>
+            {brands.map((brand) => (
+              <option key={brand.id} value={brand.id}>
+                {brand.brand_name} ({brand.organisation_name})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Product</label>
+          <select
+            name="product_id"
+            value={form.product_id || ''}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          >
+            <option value="">Select a product</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.product_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Persona</label>
+          <select
+            name="persona_id"
+            value={form.persona_id || ''}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          >
+            <option value="">Select a persona</option>
+            {personas.map((persona) => (
+              <option key={persona.id} value={persona.id}>
+                {persona.persona_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Market</label>
+          <select
+            name="market_id"
+            value={form.market_id || ''}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          >
+            <option value="">Select a market</option>
+            {markets.map((market) => (
+              <option key={market.id} value={market.id}>
+                {market.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Audience</label>
+          <select
+            name="audience_id"
+            value={form.audience_id || ''}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            required
+          >
+            <option value="">Select an audience</option>
+            {audiences.map((audience) => (
+              <option key={audience.id} value={audience.id}>
+                {audience.target_audience}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end space-x-4">
+          <button
+            type="submit"
+            disabled={isProcessing}
+            className={`px-4 py-2 rounded-md text-white ${
+              isProcessing ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            {isProcessing ? 'Processing...' : 'Save Configuration'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 } 
