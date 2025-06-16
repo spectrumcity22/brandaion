@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { 
   Button, 
   Card, 
@@ -28,7 +28,7 @@ export default function ReviewQuestions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedQuestions, setSelectedQuestions] = useState<Record<string, boolean>>({});
-  const supabase = useSupabaseClient();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchQuestions();
@@ -39,7 +39,7 @@ export default function ReviewQuestions() {
       const { data, error } = await supabase
         .from('construct_faq_pairs')
         .select('*')
-        .eq('generation_status', 'pending')
+        .eq('generation_status', 'questions_generated')
         .order('created_at', { ascending: true });
 
       if (error) throw error;
