@@ -20,6 +20,9 @@ export default function ClientConfigurationForm() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
   const [session, setSession] = useState<any>(null);
+  const [isMerging, setIsMerging] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [mergeComplete, setMergeComplete] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -76,55 +79,36 @@ export default function ClientConfigurationForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-    setProcessingStatus('Starting configuration processing...');
+    setProcessingStatus('Saving configuration...');
 
     try {
-      // Save the configuration
-      const { error } = await supabase
-        .from('construct_faq_pairs')
-        .insert({
+      // First save to client_configuration
+      const { error: configError } = await supabase
+        .from('client_configuration')
+        .upsert({
           auth_user_id: user.id,
           product_name: products.find(p => p.id === form.product_id)?.product_name,
           persona_name: personas.find(p => p.id === form.persona_id)?.persona_name,
           audience_name: audiences.find(a => a.id === form.audience_id)?.target_audience,
           market_name: markets.find(m => m.id === form.market_id)?.name,
-          generation_status: 'pending'
-        });
+          brand_jsonld_object: brands.find(b => b.id === form.brand_id)?.brand_jsonld_object,
+          schema_json: products.find(p => p.id === form.product_id)?.schema_json,
+          persona_jsonld: personas.find(p => p.id === form.persona_id)?.persona_jsonld
+        }, { onConflict: "auth_user_id" });
 
-      if (error) {
-        console.error('Error saving configuration:', error);
-        setMessage("❌ Error: " + error.message);
-        return;
+      if (configError) {
+        throw new Error(`Failed to save configuration: ${configError.message}`);
       }
 
-      setProcessingStatus('Configuration saved, starting question generation...');
+      setProcessingStatus('Configuration saved, merging with schedule...');
 
-      // Call the webhook after successful save
+      // Get the session for the webhook call
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('No session found');
       }
 
-      console.log('Session token available:', !!session.access_token);
-      
-      // First, make an OPTIONS request to handle CORS preflight for merge_schedule_and_configuration
-      console.log('Making CORS preflight request for merge...');
-      const preflightResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
-        method: "OPTIONS",
-        headers: {
-          "Access-Control-Request-Method": "POST",
-          "Access-Control-Request-Headers": "authorization, x-client-info, apikey, content-type",
-        },
-      });
-
-      if (!preflightResponse.ok) {
-        console.error('CORS preflight failed:', preflightResponse.status, preflightResponse.statusText);
-        throw new Error('CORS preflight failed');
-      }
-
-      console.log('CORS preflight successful, making POST request to merge...');
-
-      // Then make the actual POST request to merge_schedule_and_configuration
+      // Call merge_schedule_and_configuration
       const mergeResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "POST",
         headers: {
@@ -137,21 +121,37 @@ export default function ClientConfigurationForm() {
       });
 
       const mergeData = await mergeResponse.json();
-      console.log('Merge response:', {
-        status: mergeResponse.status,
-        statusText: mergeResponse.statusText,
-        data: mergeData
-      });
-
       if (!mergeResponse.ok) {
         throw new Error(`Merge failed: ${mergeData.error || 'Unknown error'}`);
       }
 
-      setProcessingStatus('Configuration merged, requesting questions...');
+      setProcessingStatus('Configuration merged. Redirecting to review page...');
+      
+      // Wait a moment to show the status
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Redirect to review questions page
+      router.push('/review-questions');
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-      // Now make the request to generate questions
+  const handleGenerateQuestions = async () => {
+    setIsGenerating(true);
+    setProcessingStatus('Generating questions...');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session found');
+      }
+
       console.log('Making CORS preflight request for questions...');
-      const questionsPreflightResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
+      const preflightResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
         method: "OPTIONS",
         headers: {
           "Access-Control-Request-Method": "POST",
@@ -159,12 +159,9 @@ export default function ClientConfigurationForm() {
         },
       });
 
-      if (!questionsPreflightResponse.ok) {
-        console.error('Questions CORS preflight failed:', questionsPreflightResponse.status, questionsPreflightResponse.statusText);
-        throw new Error('Questions CORS preflight failed');
+      if (!preflightResponse.ok) {
+        throw new Error('CORS preflight failed');
       }
-
-      console.log('Questions CORS preflight successful, making POST request...');
 
       const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
         method: "POST",
@@ -178,12 +175,6 @@ export default function ClientConfigurationForm() {
       });
 
       const questionsData = await questionsResponse.json();
-      console.log('Questions response:', {
-        status: questionsResponse.status,
-        statusText: questionsResponse.statusText,
-        data: questionsData
-      });
-
       if (!questionsResponse.ok) {
         throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
       }
@@ -198,7 +189,8 @@ export default function ClientConfigurationForm() {
     } catch (error) {
       console.error('Error:', error);
       setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
-      setIsProcessing(false);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -210,7 +202,7 @@ export default function ClientConfigurationForm() {
     <div className="w-full max-w-2xl mx-auto p-8">
       <div className="bg-gray-900 p-8 rounded-2xl shadow-lg">
         <h2 className="text-xl font-bold mb-4">Configure AI Request</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form className="space-y-4">
           <div>
             <label className="block text-gray-400 mb-1">Brand</label>
             <select
@@ -276,13 +268,22 @@ export default function ClientConfigurationForm() {
               {audiences.map(a => <option key={a.id} value={a.id}>{a.target_audience}</option>)}
             </select>
           </div>
-          <div>
+          <div className="space-y-4">
             <button
               type="submit"
-              className="w-full p-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition"
+              className="w-full p-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-bold transition"
               disabled={isProcessing || !form.brand_id || !form.product_id || !form.persona_id || !form.market_id || !form.audience_id}
             >
-              {isProcessing ? 'Processing...' : 'Save and Process Configuration'}
+              {isProcessing ? 'Saving...' : 'Save Configuration'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerateQuestions}
+              className="w-full p-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition"
+              disabled={isGenerating || !mergeComplete}
+            >
+              {isGenerating ? 'Generating...' : 'Generate Questions'}
             </button>
           </div>
           
