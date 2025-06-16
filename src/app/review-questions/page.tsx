@@ -23,11 +23,37 @@ interface FAQPair {
   timestamp: string;
 }
 
+// Define a type for the question object
+type Question = {
+  id: string;
+  text: string;
+  status: 'pending' | 'approved' | 'edited';
+};
+
 export default function ReviewQuestions() {
-  const [currentBatch, setCurrentBatch] = useState<FAQPair[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentBatch, setCurrentBatch] = useState<FAQPair[]>([]);
   const [selectedQuestions, setSelectedQuestions] = useState<Record<string, boolean>>({});
   const supabase = useSupabaseClient();
+
+  useEffect(() => {
+    async function fetchQuestions() {
+      try {
+        const response = await fetch('/api/questions');
+        if (!response.ok) {
+          throw new Error('Failed to fetch questions');
+        }
+        const data = await response.json();
+        setQuestions(data);
+      } catch (error) {
+        console.error('Error fetching questions:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchQuestions();
+  }, []);
 
   useEffect(() => {
     fetchCurrentBatch();
@@ -124,6 +150,25 @@ export default function ReviewQuestions() {
     } catch (error) {
       console.error('Error approving questions:', error);
     }
+  };
+
+  const handleApprove = async (id: string) => {
+    try {
+      const response = await fetch(`/api/questions/${id}/approve`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to approve question');
+      }
+      setQuestions(questions.map(q => q.id === id ? { ...q, status: 'approved' } : q));
+    } catch (error) {
+      console.error('Error approving question:', error);
+    }
+  };
+
+  const handleEdit = async (id: string) => {
+    // Implement edit functionality, e.g., open a modal or navigate to an edit page
+    console.log('Edit question:', id);
   };
 
   if (loading) {
