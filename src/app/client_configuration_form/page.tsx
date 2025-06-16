@@ -107,8 +107,8 @@ export default function ClientConfigurationForm() {
 
       console.log('Session token available:', !!session.access_token);
       
-      // First, make an OPTIONS request to handle CORS preflight
-      console.log('Making CORS preflight request...');
+      // First, make an OPTIONS request to handle CORS preflight for merge_schedule_and_configuration
+      console.log('Making CORS preflight request for merge...');
       const preflightResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "OPTIONS",
         headers: {
@@ -122,10 +122,10 @@ export default function ClientConfigurationForm() {
         throw new Error('CORS preflight failed');
       }
 
-      console.log('CORS preflight successful, making POST request...');
+      console.log('CORS preflight successful, making POST request to merge...');
 
       // Then make the actual POST request to merge_schedule_and_configuration
-      const webhookResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
+      const mergeResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -136,15 +136,56 @@ export default function ClientConfigurationForm() {
         body: JSON.stringify({ auth_user_id: user.id }),
       });
 
-      const responseData = await webhookResponse.json();
-      console.log('Webhook response:', {
-        status: webhookResponse.status,
-        statusText: webhookResponse.statusText,
-        data: responseData
+      const mergeData = await mergeResponse.json();
+      console.log('Merge response:', {
+        status: mergeResponse.status,
+        statusText: mergeResponse.statusText,
+        data: mergeData
       });
 
-      if (!webhookResponse.ok) {
-        throw new Error(`Webhook failed: ${responseData.error || 'Unknown error'}`);
+      if (!mergeResponse.ok) {
+        throw new Error(`Merge failed: ${mergeData.error || 'Unknown error'}`);
+      }
+
+      setProcessingStatus('Configuration merged, requesting questions...');
+
+      // Now make the request to generate questions
+      console.log('Making CORS preflight request for questions...');
+      const questionsPreflightResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
+        method: "OPTIONS",
+        headers: {
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "authorization, x-client-info, apikey, content-type",
+        },
+      });
+
+      if (!questionsPreflightResponse.ok) {
+        console.error('Questions CORS preflight failed:', questionsPreflightResponse.status, questionsPreflightResponse.statusText);
+        throw new Error('Questions CORS preflight failed');
+      }
+
+      console.log('Questions CORS preflight successful, making POST request...');
+
+      const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "x-client-info": "supabase-js/2.39.3",
+          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        },
+        body: JSON.stringify({ auth_user_id: user.id }),
+      });
+
+      const questionsData = await questionsResponse.json();
+      console.log('Questions response:', {
+        status: questionsResponse.status,
+        statusText: questionsResponse.statusText,
+        data: questionsData
+      });
+
+      if (!questionsResponse.ok) {
+        throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
       }
 
       setProcessingStatus('Questions are being generated. Redirecting to review page...');
