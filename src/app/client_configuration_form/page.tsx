@@ -75,54 +75,20 @@ export default function ClientConfigurationForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("Saving...");
+    setIsProcessing(true);
+    setProcessingStatus('Starting configuration processing...');
 
     try {
-      // Find names from loaded lists
-      const brand = brands.find(b => b.id === form.brand_id);
-      const product = products.find(p => p.id === form.product_id);
-      const persona = personas.find(p => p.id === form.persona_id);
-      const market = markets.find(m => m.id === form.market_id);
-      const audience = audiences.find(a => a.id === form.audience_id);
-
-      console.log('Saving configuration with data:', {
-        auth_user_id: user.id,
-        brand_id: form.brand_id,
-        product_id: form.product_id,
-        persona_id: form.persona_id,
-        market_id: form.market_id,
-        audience_id: form.audience_id
-      });
-
-      // Fetch JSON fields from DB
-      const { data: brandRow } = form.brand_id
-        ? await supabase.from("brands").select("brand_jsonld_object").eq("id", form.brand_id).single()
-        : { data: null };
-      const { data: productRow } = form.product_id
-        ? await supabase.from("products").select("schema_json").eq("id", form.product_id).single()
-        : { data: null };
-      const { data: personaRow } = form.persona_id
-        ? await supabase.from("client_product_persona").select("persona_jsonld").eq("id", form.persona_id).single()
-        : { data: null };
-
+      // Save the configuration
       const { error } = await supabase
-        .from("client_configuration")
+        .from('client_configurations')
         .upsert({
           auth_user_id: user.id,
-          organisation_name: brand?.organisation_name || "",
           brand_id: form.brand_id,
           product_id: form.product_id,
           persona_id: form.persona_id,
           market_id: form.market_id,
           audience_id: form.audience_id,
-          brand_name: brand?.brand_name || "",
-          product_name: product?.product_name || "",
-          persona_name: persona?.persona_name || "",
-          market_name: market?.name || "",
-          audience_name: audience?.target_audience || "",
-          brand_jsonld_object: brandRow?.brand_jsonld_object || null,
-          schema_json: productRow?.schema_json || null,
-          persona_jsonld: personaRow?.persona_jsonld || null,
         }, { onConflict: "auth_user_id" });
 
       if (error) {
@@ -131,7 +97,7 @@ export default function ClientConfigurationForm() {
         return;
       }
 
-      console.log('Configuration saved successfully, calling webhook...');
+      setProcessingStatus('Configuration saved, starting question generation...');
 
       // Call the webhook after successful save
       const { data: { session } } = await supabase.auth.getSession();
@@ -181,44 +147,16 @@ export default function ClientConfigurationForm() {
         throw new Error(`Webhook failed: ${responseData.error || 'Unknown error'}`);
       }
 
-      setMessage("✅ Configuration saved and processing started!");
-      // Redirect to review questions page
-      router.push('/review-questions');
-    } catch (error) {
-      console.error('Error:', error);
-      setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  };
-
-  const handleProcessConfiguration = async () => {
-    setIsProcessing(true);
-    setProcessingStatus('Starting question generation...');
-
-    try {
-      // Call the questions webhook
-      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ auth_user_id: user.id }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to start question generation');
-      }
-
       setProcessingStatus('Questions are being generated. Redirecting to review page...');
       
       // Wait a moment to show the status
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Redirect to review page
+      // Redirect to review questions page
       router.push('/review-questions');
     } catch (error) {
-      console.error('Error processing configuration:', error);
-      setProcessingStatus('Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Error:', error);
+      setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
       setIsProcessing(false);
     }
   };
@@ -297,22 +235,13 @@ export default function ClientConfigurationForm() {
               {audiences.map(a => <option key={a.id} value={a.id}>{a.target_audience}</option>)}
             </select>
           </div>
-          <div className="flex justify-between gap-4">
+          <div>
             <button
               type="submit"
-              className="flex-1 p-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition"
-              disabled={isProcessing}
-            >
-              Save Configuration
-            </button>
-            
-            <button
-              type="button"
-              onClick={handleProcessConfiguration}
-              className="flex-1 p-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-bold transition"
+              className="w-full p-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition"
               disabled={isProcessing || !form.brand_id || !form.product_id || !form.persona_id || !form.market_id || !form.audience_id}
             >
-              {isProcessing ? 'Processing...' : 'Process Configuration'}
+              {isProcessing ? 'Processing...' : 'Save and Process Configuration'}
             </button>
           </div>
           
