@@ -81,15 +81,15 @@ export default function ClientConfigurationForm() {
     try {
       // Save the configuration
       const { error } = await supabase
-        .from('client_configurations')
-        .upsert({
+        .from('construct_faq_pairs')
+        .insert({
           auth_user_id: user.id,
-          brand_id: form.brand_id,
-          product_id: form.product_id,
-          persona_id: form.persona_id,
-          market_id: form.market_id,
-          audience_id: form.audience_id,
-        }, { onConflict: "auth_user_id" });
+          product_name: products.find(p => p.id === form.product_id)?.product_name,
+          persona_name: personas.find(p => p.id === form.persona_id)?.persona_name,
+          audience_name: audiences.find(a => a.id === form.audience_id)?.target_audience,
+          market_name: markets.find(m => m.id === form.market_id)?.name,
+          generation_status: 'pending'
+        });
 
       if (error) {
         console.error('Error saving configuration:', error);
