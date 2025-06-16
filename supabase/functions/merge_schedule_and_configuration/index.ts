@@ -114,28 +114,55 @@ serve(async (req: Request) => {
       }
 
       if (!existingRow) {
-        console.error(`No existing row found for batch ${schedule.unique_batch_id}`);
-        continue;
-      }
+        // Create new row if it doesn't exist
+        const { error: insertError } = await supabase
+          .from('construct_faq_pairs')
+          .insert({
+            unique_batch_cluster: schedule.unique_batch_cluster,
+            unique_batch_id: schedule.unique_batch_id,
+            batch_date: schedule.batch_date,
+            batch_faq_pairs: schedule.batch_faq_pairs,
+            total_faq_pairs: schedule.total_faq_pairs,
+            organisation: schedule.organisation,
+            user_email: schedule.user_email,
+            auth_user_id: schedule.auth_user_id,
+            organisation_id: schedule.organisation_id,
+            product_name: config.product_name,
+            persona_name: config.persona_name,
+            audience_name: config.audience_name,
+            market_name: config.market_name,
+            brand_jsonld_object: config.brand_jsonld_object,
+            product_jsonld_object: config.schema_json,
+            persona_jsonld: config.persona_jsonld,
+            generation_status: 'pending',
+            ai_request_for_questions: config.brand_jsonld_object
+          });
 
-      // Update the row with client configuration
-      const { error: updateError } = await supabase
-        .from('construct_faq_pairs')
-        .update({
-          product_name: config.product_name,
-          persona_name: config.persona_name,
-          audience_name: config.audience_name,
-          market_name: config.market_name,
-          brand_jsonld_object: config.brand_jsonld_object,
-          product_jsonld_object: config.schema_json,
-          persona_jsonld: config.persona_jsonld,
-          generation_status: 'pending'
-        })
-        .eq('id', existingRow.id);
+        if (insertError) {
+          console.error(`Failed to create FAQ pair for batch ${schedule.unique_batch_id}:`, insertError);
+          continue;
+        }
+      } else {
+        // Update existing row with client configuration
+        const { error: updateError } = await supabase
+          .from('construct_faq_pairs')
+          .update({
+            product_name: config.product_name,
+            persona_name: config.persona_name,
+            audience_name: config.audience_name,
+            market_name: config.market_name,
+            brand_jsonld_object: config.brand_jsonld_object,
+            product_jsonld_object: config.schema_json,
+            persona_jsonld: config.persona_jsonld,
+            generation_status: 'pending',
+            ai_request_for_questions: config.brand_jsonld_object
+          })
+          .eq('id', existingRow.id);
 
-      if (updateError) {
-        console.error(`Failed to update FAQ pair ${existingRow.id}:`, updateError);
-        continue;
+        if (updateError) {
+          console.error(`Failed to update FAQ pair ${existingRow.id}:`, updateError);
+          continue;
+        }
       }
     }
 
