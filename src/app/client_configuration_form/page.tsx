@@ -100,7 +100,7 @@ export default function ClientConfigurationForm() {
         throw new Error(`Failed to save configuration: ${configError.message}`);
       }
 
-      setProcessingStatus('Merging with schedule...');
+      setProcessingStatus('Merging with pending rows...');
 
       // Get the session for the webhook call
       const { data: { session } } = await supabase.auth.getSession();
@@ -109,8 +109,9 @@ export default function ClientConfigurationForm() {
       }
 
       // Call merge_schedule_and_configuration which will:
-      // 1. Update existing rows in construct_faq_pairs with merged data
-      // 2. Set status to 'pending'
+      // 1. Find rows in construct_faq_pairs where status is 'pending'
+      // 2. Update those rows with the new configuration data
+      // 3. Keep status as 'pending'
       const mergeResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "POST",
         headers: {
