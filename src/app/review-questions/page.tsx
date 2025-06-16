@@ -39,8 +39,7 @@ export default function ReviewQuestions() {
       const { data, error } = await supabase
         .from('construct_faq_pairs')
         .select('*')
-        .eq('generation_status', 'questions_generated')
-        .order('created_at', { ascending: true });
+        .eq('generation_status', 'questions_generated');
 
       if (error) throw error;
 
