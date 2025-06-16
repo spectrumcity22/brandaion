@@ -203,8 +203,8 @@ export default function ClientConfigurationForm() {
       }
 
       // Now call the generate_faq_questions webhook
-      console.log('Calling generate_faq_questions webhook...');
-      const generateResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_faq_questions", {
+      console.log('Calling open_ai_request_questions webhook...');
+      const generateResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
