@@ -100,32 +100,43 @@ serve(async (req: Request) => {
       });
     }
 
-    // 3. For each schedule row, insert into construct_faq_pairs
-    const inserts = schedules.map((s: any) => ({
-      unique_batch_cluster: s.unique_batch_cluster,
-      unique_batch_id: s.unique_batch_id,
-      batch_date: s.batch_date,
-      batch_faq_pairs: s.batch_faq_pairs,
-      total_faq_pairs: s.total_faq_pairs,
-      organisation: s.organisation,
-      user_email: s.user_email,
-      auth_user_id: s.auth_user_id,
-      organisation_id: s.organisation_id,
-      product_name: config.product_name,
-      persona_name: config.persona_name,
-      audience_name: config.audience_name,
-      market_name: config.market_name,
-      brand_jsonld_object: config.brand_jsonld_object,
-      product_jsonld_object: config.schema_json,
-      persona_jsonld: config.persona_jsonld,
-    }));
+    // 3. For each schedule row, update existing construct_faq_pairs
+    for (const schedule of schedules) {
+      // Find existing row
+      const { data: existingRow, error: findError } = await supabase
+        .from('construct_faq_pairs')
+        .select('*')
+        .eq('unique_batch_id', schedule.unique_batch_id)
+        .single();
 
-    const { error: insertError } = await supabase
-      .from('construct_faq_pairs')
-      .insert(inserts);
+      if (findError && findError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        throw new Error(`Error finding existing FAQ pair: ${findError.message}`);
+      }
 
-    if (insertError) {
-      throw new Error(`Failed to insert FAQ pairs: ${insertError.message}`);
+      if (!existingRow) {
+        console.error(`No existing row found for batch ${schedule.unique_batch_id}`);
+        continue;
+      }
+
+      // Update the row with client configuration
+      const { error: updateError } = await supabase
+        .from('construct_faq_pairs')
+        .update({
+          product_name: config.product_name,
+          persona_name: config.persona_name,
+          audience_name: config.audience_name,
+          market_name: config.market_name,
+          brand_jsonld_object: config.brand_jsonld_object,
+          product_jsonld_object: config.schema_json,
+          persona_jsonld: config.persona_jsonld,
+          generation_status: 'pending'
+        })
+        .eq('id', existingRow.id);
+
+      if (updateError) {
+        console.error(`Failed to update FAQ pair ${existingRow.id}:`, updateError);
+        continue;
+      }
     }
 
     // 4. Update schedule rows to sent_for_processing = TRUE
@@ -139,8 +150,8 @@ serve(async (req: Request) => {
       throw new Error(`Failed to update schedule rows: ${updateError.message}`);
     }
 
-    // 5. Trigger the generate_faq_questions function
-    const generateResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_faq_questions", {
+    // 5. Trigger the open_ai_request_questions function
+    const generateResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
