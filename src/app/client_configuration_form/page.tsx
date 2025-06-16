@@ -73,26 +73,6 @@ export default function ClientConfigurationForm() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Add this new function to trigger the questions webhook
-  async function triggerQuestionsWebhook() {
-    try {
-      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to trigger questions webhook');
-      }
-      console.log('Questions webhook triggered successfully');
-    } catch (error) {
-      console.error('Error triggering questions webhook:', error);
-    }
-  }
-
-  // Update the handleSubmit function to trigger the webhook and redirect
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage("Saving...");

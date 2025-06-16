@@ -62,17 +62,17 @@ export default function ReviewQuestions() {
   const handleQuestionEdit = async (id: string, newQuestion: string) => {
     try {
       const { error } = await supabase
-        .from('review_questions')
+        .from('construct_faq_pairs')
         .update({
-          edited_question: newQuestion,
-          status: 'edited'
+          ai_response_questions: newQuestion,
+          generation_status: 'completed'
         })
         .eq('id', id);
 
       if (error) throw error;
 
       setQuestions(questions.map(q => 
-        q.id === id ? { ...q, edited_question: newQuestion, status: 'edited' } : q
+        q.id === id ? { ...q, question_text: newQuestion } : q
       ));
     } catch (error) {
       console.error('Error updating question:', error);
@@ -101,38 +101,13 @@ export default function ReviewQuestions() {
         .filter(([_, selected]) => selected)
         .map(([id]) => id);
 
-      // Update selected questions to approved
+      // Update selected questions to completed
       const { error: updateError } = await supabase
-        .from('review_questions')
-        .update({ status: 'approved' })
+        .from('construct_faq_pairs')
+        .update({ generation_status: 'completed' })
         .in('id', selectedIds);
 
       if (updateError) throw updateError;
-
-      // Create review_answers entries for approved questions
-      const { error: insertError } = await supabase
-        .from('review_answers')
-        .insert(
-          selectedIds.map(id => ({
-            review_question_id: id,
-            status: 'pending'
-          }))
-        );
-
-      if (insertError) throw insertError;
-
-      // Trigger answer generation webhook
-      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_answers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question_ids: selectedIds }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to trigger answer generation');
-      }
 
       // Refresh the questions list
       fetchQuestions();
