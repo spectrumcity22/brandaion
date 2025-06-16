@@ -125,13 +125,76 @@ export default function ClientConfigurationForm() {
         throw new Error(`Merge failed: ${mergeData.error || 'Unknown error'}`);
       }
 
-      setProcessingStatus('Configuration merged. Redirecting to review page...');
-      
-      // Wait a moment to show the status
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Redirect to review questions page
-      router.push('/review-questions');
+      setProcessingStatus('Configuration merged. Starting question generation...');
+
+      // Call open_ai_request_questions directly
+      const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "x-client-info": "supabase-js/2.39.3",
+          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        },
+        body: JSON.stringify({ auth_user_id: user.id }),
+      });
+
+      const questionsData = await questionsResponse.json();
+      if (!questionsResponse.ok) {
+        throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
+      }
+
+      setProcessingStatus('Questions generation started. Checking status...');
+
+      // Poll for status changes
+      let attempts = 0;
+      const maxAttempts = 30;
+      const pollInterval = 2000; // 2 seconds
+
+      while (attempts < maxAttempts) {
+        const { data: pairs, error: statusError } = await supabase
+          .from('construct_faq_pairs')
+          .select('generation_status, error_message')
+          .eq('auth_user_id', user.id)
+          .in('generation_status', ['pending', 'completed', 'error']);
+
+        if (statusError) {
+          throw new Error(`Failed to check status: ${statusError.message}`);
+        }
+
+        if (!pairs || pairs.length === 0) {
+          setProcessingStatus('No FAQ pairs found. Please try again.');
+          break;
+        }
+
+        const hasError = pairs.some(p => p.generation_status === 'error');
+        const allCompleted = pairs.every(p => p.generation_status === 'completed');
+        const stillPending = pairs.some(p => p.generation_status === 'pending');
+
+        if (hasError) {
+          const errorPair = pairs.find(p => p.generation_status === 'error');
+          throw new Error(`Question generation failed: ${errorPair?.error_message || 'Unknown error'}`);
+        }
+
+        if (allCompleted) {
+          setProcessingStatus('Questions generated successfully! Redirecting...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          router.push('/review-questions');
+          break;
+        }
+
+        if (stillPending) {
+          setProcessingStatus(`Still generating questions... (${attempts + 1}/${maxAttempts})`);
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          attempts++;
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        setProcessingStatus('Question generation is taking longer than expected. You can check the review page for updates.');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        router.push('/review-questions');
+      }
     } catch (error) {
       console.error('Error:', error);
       setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
