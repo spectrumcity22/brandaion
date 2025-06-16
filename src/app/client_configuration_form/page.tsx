@@ -100,9 +100,6 @@ export default function ClientConfigurationForm() {
         throw new Error(`Failed to save configuration: ${configError.message}`);
       }
 
-      setProcessingStatus('Configuration saved. Waiting 5 seconds before merging...');
-      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
-
       setProcessingStatus('Merging with schedule...');
 
       // Get the session for the webhook call
@@ -111,7 +108,9 @@ export default function ClientConfigurationForm() {
         throw new Error('No session found');
       }
 
-      // Call merge_schedule_and_configuration
+      // Call merge_schedule_and_configuration which will:
+      // 1. Update existing rows in construct_faq_pairs with merged data
+      // 2. Set status to 'pending'
       const mergeResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "POST",
         headers: {
@@ -128,7 +127,27 @@ export default function ClientConfigurationForm() {
         throw new Error(`Merge failed: ${mergeData.error || 'Unknown error'}`);
       }
 
-      setMessage("✅ Configuration saved and merged successfully!");
+      setProcessingStatus('Merge complete. Waiting 5 seconds before generating questions...');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay after merge
+
+      // Call open_ai_request_questions for pending rows
+      const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "x-client-info": "supabase-js/2.39.3",
+          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        },
+        body: JSON.stringify({ auth_user_id: user.id }),
+      });
+
+      const questionsData = await questionsResponse.json();
+      if (!questionsResponse.ok) {
+        throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
+      }
+
+      setMessage("✅ Configuration saved and questions generation started!");
       router.push('/review-questions');
     } catch (error) {
       console.error('Error:', error);
