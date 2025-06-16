@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { 
   Button, 
@@ -11,109 +11,79 @@ import {
   Checkbox,
   FormControlLabel,
   Stack,
-  Container
+  Container,
+  Alert
 } from '@mui/material';
 
-interface FAQPair {
+interface ReviewQuestion {
   id: string;
-  unique_batch_id: string;
-  ai_response_questions: string;
-  generation_status: string;
-  questions_status?: string;
-  timestamp: string;
+  construct_faq_pair_id: string;
+  question_text: string;
+  status: 'pending' | 'approved' | 'edited';
+  edited_question: string | null;
 }
 
-// Define a type for the question object
-type Question = {
-  id: string;
-  text: string;
-  status: 'pending' | 'approved' | 'edited';
-};
-
 export default function ReviewQuestions() {
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentBatch, setCurrentBatch] = useState<FAQPair[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [selectedQuestions, setSelectedQuestions] = useState<Record<string, boolean>>({});
   const supabase = useSupabaseClient();
 
   useEffect(() => {
-    async function fetchQuestions() {
-      try {
-        const response = await fetch('/api/questions');
-        if (!response.ok) {
-          throw new Error('Failed to fetch questions');
-        }
-        const data = await response.json();
-        setQuestions(data);
-      } catch (error) {
-        console.error('Error fetching questions:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchQuestions();
   }, []);
 
-  useEffect(() => {
-    fetchCurrentBatch();
-  }, []);
-
-  const fetchCurrentBatch = async () => {
+  const fetchQuestions = async () => {
     try {
-      // Get the first batch that needs approval
-      const { data: firstBatch } = await supabase
+      const { data, error } = await supabase
         .from('construct_faq_pairs')
         .select('*')
-        .not('ai_response_questions', 'is', null)
-        .eq('generation_status', 'completed')
-        .is('ai_response_answers', null)
-        .order('timestamp', { ascending: true })
-        .limit(1);
+        .eq('generation_status', 'pending')
+        .order('created_at', { ascending: true });
 
-      if (firstBatch?.[0]) {
-        // Get all FAQ pairs in this batch
-        const { data: batchPairs } = await supabase
-          .from('construct_faq_pairs')
-          .select('*')
-          .eq('unique_batch_id', firstBatch[0].unique_batch_id)
-          .order('timestamp', { ascending: true });
+      if (error) throw error;
 
-        setCurrentBatch(batchPairs || []);
-        // Initialize selected state for each question
-        const initialSelected: Record<string, boolean> = {};
-        batchPairs?.forEach((pair: FAQPair) => {
-          initialSelected[pair.id] = true; // Default all to selected
-        });
-        setSelectedQuestions(initialSelected);
-      }
-      setLoading(false);
+      setQuestions(data || []);
+      // Initialize selected state for each question
+      const initialSelected: Record<string, boolean> = {};
+      data?.forEach((question: ReviewQuestion) => {
+        initialSelected[question.id] = true; // Default all to selected
+      });
+      setSelectedQuestions(initialSelected);
     } catch (error) {
-      console.error('Error fetching batch:', error);
+      console.error('Error fetching questions:', error);
+      setError('Failed to load questions');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleQuestionEdit = async (id: string, newQuestion: string) => {
     try {
-      await supabase
-        .from('construct_faq_pairs')
+      const { error } = await supabase
+        .from('review_questions')
         .update({
-          ai_response_questions: newQuestion
+          edited_question: newQuestion,
+          status: 'edited'
         })
         .eq('id', id);
 
-      setCurrentBatch(currentBatch.map(pair => 
-        pair.id === id ? { ...pair, ai_response_questions: newQuestion } : pair
+      if (error) throw error;
+
+      setQuestions(questions.map(q => 
+        q.id === id ? { ...q, edited_question: newQuestion, status: 'edited' } : q
       ));
     } catch (error) {
       console.error('Error updating question:', error);
+      setError('Failed to update question');
     }
   };
 
   const handleSelectAll = (checked: boolean) => {
     const newSelected: Record<string, boolean> = {};
-    currentBatch.forEach(pair => {
-      newSelected[pair.id] = checked;
+    questions.forEach(question => {
+      newSelected[question.id] = checked;
     });
     setSelectedQuestions(newSelected);
   };
@@ -131,44 +101,45 @@ export default function ReviewQuestions() {
         .filter(([_, selected]) => selected)
         .map(([id]) => id);
 
-      // Update selected questions
-      await supabase
-        .from('construct_faq_pairs')
-        .update({ 
-          questions_status: 'approved',
-          generation_status: 'questions_approved'
-        })
+      // Update selected questions to approved
+      const { error: updateError } = await supabase
+        .from('review_questions')
+        .update({ status: 'approved' })
         .in('id', selectedIds);
 
-      // If all questions in batch are approved, trigger next batch
-      if (selectedIds.length === currentBatch.length) {
-        await fetch('/api/process-next-batch', { method: 'POST' });
+      if (updateError) throw updateError;
+
+      // Create review_answers entries for approved questions
+      const { error: insertError } = await supabase
+        .from('review_answers')
+        .insert(
+          selectedIds.map(id => ({
+            review_question_id: id,
+            status: 'pending'
+          }))
+        );
+
+      if (insertError) throw insertError;
+
+      // Trigger answer generation webhook
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_answers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question_ids: selectedIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to trigger answer generation');
       }
 
-      // Refresh the current batch
-      fetchCurrentBatch();
+      // Refresh the questions list
+      fetchQuestions();
     } catch (error) {
       console.error('Error approving questions:', error);
+      setError('Failed to approve questions');
     }
-  };
-
-  const handleApprove = async (id: string) => {
-    try {
-      const response = await fetch(`/api/questions/${id}/approve`, {
-        method: 'POST',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to approve question');
-      }
-      setQuestions(questions.map(q => q.id === id ? { ...q, status: 'approved' } : q));
-    } catch (error) {
-      console.error('Error approving question:', error);
-    }
-  };
-
-  const handleEdit = async (id: string) => {
-    // Implement edit functionality, e.g., open a modal or navigate to an edit page
-    console.log('Edit question:', id);
   };
 
   if (loading) {
@@ -179,11 +150,19 @@ export default function ReviewQuestions() {
     );
   }
 
-  if (currentBatch.length === 0) {
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
+
+  if (questions.length === 0) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4 }}>
         <Typography variant="h5" align="center">
-          No FAQ questions pending approval
+          No questions pending review
         </Typography>
       </Container>
     );
@@ -193,32 +172,32 @@ export default function ReviewQuestions() {
     <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4">
-          Review FAQ Questions - Batch {currentBatch[0]?.unique_batch_id}
+          Review Questions
         </Typography>
         <FormControlLabel
           control={
             <Checkbox
               checked={Object.values(selectedQuestions).every(v => v)}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => handleSelectAll(e.target.checked)}
+              onChange={(e) => handleSelectAll(e.target.checked)}
             />
           }
           label="Select All"
         />
       </Stack>
       
-      {currentBatch.map((pair) => (
-        <Card key={pair.id} sx={{ mb: 2, p: 2 }}>
+      {questions.map((question) => (
+        <Card key={question.id} sx={{ mb: 2, p: 2 }}>
           <Stack direction="row" spacing={2} alignItems="flex-start">
             <Checkbox
-              checked={selectedQuestions[pair.id] || false}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => handleSelectQuestion(pair.id, e.target.checked)}
+              checked={selectedQuestions[question.id] || false}
+              onChange={(e) => handleSelectQuestion(question.id, e.target.checked)}
             />
             <TextField
               fullWidth
               multiline
               rows={2}
-              value={pair.ai_response_questions}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => handleQuestionEdit(pair.id, e.target.value)}
+              value={question.edited_question || question.question_text}
+              onChange={(e) => handleQuestionEdit(question.id, e.target.value)}
               label="Question"
               variant="outlined"
             />

@@ -17,10 +17,15 @@ export default function ClientConfigurationForm() {
   const [form, setForm] = useState<any>({});
   const [user, setUser] = useState<any>(null);
   const [message, setMessage] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
+  const [session, setSession] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
     (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUser(user);
@@ -193,58 +198,48 @@ export default function ClientConfigurationForm() {
       });
 
       if (!webhookResponse.ok) {
-        console.error("Webhook error details:", {
-          status: webhookResponse.status,
-          statusText: webhookResponse.statusText,
-          data: responseData
-        });
-        setMessage("✅ Configuration saved, but failed to trigger merge function");
-        return;
+        throw new Error(`Webhook failed: ${responseData.error || 'Unknown error'}`);
       }
 
-      // Now call the generate_faq_questions webhook
-      console.log('Calling open_ai_request_questions webhook...');
-      const generateResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
-        method: "POST",
+      setMessage("✅ Configuration saved and processing started!");
+      // Redirect to review questions page
+      router.push('/review-questions');
+    } catch (error) {
+      console.error('Error:', error);
+      setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
+  const handleProcessConfiguration = async () => {
+    setIsProcessing(true);
+    setProcessingStatus('Starting question generation...');
+
+    try {
+      // Call the questions webhook
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
-          "x-client-info": "supabase-js/2.39.3",
-          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({ auth_user_id: user.id }),
       });
 
-      const generateData = await generateResponse.json();
-      console.log('Generate FAQ response:', {
-        status: generateResponse.status,
-        statusText: generateResponse.statusText,
-        data: generateData
-      });
-
-      if (!generateResponse.ok) {
-        console.error("Generate FAQ error details:", {
-          status: generateResponse.status,
-          statusText: generateResponse.statusText,
-          data: generateData
-        });
-        setMessage("✅ Configuration saved and merged, but failed to generate FAQ questions");
-        return;
+      if (!response.ok) {
+        throw new Error('Failed to start question generation');
       }
 
-      setMessage("✅ Configuration saved, merged, and FAQ questions generated!");
+      setProcessingStatus('Questions are being generated. Redirecting to review page...');
       
-      // Wait for 2 seconds to show the success message before redirecting
+      // Wait a moment to show the status
       await new Promise(resolve => setTimeout(resolve, 2000));
-      router.push('/faq-generation-status');
-
-      // Trigger the questions webhook
-      await triggerQuestionsWebhook();
-      // Redirect to the review-questions page
+      
+      // Redirect to review page
       router.push('/review-questions');
     } catch (error) {
-      console.error("Error in form submission:", error);
-      setMessage(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error processing configuration:', error);
+      setProcessingStatus('Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setIsProcessing(false);
     }
   };
 
@@ -322,13 +317,27 @@ export default function ClientConfigurationForm() {
               {audiences.map(a => <option key={a.id} value={a.id}>{a.target_audience}</option>)}
             </select>
           </div>
-          <button
-            type="submit"
-            className="w-full p-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition"
-          >
-            Save Configuration
-          </button>
-          {message && <div className="mt-2">{message}</div>}
+          <div className="flex justify-between gap-4">
+            <button
+              type="submit"
+              className="flex-1 p-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-bold transition"
+              disabled={isProcessing}
+            >
+              Save Configuration
+            </button>
+            
+            <button
+              type="button"
+              onClick={handleProcessConfiguration}
+              className="flex-1 p-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-bold transition"
+              disabled={isProcessing || !form.brand_id || !form.product_id || !form.persona_id || !form.market_id || !form.audience_id}
+            >
+              {isProcessing ? 'Processing...' : 'Process Configuration'}
+            </button>
+          </div>
+          
+          {message && <div className="mt-2 text-green-400">{message}</div>}
+          {processingStatus && <div className="mt-2 text-blue-400">{processingStatus}</div>}
         </form>
       </div>
     </div>
