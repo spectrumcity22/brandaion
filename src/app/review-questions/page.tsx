@@ -36,8 +36,12 @@ export default function ReviewQuestions() {
   const [approving, setApproving] = useState<string | null>(null);
   const [batchApproving, setBatchApproving] = useState<string | null>(null);
   const [debugSession, setDebugSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
     fetchQuestions();
   }, []);
 
@@ -162,10 +166,8 @@ export default function ReviewQuestions() {
         setDebugSession('No batchId provided');
         return;
       }
-      // Get the user's access token
-      const { data: { session } } = await supabase.auth.getSession();
-      setDebugSession(session);
       const accessToken = session?.access_token;
+      setDebugSession(session);
       if (!accessToken) {
         setError('No access token found. Please log in again.');
         return;
