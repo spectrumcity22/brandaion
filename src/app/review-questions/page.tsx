@@ -148,14 +148,24 @@ export default function ReviewQuestions() {
     try {
       setBatchApproving(batchId);
       const batchPairIds = (batches[batchId] || []).map(q => q.pairId);
+      // 1. Update status to 'question_approved'
       const { error } = await supabase
         .from('construct_faq_pairs')
         .update({ generation_status: 'question_approved' })
         .in('id', batchPairIds);
       if (error) throw error;
+      // 2. Trigger the answers webhook
+      const webhookResponse = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchId }),
+      });
+      if (!webhookResponse.ok) {
+        throw new Error('Failed to trigger answers webhook');
+      }
       fetchQuestions();
     } catch (e) {
-      setError('Failed to approve batch');
+      setError('Failed to approve batch and trigger answers webhook');
     } finally {
       setBatchApproving(null);
     }
