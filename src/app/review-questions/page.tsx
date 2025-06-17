@@ -35,6 +35,7 @@ export default function ReviewQuestions() {
   const [editedQuestions, setEditedQuestions] = useState<Record<string, string>>({});
   const [approving, setApproving] = useState<string | null>(null);
   const [batchApproving, setBatchApproving] = useState<string | null>(null);
+  const [debugSession, setDebugSession] = useState<any>(null);
 
   useEffect(() => {
     fetchQuestions();
@@ -147,6 +148,7 @@ export default function ReviewQuestions() {
   const handleBatchApprove = async (batchId: string) => {
     try {
       setBatchApproving(batchId);
+      setDebugSession(null); // reset debug info
       const batchPairIds = (batches[batchId] || []).map(q => q.pairId);
       // 1. Update status to 'question_approved'
       const { error } = await supabase
@@ -156,18 +158,18 @@ export default function ReviewQuestions() {
       if (error) throw error;
       // 2. Trigger the answers webhook
       if (!batchId) {
-        console.error('No batchId provided for answers webhook');
         setError('No batchId provided for answers webhook');
+        setDebugSession('No batchId provided');
         return;
       }
       // Get the user's access token
       const { data: { session } } = await supabase.auth.getSession();
+      setDebugSession(session);
       const accessToken = session?.access_token;
       if (!accessToken) {
         setError('No access token found. Please log in again.');
         return;
       }
-      console.log('Triggering answers webhook with batchId:', batchId);
       const webhookResponse = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers', {
         method: 'POST',
         headers: {
@@ -178,14 +180,14 @@ export default function ReviewQuestions() {
       });
       if (!webhookResponse.ok) {
         const respText = await webhookResponse.text();
-        console.error('Answers webhook error:', respText);
         setError('Failed to trigger answers webhook: ' + respText);
+        setDebugSession(respText);
         return;
       }
       fetchQuestions();
     } catch (e) {
-      console.error('Batch approval error:', e);
       setError('Failed to approve batch and trigger answers webhook: ' + (e instanceof Error ? e.message : JSON.stringify(e)));
+      setDebugSession(e);
     } finally {
       setBatchApproving(null);
     }
@@ -202,6 +204,12 @@ export default function ReviewQuestions() {
     return (
       <Container maxWidth="md" sx={{ mt: 4 }}>
         <Alert severity="error">{error}</Alert>
+        {debugSession && (
+          <Box mt={2} p={2} bgcolor="#222" color="#fff" borderRadius={2}>
+            <Typography variant="subtitle2">Session Debug Info:</Typography>
+            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(debugSession, null, 2)}</pre>
+          </Box>
+        )}
       </Container>
     );
   }
