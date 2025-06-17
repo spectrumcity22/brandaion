@@ -155,17 +155,25 @@ export default function ReviewQuestions() {
         .in('id', batchPairIds);
       if (error) throw error;
       // 2. Trigger the answers webhook
+      if (!batchId) {
+        console.error('No batchId provided for answers webhook');
+        setError('No batchId provided for answers webhook');
+        return;
+      }
+      console.log('Triggering answers webhook with batchId:', batchId);
       const webhookResponse = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batchId }),
       });
       if (!webhookResponse.ok) {
-        throw new Error('Failed to trigger answers webhook');
+        const respText = await webhookResponse.text();
+        console.error('Answers webhook error:', respText);
+        throw new Error('Failed to trigger answers webhook: ' + respText);
       }
       fetchQuestions();
     } catch (e) {
-      setError('Failed to approve batch and trigger answers webhook');
+      setError('Failed to approve batch and trigger answers webhook: ' + (e instanceof Error ? e.message : e));
     } finally {
       setBatchApproving(null);
     }
