@@ -39,10 +39,18 @@ export default function ReviewQuestions() {
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
+    // Listen for auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
     fetchQuestions();
+    return () => {
+      listener?.subscription?.unsubscribe();
+    };
   }, []);
 
   const fetchQuestions = async () => {
