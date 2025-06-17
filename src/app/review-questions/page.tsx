@@ -1,223 +1,251 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  Button,
+  Typography,
+  Box,
+  CircularProgress,
+  Container,
+  Alert,
+  Card,
+  CardContent,
+  Stack,
+} from '@mui/material';
 
-interface Question {
-  id: string;
-  construct_faq_pair_id: string;
-  question_text: string;
-  status: 'pending' | 'approved' | 'edited';
-  edited_question: string | null;
-  batch_id: string;
+interface ParsedQuestion {
+  pairId: string;
+  topic: string;
+  question: string;
+  batchId: string;
+  original: any;
 }
 
-interface Batch {
-  id: string;
-  questions: Question[];
+function cleanJsonString(str: string) {
+  return str
+    .replace(/```json\s*/gi, '')
+    .replace(/```/g, '')
+    .trim();
 }
 
 export default function ReviewQuestions() {
-  const [batches, setBatches] = useState<Batch[]>([]);
+  const [parsedQuestions, setParsedQuestions] = useState<ParsedQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [selectedBatches, setSelectedBatches] = useState<Record<string, boolean>>({});
+  const [editedQuestions, setEditedQuestions] = useState<Record<string, string>>({});
+  const [approving, setApproving] = useState<string | null>(null);
+  const [batchApproving, setBatchApproving] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuestions();
   }, []);
 
   const fetchQuestions = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('review_questions')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true });
-
+        .from('construct_faq_pairs')
+        .select('id, ai_response_questions, unique_batch_id')
+        .not('ai_response_questions', 'is', null);
       if (error) throw error;
-
-      // Group questions by batch
-      const batchMap = new Map<string, Question[]>();
-      data.forEach((question: Question) => {
-        const batchId = question.batch_id;
-        if (!batchMap.has(batchId)) {
-          batchMap.set(batchId, []);
+      const allRows: ParsedQuestion[] = [];
+      (data || []).forEach((pair: any) => {
+        let raw = pair.ai_response_questions;
+        let cleaned = cleanJsonString(raw);
+        let parsed = null;
+        let added = false;
+        try {
+          parsed = JSON.parse(cleaned);
+          if (parsed && Array.isArray(parsed.topics)) {
+            parsed.topics.forEach((topicObj: any) => {
+              if (Array.isArray(topicObj.questions)) {
+                topicObj.questions.forEach((qObj: any) => {
+                  allRows.push({
+                    pairId: pair.id,
+                    topic: topicObj.topic || '',
+                    question: qObj.question || '',
+                    batchId: pair.unique_batch_id || 'default',
+                    original: qObj,
+                  });
+                  added = true;
+                });
+              }
+            });
+          }
+        } catch (e) {}
+        if (!added) {
+          allRows.push({
+            pairId: pair.id,
+            topic: '',
+            question: raw,
+            batchId: pair.unique_batch_id || 'default',
+            original: raw,
+          });
         }
-        batchMap.get(batchId)?.push(question);
       });
-
-      // Convert to array of batches
-      const batchArray = Array.from(batchMap.entries()).map(([id, questions]) => ({
-        id,
-        questions
-      }));
-
-      setBatches(batchArray);
+      setParsedQuestions(allRows);
     } catch (error) {
-      console.error('Error fetching questions:', error);
       setError('Failed to load questions');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuestionEdit = async (batchId: string, questionId: string, newQuestion: string) => {
-    try {
-      const { error } = await supabase
-        .from('review_questions')
-        .update({
-          edited_question: newQuestion,
-          status: 'edited'
-        })
-        .eq('id', questionId);
+  // Group questions by batchId
+  const batches = parsedQuestions.reduce((acc, q) => {
+    if (!acc[q.batchId]) acc[q.batchId] = [];
+    acc[q.batchId].push(q);
+    return acc;
+  }, {} as Record<string, ParsedQuestion[]>);
 
-      if (error) throw error;
-
-      // Update local state
-      setBatches(batches.map(batch => {
-        if (batch.id === batchId) {
-          return {
-            ...batch,
-            questions: batch.questions.map(q => 
-              q.id === questionId ? { ...q, edited_question: newQuestion, status: 'edited' } : q
-            )
-          };
-        }
-        return batch;
-      }));
-    } catch (error) {
-      console.error('Error updating question:', error);
-      setError('Failed to update question');
-    }
+  const handleEdit = (pairId: string, idx: number, value: string) => {
+    setParsedQuestions(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], question: value };
+      return updated;
+    });
+    setEditedQuestions(prev => ({ ...prev, [pairId]: value }));
   };
 
-  const handleApproveQuestion = async (batchId: string, questionId: string) => {
+  const handleSave = async (pairId: string, question: string) => {
     try {
+      setApproving(pairId);
       const { error } = await supabase
-        .from('review_questions')
-        .update({ status: 'approved' })
-        .eq('id', questionId);
-
+        .from('construct_faq_pairs')
+        .update({ ai_response_questions: question })
+        .eq('id', pairId);
       if (error) throw error;
-
-      // Update local state
-      setBatches(batches.map(batch => {
-        if (batch.id === batchId) {
-          return {
-            ...batch,
-            questions: batch.questions.filter(q => q.id !== questionId)
-          };
-        }
-        return batch;
-      }));
-    } catch (error) {
-      console.error('Error approving question:', error);
-      setError('Failed to approve question');
-    }
-  };
-
-  const handleApproveBatch = async (batchId: string) => {
-    setSaving(true);
-    try {
-      // Get all question IDs in the batch
-      const batch = batches.find(b => b.id === batchId);
-      if (!batch) throw new Error('Batch not found');
-
-      const questionIds = batch.questions.map(q => q.id);
-
-      // Update all questions in the batch to approved
-      const { error: updateError } = await supabase
-        .from('review_questions')
-        .update({ status: 'approved' })
-        .in('id', questionIds);
-
-      if (updateError) throw updateError;
-
-      // Trigger the Answers Edge Function
-      const { error: functionError } = await supabase.functions.invoke('generate_answers', {
-        body: { batch_id: batchId }
+      setEditedQuestions(prev => {
+        const copy = { ...prev };
+        delete copy[pairId];
+        return copy;
       });
+      fetchQuestions();
+    } catch (e) {
+      setError('Failed to save question');
+    } finally {
+      setApproving(null);
+    }
+  };
 
-      if (functionError) throw functionError;
+  const handleApprove = async (pairId: string) => {
+    try {
+      setApproving(pairId);
+      const { error } = await supabase
+        .from('construct_faq_pairs')
+        .update({ generation_status: 'completed' })
+        .eq('id', pairId);
+      if (error) throw error;
+      fetchQuestions();
+    } catch (e) {
+      setError('Failed to approve question');
+    } finally {
+      setApproving(null);
+    }
+  };
 
-      // Remove the batch from local state
-      setBatches(batches.filter(b => b.id !== batchId));
-    } catch (error) {
-      console.error('Error approving batch:', error);
+  const handleBatchApprove = async (batchId: string) => {
+    try {
+      setBatchApproving(batchId);
+      const batchPairIds = (batches[batchId] || []).map(q => q.pairId);
+      const { error } = await supabase
+        .from('construct_faq_pairs')
+        .update({ generation_status: 'completed' })
+        .in('id', batchPairIds);
+      if (error) throw error;
+      fetchQuestions();
+    } catch (e) {
       setError('Failed to approve batch');
     } finally {
-      setSaving(false);
+      setBatchApproving(null);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-200"></div>
-      </div>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress />
+      </Box>
     );
   }
-
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto mt-8">
-        <div className="bg-red-900 text-red-200 p-4 rounded">{error}</div>
-      </div>
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
     );
   }
-
-  if (batches.length === 0) {
+  if (parsedQuestions.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto mt-8">
-        <div className="text-center text-lg text-foreground">No questions pending review</div>
-      </div>
+      <Container maxWidth="md" sx={{ mt: 4 }}>
+        <Typography align="center">No questions pending review</Typography>
+      </Container>
     );
   }
-
   return (
-    <div className="max-w-4xl mx-auto mt-8">
-      <h1 className="text-3xl font-bold mb-6 text-foreground">Review Questions</h1>
-      
-      <div className="space-y-8">
-        {batches.map((batch) => (
-          <div key={batch.id} className="bg-gray-800 p-6 rounded-lg">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-foreground">Batch {batch.id}</h2>
-              <button
-                onClick={() => handleApproveBatch(batch.id)}
-                disabled={saving}
-                className={`px-4 py-2 rounded-lg font-bold transition ${
-                  saving ? 'bg-gray-600 text-white cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'
-                }`}
+    <Container maxWidth="md" sx={{ mt: 4 }}>
+      <Typography variant="h4" fontWeight="bold" mb={4}>Review Questions</Typography>
+      {Object.entries(batches).map(([batchId, questions]) => (
+        <Card key={batchId} sx={{ mb: 4, background: 'var(--background)', color: 'var(--foreground)' }}>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">Batch: {batchId}</Typography>
+              <Button
+                variant="contained"
+                color="success"
+                onClick={() => handleBatchApprove(batchId)}
+                disabled={batchApproving === batchId}
               >
-                {saving ? 'Processing...' : 'Approve Batch & Generate Answers'}
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {batch.questions.map((question) => (
-                <div key={question.id} className="bg-gray-700 p-4 rounded-lg">
-                  <textarea
-                    value={question.edited_question || question.question_text}
-                    onChange={(e) => handleQuestionEdit(batch.id, question.id, e.target.value)}
-                    className="w-full bg-gray-600 text-white rounded p-3 mb-3 min-h-[100px]"
-                    placeholder="Edit question here..."
-                  />
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => handleApproveQuestion(batch.id, question.id)}
-                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded"
-                    >
-                      Approve Question
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+                {batchApproving === batchId ? 'Approving...' : 'Approve Batch'}
+              </Button>
+            </Stack>
+            <Box component="table" width="100%">
+              <Box component="thead">
+                <Box component="tr">
+                  <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Topic</Box>
+                  <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Question</Box>
+                  <Box component="th" sx={{ textAlign: 'left', p: 1 }}>Actions</Box>
+                </Box>
+              </Box>
+              <Box component="tbody">
+                {questions.map((row, idx) => (
+                  <Box component="tr" key={idx}>
+                    <Box component="td" sx={{ p: 1, width: '20%' }}>{row.topic}</Box>
+                    <Box component="td" sx={{ p: 1, width: '60%' }}>
+                      <textarea
+                        style={{ width: '100%', minHeight: 48, background: 'var(--background)', color: 'var(--foreground)', border: '1px solid #444', borderRadius: 4, padding: 4 }}
+                        value={row.question}
+                        onChange={e => handleEdit(row.pairId, parsedQuestions.findIndex(q => q.pairId === row.pairId && q.question === row.question), e.target.value)}
+                      />
+                    </Box>
+                    <Box component="td" sx={{ p: 1, width: '20%' }}>
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleSave(row.pairId, row.question)}
+                          disabled={approving === row.pairId}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          onClick={() => handleApprove(row.pairId)}
+                          disabled={approving === row.pairId}
+                        >
+                          {approving === row.pairId ? 'Approving...' : 'Approve'}
+                        </Button>
+                      </Stack>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      ))}
+    </Container>
   );
 } 

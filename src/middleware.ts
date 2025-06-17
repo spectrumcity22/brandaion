@@ -11,11 +11,11 @@ export function middleware(request: NextRequest) {
     `
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://ifezhvuckifvuracnnhl.supabase.co;
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://*.shopify.com;
       font-src 'self' https://fonts.gstatic.com;
       img-src 'self' data: https:;
-      connect-src 'self' https://ifezhvuckifvuracnnhl.supabase.co;
-      frame-src 'self';
+      connect-src 'self' https://ifezhvuckifvuracnnhl.supabase.co https://*.shopify.com;
+      frame-src 'self' https://*.shopify.com;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
