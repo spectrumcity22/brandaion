@@ -1,0 +1,13 @@
+-- First, drop the existing constraint if it exists
+ALTER TABLE public.construct_faq_pairs
+DROP CONSTRAINT IF EXISTS construct_faq_pairs_generation_status_check;
+
+-- Then add the new constraint
+ALTER TABLE public.construct_faq_pairs
+ADD CONSTRAINT construct_faq_pairs_generation_status_check 
+CHECK (generation_status IN ('pending', 'generating_questions', 'generating_answers', 'completed', 'failed'));
+
+-- Update any existing records with invalid status to 'pending'
+UPDATE public.construct_faq_pairs
+SET generation_status = 'pending'
+WHERE generation_status NOT IN ('pending', 'generating_questions', 'generating_answers', 'completed', 'failed'); 

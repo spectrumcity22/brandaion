@@ -134,8 +134,8 @@ serve(async (req: Request) => {
             brand_jsonld_object: config.brand_jsonld_object,
             product_jsonld_object: config.schema_json,
             persona_jsonld: config.persona_jsonld,
-            generation_status: 'pending',
-            ai_request_for_questions: config.brand_jsonld_object
+            ai_request_for_questions: config.brand_jsonld_object,
+            generation_status: 'pending'
           });
 
         if (insertError) {
@@ -154,8 +154,8 @@ serve(async (req: Request) => {
             brand_jsonld_object: config.brand_jsonld_object,
             product_jsonld_object: config.schema_json,
             persona_jsonld: config.persona_jsonld,
-            generation_status: 'pending',
-            ai_request_for_questions: config.brand_jsonld_object
+            ai_request_for_questions: config.brand_jsonld_object,
+            generation_status: 'pending'
           })
           .eq('id', existingRow.id);
 

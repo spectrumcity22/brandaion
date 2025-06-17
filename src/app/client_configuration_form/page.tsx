@@ -35,7 +35,7 @@ export default function ClientConfigurationForm() {
       // Fetch brands for this user/org
       const { data: brandsData } = await supabase
         .from("brands")
-        .select("id, brand_name, organisation_name")
+        .select("id, brand_name, organisation_name, brand_jsonld_object")
         .eq("auth_user_id", user.id);
       setBrands(brandsData || []);
     })();
@@ -46,7 +46,7 @@ export default function ClientConfigurationForm() {
     (async () => {
       const { data: productsData } = await supabase
         .from("products")
-        .select("id, product_name")
+        .select("id, product_name, schema_json")
         .eq("brand_id", form.brand_id);
       setProducts(productsData || []);
     })();
@@ -57,7 +57,7 @@ export default function ClientConfigurationForm() {
     (async () => {
       const { data: personasData } = await supabase
         .from("client_product_persona")
-        .select("id, persona_name")
+        .select("id, persona_name, persona_jsonld")
         .eq("product_id", form.product_id);
       setPersonas(personasData || []);
     })();
