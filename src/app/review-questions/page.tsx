@@ -150,7 +150,7 @@ export default function ReviewQuestions() {
       const batchPairIds = (batches[batchId] || []).map(q => q.pairId);
       const { error } = await supabase
         .from('construct_faq_pairs')
-        .update({ generation_status: 'completed' })
+        .update({ generation_status: 'question_approved' })
         .in('id', batchPairIds);
       if (error) throw error;
       fetchQuestions();
