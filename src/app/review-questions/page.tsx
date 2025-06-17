@@ -169,11 +169,13 @@ export default function ReviewQuestions() {
       if (!webhookResponse.ok) {
         const respText = await webhookResponse.text();
         console.error('Answers webhook error:', respText);
-        throw new Error('Failed to trigger answers webhook: ' + respText);
+        setError('Failed to trigger answers webhook: ' + respText);
+        return;
       }
       fetchQuestions();
     } catch (e) {
-      setError('Failed to approve batch and trigger answers webhook: ' + (e instanceof Error ? e.message : e));
+      console.error('Batch approval error:', e);
+      setError('Failed to approve batch and trigger answers webhook: ' + (e instanceof Error ? e.message : JSON.stringify(e)));
     } finally {
       setBatchApproving(null);
     }
