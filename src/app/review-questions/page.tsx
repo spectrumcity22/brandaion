@@ -29,11 +29,10 @@ interface ReviewQuestion {
 }
 
 function cleanJsonString(str: string) {
-  // Remove triple backticks and optional 'json' language tag
+  // Remove all triple backticks and optional 'json' language tag, even if on their own lines
   return str
-    .replace(/^```json\s*/i, '')
-    .replace(/^```/, '')
-    .replace(/```$/, '')
+    .replace(/```json\s*/gi, '')
+    .replace(/```/g, '')
     .trim();
 }
 
