@@ -174,7 +174,7 @@ export default function ReviewQuestions() {
     );
   }
 
-  if (questions.length === 0) {
+  if (parsedQuestions.length === 0) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4 }}>
         <Typography variant="h5" align="center">
