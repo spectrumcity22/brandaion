@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { 
   Button, 
   Card, 
@@ -12,7 +12,12 @@ import {
   FormControlLabel,
   Stack,
   Container,
-  Alert
+  Alert,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody
 } from '@mui/material';
 
 interface ReviewQuestion {
@@ -28,7 +33,7 @@ export default function ReviewQuestions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedQuestions, setSelectedQuestions] = useState<Record<string, boolean>>({});
-  const supabase = createClientComponentClient();
+  const [parsedQuestions, setParsedQuestions] = useState<any[]>([]);
 
   useEffect(() => {
     fetchQuestions();
@@ -38,18 +43,37 @@ export default function ReviewQuestions() {
     try {
       const { data, error } = await supabase
         .from('construct_faq_pairs')
-        .select('*')
-        .eq('generation_status', 'questions_generated');
+        .select('id, ai_response_questions')
+        .not('ai_response_questions', 'is', null);
 
       if (error) throw error;
 
-      setQuestions(data || []);
-      // Initialize selected state for each question
-      const initialSelected: Record<string, boolean> = {};
-      data?.forEach((question: ReviewQuestion) => {
-        initialSelected[question.id] = true; // Default all to selected
+      // Parse all questions into a flat array
+      const allRows: any[] = [];
+      (data || []).forEach((pair: any) => {
+        try {
+          const parsed = JSON.parse(pair.ai_response_questions);
+          if (parsed.topics) {
+            parsed.topics.forEach((topicObj: any) => {
+              topicObj.questions.forEach((qObj: any) => {
+                allRows.push({
+                  pairId: pair.id,
+                  topic: topicObj.topic,
+                  question: qObj.question,
+                });
+              });
+            });
+          }
+        } catch (e) {
+          // fallback: treat as plain text
+          allRows.push({
+            pairId: pair.id,
+            topic: '',
+            question: pair.ai_response_questions,
+          });
+        }
       });
-      setSelectedQuestions(initialSelected);
+      setParsedQuestions(allRows);
     } catch (error) {
       console.error('Error fetching questions:', error);
       setError('Failed to load questions');
@@ -144,41 +168,39 @@ export default function ReviewQuestions() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">
-          Review Questions
-        </Typography>
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={Object.values(selectedQuestions).every(v => v)}
-              onChange={(e) => handleSelectAll(e.target.checked)}
-            />
-          }
-          label="Select All"
-        />
-      </Stack>
-      
-      {questions.map((question) => (
-        <Card key={question.id} sx={{ mb: 2, p: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="flex-start">
-            <Checkbox
-              checked={selectedQuestions[question.id] || false}
-              onChange={(e) => handleSelectQuestion(question.id, e.target.checked)}
-            />
-            <TextField
-              fullWidth
-              multiline
-              rows={2}
-              value={question.edited_question || question.ai_response_questions}
-              onChange={(e) => handleQuestionEdit(question.id, e.target.value)}
-              label="Question"
-              variant="outlined"
-            />
-          </Stack>
-        </Card>
-      ))}
-
+      <Typography variant="h4" gutterBottom>
+        Review Questions
+      </Typography>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Topic</TableCell>
+            <TableCell>Question</TableCell>
+            <TableCell>Edit</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {parsedQuestions.map((row, idx) => (
+            <TableRow key={idx}>
+              <TableCell>{row.topic}</TableCell>
+              <TableCell>
+                <TextField
+                  fullWidth
+                  value={row.question}
+                  onChange={e => {
+                    const updated = [...parsedQuestions];
+                    updated[idx].question = e.target.value;
+                    setParsedQuestions(updated);
+                  }}
+                />
+              </TableCell>
+              <TableCell>
+                {/* Add approve/edit buttons as needed */}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
       <Button
         variant="contained"
         color="primary"
