@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   Button, 
@@ -160,50 +160,46 @@ export default function ReviewQuestions() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-200"></div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <div className="max-w-4xl mx-auto mt-8">
+        <div className="bg-red-900 text-red-200 p-4 rounded">{error}</div>
+      </div>
     );
   }
 
   if (parsedQuestions.length === 0) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Typography variant="h5" align="center">
-          No questions pending review
-        </Typography>
-      </Container>
+      <div className="max-w-4xl mx-auto mt-8">
+        <div className="text-center text-lg text-foreground">No questions pending review</div>
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Review Questions
-      </Typography>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Topic</TableCell>
-            <TableCell>Question</TableCell>
-            <TableCell>Edit</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
+    <div className="max-w-4xl mx-auto mt-8">
+      <h1 className="text-3xl font-bold mb-6 text-foreground">Review Questions</h1>
+      <table className="w-full text-left border-separate border-spacing-y-2">
+        <thead>
+          <tr>
+            <th className="text-foreground font-semibold py-2 px-4">Topic</th>
+            <th className="text-foreground font-semibold py-2 px-4">Question</th>
+            <th className="text-foreground font-semibold py-2 px-4">Edit</th>
+          </tr>
+        </thead>
+        <tbody>
           {parsedQuestions.map((row, idx) => (
-            <TableRow key={idx}>
-              <TableCell>{row.topic}</TableCell>
-              <TableCell>
-                <TextField
-                  fullWidth
+            <tr key={idx} className="bg-transparent border-b border-gray-700">
+              <td className="text-foreground py-1 px-4 align-top w-1/4">{row.topic}</td>
+              <td className="text-foreground py-1 px-4 align-top w-3/5">
+                <input
+                  className="w-full bg-background text-foreground border border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand"
                   value={row.question}
                   onChange={e => {
                     const updated = [...parsedQuestions];
@@ -211,23 +207,17 @@ export default function ReviewQuestions() {
                     setParsedQuestions(updated);
                   }}
                 />
-              </TableCell>
-              <TableCell>
-                {/* Add approve/edit buttons as needed */}
-              </TableCell>
-            </TableRow>
+              </td>
+              <td className="text-foreground py-1 px-4 align-top w-1/6">{/* Edit/Approve buttons */}</td>
+            </tr>
           ))}
-        </TableBody>
-      </Table>
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleApproveSelected}
-        disabled={Object.values(selectedQuestions).every(v => !v)}
-        sx={{ mt: 2 }}
-      >
-        Approve Selected Questions
-      </Button>
-    </Container>
+        </tbody>
+      </table>
+      <style jsx>{`
+        .text-foreground { color: var(--foreground); }
+        .bg-background { background: var(--background); }
+        .focus\:ring-brand:focus { box-shadow: 0 0 0 2px var(--brand); }
+      `}</style>
+    </div>
   );
 } 
