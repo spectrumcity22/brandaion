@@ -61,30 +61,30 @@ export default function ReviewQuestions() {
       const allRows: any[] = [];
       (data || []).forEach((pair: any) => {
         let raw = pair.ai_response_questions;
+        let cleaned = cleanJsonString(raw);
         let parsed = null;
+        let added = false;
         try {
-          const cleaned = cleanJsonString(raw);
           parsed = JSON.parse(cleaned);
-          if (parsed.topics) {
+          if (parsed && Array.isArray(parsed.topics)) {
             parsed.topics.forEach((topicObj: any) => {
-              topicObj.questions.forEach((qObj: any) => {
-                allRows.push({
-                  pairId: pair.id,
-                  topic: topicObj.topic,
-                  question: qObj.question,
+              if (Array.isArray(topicObj.questions)) {
+                topicObj.questions.forEach((qObj: any) => {
+                  allRows.push({
+                    pairId: pair.id,
+                    topic: topicObj.topic || '',
+                    question: qObj.question || '',
+                  });
+                  added = true;
                 });
-              });
-            });
-          } else {
-            // fallback: show the whole object as a single question
-            allRows.push({
-              pairId: pair.id,
-              topic: '',
-              question: cleaned,
+              }
             });
           }
         } catch (e) {
-          // fallback: treat as plain text
+          // Ignore parse error
+        }
+        // If nothing was added, show the raw string
+        if (!added) {
           allRows.push({
             pairId: pair.id,
             topic: '',
@@ -92,9 +92,9 @@ export default function ReviewQuestions() {
           });
         }
       });
+      console.log('Rows to display:', allRows);
       setParsedQuestions(allRows);
     } catch (error) {
-      console.error('Error fetching questions:', error);
       setError('Failed to load questions');
     } finally {
       setLoading(false);
