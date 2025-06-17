@@ -1,47 +1,27 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { 
-  Button, 
-  Card, 
-  TextField, 
-  Typography, 
-  Box, 
-  CircularProgress,
-  Checkbox,
-  FormControlLabel,
-  Stack,
-  Container,
-  Alert,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody
-} from '@mui/material';
 
-interface ReviewQuestion {
+interface Question {
   id: string;
   construct_faq_pair_id: string;
   question_text: string;
   status: 'pending' | 'approved' | 'edited';
   edited_question: string | null;
+  batch_id: string;
 }
 
-function cleanJsonString(str: string) {
-  // Remove all triple backticks and optional 'json' language tag, even if on their own lines
-  return str
-    .replace(/```json\s*/gi, '')
-    .replace(/```/g, '')
-    .trim();
+interface Batch {
+  id: string;
+  questions: Question[];
 }
 
 export default function ReviewQuestions() {
-  const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedQuestions, setSelectedQuestions] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [selectedBatches, setSelectedBatches] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchQuestions();
@@ -56,7 +36,24 @@ export default function ReviewQuestions() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setQuestions(data || []);
+
+      // Group questions by batch
+      const batchMap = new Map<string, Question[]>();
+      data.forEach((question: Question) => {
+        const batchId = question.batch_id;
+        if (!batchMap.has(batchId)) {
+          batchMap.set(batchId, []);
+        }
+        batchMap.get(batchId)?.push(question);
+      });
+
+      // Convert to array of batches
+      const batchArray = Array.from(batchMap.entries()).map(([id, questions]) => ({
+        id,
+        questions
+      }));
+
+      setBatches(batchArray);
     } catch (error) {
       console.error('Error fetching questions:', error);
       setError('Failed to load questions');
@@ -65,7 +62,7 @@ export default function ReviewQuestions() {
     }
   };
 
-  const handleQuestionEdit = async (id: string, newQuestion: string) => {
+  const handleQuestionEdit = async (batchId: string, questionId: string, newQuestion: string) => {
     try {
       const { error } = await supabase
         .from('review_questions')
@@ -73,55 +70,82 @@ export default function ReviewQuestions() {
           edited_question: newQuestion,
           status: 'edited'
         })
-        .eq('id', id);
+        .eq('id', questionId);
 
       if (error) throw error;
 
-      setQuestions(questions.map(q => 
-        q.id === id ? { ...q, edited_question: newQuestion, status: 'edited' } : q
-      ));
+      // Update local state
+      setBatches(batches.map(batch => {
+        if (batch.id === batchId) {
+          return {
+            ...batch,
+            questions: batch.questions.map(q => 
+              q.id === questionId ? { ...q, edited_question: newQuestion, status: 'edited' } : q
+            )
+          };
+        }
+        return batch;
+      }));
     } catch (error) {
       console.error('Error updating question:', error);
       setError('Failed to update question');
     }
   };
 
-  const handleApproveQuestion = async (id: string) => {
+  const handleApproveQuestion = async (batchId: string, questionId: string) => {
     try {
       const { error } = await supabase
         .from('review_questions')
         .update({ status: 'approved' })
-        .eq('id', id);
+        .eq('id', questionId);
 
       if (error) throw error;
 
-      setQuestions(questions.filter(q => q.id !== id));
+      // Update local state
+      setBatches(batches.map(batch => {
+        if (batch.id === batchId) {
+          return {
+            ...batch,
+            questions: batch.questions.filter(q => q.id !== questionId)
+          };
+        }
+        return batch;
+      }));
     } catch (error) {
       console.error('Error approving question:', error);
       setError('Failed to approve question');
     }
   };
 
-  const handleApproveSelected = async () => {
+  const handleApproveBatch = async (batchId: string) => {
     setSaving(true);
     try {
-      const selectedIds = Object.entries(selectedQuestions)
-        .filter(([_, selected]) => selected)
-        .map(([id]) => id);
+      // Get all question IDs in the batch
+      const batch = batches.find(b => b.id === batchId);
+      if (!batch) throw new Error('Batch not found');
 
-      const { error } = await supabase
+      const questionIds = batch.questions.map(q => q.id);
+
+      // Update all questions in the batch to approved
+      const { error: updateError } = await supabase
         .from('review_questions')
         .update({ status: 'approved' })
-        .in('id', selectedIds);
+        .in('id', questionIds);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
-      // Remove approved questions from the list
-      setQuestions(questions.filter(q => !selectedIds.includes(q.id)));
-      setSelectedQuestions({});
+      // Trigger the Answers Edge Function
+      const { error: functionError } = await supabase.functions.invoke('generate_answers', {
+        body: { batch_id: batchId }
+      });
+
+      if (functionError) throw functionError;
+
+      // Remove the batch from local state
+      setBatches(batches.filter(b => b.id !== batchId));
     } catch (error) {
-      console.error('Error approving questions:', error);
-      setError('Failed to approve questions');
+      console.error('Error approving batch:', error);
+      setError('Failed to approve batch');
     } finally {
       setSaving(false);
     }
@@ -143,7 +167,7 @@ export default function ReviewQuestions() {
     );
   }
 
-  if (questions.length === 0) {
+  if (batches.length === 0) {
     return (
       <div className="max-w-4xl mx-auto mt-8">
         <div className="text-center text-lg text-foreground">No questions pending review</div>
@@ -153,50 +177,43 @@ export default function ReviewQuestions() {
 
   return (
     <div className="max-w-4xl mx-auto mt-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-foreground">Review Questions</h1>
-        <button
-          onClick={handleApproveSelected}
-          disabled={saving || Object.values(selectedQuestions).every(v => !v)}
-          className={`px-4 py-2 rounded-lg font-bold transition ${
-            saving || Object.values(selectedQuestions).every(v => !v)
-              ? 'bg-gray-600 text-white cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600 text-white'
-          }`}
-        >
-          {saving ? 'Saving...' : 'Approve Selected'}
-        </button>
-      </div>
+      <h1 className="text-3xl font-bold mb-6 text-foreground">Review Questions</h1>
+      
+      <div className="space-y-8">
+        {batches.map((batch) => (
+          <div key={batch.id} className="bg-gray-800 p-6 rounded-lg">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-foreground">Batch {batch.id}</h2>
+              <button
+                onClick={() => handleApproveBatch(batch.id)}
+                disabled={saving}
+                className={`px-4 py-2 rounded-lg font-bold transition ${
+                  saving ? 'bg-gray-600 text-white cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'
+                }`}
+              >
+                {saving ? 'Processing...' : 'Approve Batch & Generate Answers'}
+              </button>
+            </div>
 
-      <div className="space-y-4">
-        {questions.map((question) => (
-          <div key={question.id} className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-start space-x-4">
-              <input
-                type="checkbox"
-                checked={selectedQuestions[question.id] || false}
-                onChange={(e) => setSelectedQuestions(prev => ({
-                  ...prev,
-                  [question.id]: e.target.checked
-                }))}
-                className="mt-1"
-              />
-              <div className="flex-grow">
-                <textarea
-                  value={question.edited_question || question.question_text}
-                  onChange={(e) => handleQuestionEdit(question.id, e.target.value)}
-                  className="w-full bg-gray-700 text-white rounded p-2 mb-2"
-                  rows={2}
-                />
-                <div className="flex justify-end space-x-2">
-                  <button
-                    onClick={() => handleApproveQuestion(question.id)}
-                    className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded"
-                  >
-                    Approve
-                  </button>
+            <div className="space-y-4">
+              {batch.questions.map((question) => (
+                <div key={question.id} className="bg-gray-700 p-4 rounded-lg">
+                  <textarea
+                    value={question.edited_question || question.question_text}
+                    onChange={(e) => handleQuestionEdit(batch.id, question.id, e.target.value)}
+                    className="w-full bg-gray-600 text-white rounded p-3 mb-3 min-h-[100px]"
+                    placeholder="Edit question here..."
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => handleApproveQuestion(batch.id, question.id)}
+                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded"
+                    >
+                      Approve Question
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         ))}
