@@ -28,6 +28,15 @@ interface ReviewQuestion {
   edited_question: string | null;
 }
 
+function cleanJsonString(str: string) {
+  // Remove triple backticks and optional 'json' language tag
+  return str
+    .replace(/^```json\s*/i, '')
+    .replace(/^```/, '')
+    .replace(/```$/, '')
+    .trim();
+}
+
 export default function ReviewQuestions() {
   const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,8 +60,11 @@ export default function ReviewQuestions() {
       // Parse all questions into a flat array
       const allRows: any[] = [];
       (data || []).forEach((pair: any) => {
+        let raw = pair.ai_response_questions;
+        let parsed = null;
         try {
-          const parsed = JSON.parse(pair.ai_response_questions);
+          const cleaned = cleanJsonString(raw);
+          parsed = JSON.parse(cleaned);
           if (parsed.topics) {
             parsed.topics.forEach((topicObj: any) => {
               topicObj.questions.forEach((qObj: any) => {
@@ -63,13 +75,20 @@ export default function ReviewQuestions() {
                 });
               });
             });
+          } else {
+            // fallback: show the whole object as a single question
+            allRows.push({
+              pairId: pair.id,
+              topic: '',
+              question: cleaned,
+            });
           }
         } catch (e) {
           // fallback: treat as plain text
           allRows.push({
             pairId: pair.id,
             topic: '',
-            question: pair.ai_response_questions,
+            question: raw,
           });
         }
       });
