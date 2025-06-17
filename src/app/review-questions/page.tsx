@@ -160,10 +160,20 @@ export default function ReviewQuestions() {
         setError('No batchId provided for answers webhook');
         return;
       }
+      // Get the user's access token
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        setError('No access token found. Please log in again.');
+        return;
+      }
       console.log('Triggering answers webhook with batchId:', batchId);
       const webhookResponse = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({ batchId }),
       });
       if (!webhookResponse.ok) {
