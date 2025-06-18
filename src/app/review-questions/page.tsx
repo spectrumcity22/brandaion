@@ -21,27 +21,17 @@ import {
 } from '@mui/material';
 
 interface ReviewQuestion {
-  id: string;
-  construct_faq_pair_id: string;
-  ai_response_questions: string;
-  status: 'pending' | 'approved' | 'edited';
-  edited_question: string | null;
-}
-
-function cleanJsonString(str: string) {
-  // Remove all triple backticks and optional 'json' language tag, even if on their own lines
-  return str
-    .replace(/```json\s*/gi, '')
-    .replace(/```/g, '')
-    .trim();
+  id: number;
+  topic: string;
+  question: string;
+  question_status: string;
 }
 
 export default function ReviewQuestions() {
   const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedQuestions, setSelectedQuestions] = useState<Record<string, boolean>>({});
-  const [parsedQuestions, setParsedQuestions] = useState<any[]>([]);
+  const [selectedQuestions, setSelectedQuestions] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     fetchQuestions();
@@ -50,49 +40,14 @@ export default function ReviewQuestions() {
   const fetchQuestions = async () => {
     try {
       const { data, error } = await supabase
-        .from('construct_faq_pairs')
-        .select('id, ai_response_questions')
-        .not('ai_response_questions', 'is', null);
+        .from('review_questions')
+        .select('id, topic, question, question_status')
+        .eq('question_status', 'questions_generated')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Parse all questions into a flat array
-      const allRows: any[] = [];
-      (data || []).forEach((pair: any) => {
-        let raw = pair.ai_response_questions;
-        let cleaned = cleanJsonString(raw);
-        let parsed = null;
-        let added = false;
-        try {
-          parsed = JSON.parse(cleaned);
-          if (parsed && Array.isArray(parsed.topics)) {
-            parsed.topics.forEach((topicObj: any) => {
-              if (Array.isArray(topicObj.questions)) {
-                topicObj.questions.forEach((qObj: any) => {
-                  allRows.push({
-                    pairId: pair.id,
-                    topic: topicObj.topic || '',
-                    question: qObj.question || '',
-                  });
-                  added = true;
-                });
-              }
-            });
-          }
-        } catch (e) {
-          // Ignore parse error
-        }
-        // If nothing was added, show the raw string
-        if (!added) {
-          allRows.push({
-            pairId: pair.id,
-            topic: '',
-            question: raw,
-          });
-        }
-      });
-      console.log('Rows to display:', allRows);
-      setParsedQuestions(allRows);
+      setQuestions(data || []);
     } catch (error) {
       setError('Failed to load questions');
     } finally {
@@ -100,36 +55,15 @@ export default function ReviewQuestions() {
     }
   };
 
-  const handleQuestionEdit = async (id: string, newQuestion: string) => {
-    try {
-      const { error } = await supabase
-        .from('construct_faq_pairs')
-        .update({
-          ai_response_questions: newQuestion,
-          generation_status: 'completed'
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setQuestions(questions.map(q => 
-        q.id === id ? { ...q, ai_response_questions: newQuestion } : q
-      ));
-    } catch (error) {
-      console.error('Error updating question:', error);
-      setError('Failed to update question');
-    }
-  };
-
   const handleSelectAll = (checked: boolean) => {
-    const newSelected: Record<string, boolean> = {};
+    const newSelected: Record<number, boolean> = {};
     questions.forEach(question => {
       newSelected[question.id] = checked;
     });
     setSelectedQuestions(newSelected);
   };
 
-  const handleSelectQuestion = (id: string, checked: boolean) => {
+  const handleSelectQuestion = (id: number, checked: boolean) => {
     setSelectedQuestions(prev => ({
       ...prev,
       [id]: checked
@@ -140,12 +74,12 @@ export default function ReviewQuestions() {
     try {
       const selectedIds = Object.entries(selectedQuestions)
         .filter(([_, selected]) => selected)
-        .map(([id]) => id);
+        .map(([id]) => parseInt(id));
 
-      // Update selected questions to completed
+      // Update selected questions to approved
       const { error: updateError } = await supabase
-        .from('construct_faq_pairs')
-        .update({ generation_status: 'completed' })
+        .from('review_questions')
+        .update({ question_status: 'approved' })
         .in('id', selectedIds);
 
       if (updateError) throw updateError;
@@ -174,7 +108,7 @@ export default function ReviewQuestions() {
     );
   }
 
-  if (parsedQuestions.length === 0) {
+  if (questions.length === 0) {
     return (
       <div className="max-w-4xl mx-auto mt-8">
         <div className="text-center text-lg text-foreground">No questions pending review</div>
@@ -185,39 +119,44 @@ export default function ReviewQuestions() {
   return (
     <div className="max-w-4xl mx-auto mt-8">
       <h1 className="text-3xl font-bold mb-6 text-foreground">Review Questions</h1>
+      <div className="mb-4">
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={handleApproveSelected}
+          disabled={Object.values(selectedQuestions).every(v => !v)}
+        >
+          Approve Selected
+        </Button>
+      </div>
       <table className="w-full text-left border-separate border-spacing-y-2">
         <thead>
           <tr>
+            <th className="text-foreground font-semibold py-2 px-4">
+              <Checkbox
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                checked={questions.length > 0 && questions.every(q => selectedQuestions[q.id])}
+              />
+            </th>
             <th className="text-foreground font-semibold py-2 px-4">Topic</th>
             <th className="text-foreground font-semibold py-2 px-4">Question</th>
-            <th className="text-foreground font-semibold py-2 px-4">Edit</th>
           </tr>
         </thead>
         <tbody>
-          {parsedQuestions.map((row, idx) => (
-            <tr key={idx} className="bg-transparent border-b border-gray-700">
-              <td className="text-foreground py-1 px-4 align-top w-1/4">{row.topic}</td>
-              <td className="text-foreground py-1 px-4 align-top w-3/5">
-                <input
-                  className="w-full bg-background text-foreground border border-gray-700 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand"
-                  value={row.question}
-                  onChange={e => {
-                    const updated = [...parsedQuestions];
-                    updated[idx].question = e.target.value;
-                    setParsedQuestions(updated);
-                  }}
+          {questions.map((question) => (
+            <tr key={question.id} className="bg-transparent border-b border-gray-700">
+              <td className="text-foreground py-1 px-4">
+                <Checkbox
+                  checked={!!selectedQuestions[question.id]}
+                  onChange={(e) => handleSelectQuestion(question.id, e.target.checked)}
                 />
               </td>
-              <td className="text-foreground py-1 px-4 align-top w-1/6">{/* Edit/Approve buttons */}</td>
+              <td className="text-foreground py-1 px-4 align-top w-1/4">{question.topic}</td>
+              <td className="text-foreground py-1 px-4 align-top w-3/5">{question.question}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <style jsx>{`
-        .text-foreground { color: var(--foreground); }
-        .bg-background { background: var(--background); }
-        .focus\:ring-brand:focus { box-shadow: 0 0 0 2px var(--brand); }
-      `}</style>
     </div>
   );
 } 
