@@ -41,9 +41,16 @@ export default function ReviewQuestions() {
   const [error, setError] = useState<string | null>(null);
   const [selectedQuestions, setSelectedQuestions] = useState<Record<number, boolean>>({});
   const [editingQuestions, setEditingQuestions] = useState<Record<number, string>>({});
+  const [askingQuestions, setAskingQuestions] = useState<Record<number, boolean>>({});
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     fetchQuestions();
+    // Get user on component load (following client_configuration_form pattern)
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    })();
   }, []);
 
   const fetchQuestions = async () => {
@@ -184,6 +191,47 @@ export default function ReviewQuestions() {
     }
   };
 
+  const handleAskQuestion = async (questionId: number) => {
+    try {
+      setAskingQuestions(prev => ({ ...prev, [questionId]: true }));
+      
+      // Get the session for the webhook call (following client_configuration_form pattern)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No session found');
+      }
+
+      // Call ai_request_answers endpoint (following exact pattern)
+      const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "x-client-info": "supabase-js/2.39.3",
+          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        },
+        body: JSON.stringify({ 
+          question_id: questionId,
+          auth_user_id: user.id 
+        }),
+      });
+
+      const responseData = await response.json();
+      if (!response.ok) {
+        throw new Error(`Ask question failed: ${responseData.error || 'Unknown error'}`);
+      }
+
+      // Refresh the questions to show updated status
+      await fetchQuestions();
+      
+    } catch (error) {
+      console.error('Error asking question:', error);
+      setError(`Failed to ask question: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setAskingQuestions(prev => ({ ...prev, [questionId]: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -315,6 +363,21 @@ export default function ReviewQuestions() {
                             className="bg-green-600 text-white px-3 py-1 rounded text-sm"
                           >
                             Approve
+                          </button>
+                        </div>
+                      )}
+                      {isApproved && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleAskQuestion(question.id)}
+                            disabled={askingQuestions[question.id]}
+                            className={`px-3 py-1 rounded text-sm ${
+                              askingQuestions[question.id] 
+                                ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                          >
+                            {askingQuestions[question.id] ? 'Asking...' : 'Ask Question'}
                           </button>
                         </div>
                       )}
