@@ -25,6 +25,14 @@ interface ReviewQuestion {
   topic: string;
   question: string;
   question_status: string;
+  unique_batch_id: string;
+  unique_batch_cluster: string;
+}
+
+interface BatchGroup {
+  batchId: string;
+  batchCluster: string;
+  questions: ReviewQuestion[];
 }
 
 export default function ReviewQuestions() {
@@ -32,6 +40,7 @@ export default function ReviewQuestions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedQuestions, setSelectedQuestions] = useState<Record<number, boolean>>({});
+  const [editingQuestions, setEditingQuestions] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetchQuestions();
@@ -41,8 +50,8 @@ export default function ReviewQuestions() {
     try {
       const { data, error } = await supabase
         .from('review_questions')
-        .select('id, topic, question, question_status')
-        .eq('question_status', 'questions_generated')
+        .select('id, topic, question, question_status, unique_batch_id, unique_batch_cluster')
+        .in('question_status', ['questions_generated', 'question_approved'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -55,10 +64,30 @@ export default function ReviewQuestions() {
     }
   };
 
+  // Group questions by batch
+  const groupedQuestions = questions.reduce((groups: BatchGroup[], question) => {
+    const batchId = question.unique_batch_id || 'No Batch';
+    const batchCluster = question.unique_batch_cluster || 'No Cluster';
+    
+    const existingGroup = groups.find(g => g.batchId === batchId);
+    if (existingGroup) {
+      existingGroup.questions.push(question);
+    } else {
+      groups.push({
+        batchId,
+        batchCluster,
+        questions: [question]
+      });
+    }
+    return groups;
+  }, []);
+
   const handleSelectAll = (checked: boolean) => {
     const newSelected: Record<number, boolean> = {};
     questions.forEach(question => {
-      newSelected[question.id] = checked;
+      if (question.question_status === 'questions_generated') {
+        newSelected[question.id] = checked;
+      }
     });
     setSelectedQuestions(newSelected);
   };
@@ -70,6 +99,68 @@ export default function ReviewQuestions() {
     }));
   };
 
+  const handleEditQuestion = (id: number, newQuestion: string) => {
+    setEditingQuestions(prev => ({
+      ...prev,
+      [id]: newQuestion
+    }));
+  };
+
+  const handleSaveEdit = async (id: number) => {
+    try {
+      const newQuestion = editingQuestions[id];
+      if (!newQuestion) return;
+
+      const { error: updateError } = await supabase
+        .from('review_questions')
+        .update({ question: newQuestion })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setQuestions(prev => prev.map(q => 
+        q.id === id ? { ...q, question: newQuestion } : q
+      ));
+
+      // Clear editing state
+      setEditingQuestions(prev => {
+        const newState = { ...prev };
+        delete newState[id];
+        return newState;
+      });
+    } catch (error) {
+      console.error('Error updating question:', error);
+      setError('Failed to update question');
+    }
+  };
+
+  const handleApproveQuestion = async (id: number) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('review_questions')
+        .update({ question_status: 'question_approved' })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setQuestions(prev => prev.map(q => 
+        q.id === id ? { ...q, question_status: 'question_approved' } : q
+      ));
+
+      // Clear selection
+      setSelectedQuestions(prev => {
+        const newState = { ...prev };
+        delete newState[id];
+        return newState;
+      });
+    } catch (error) {
+      console.error('Error approving question:', error);
+      setError('Failed to approve question');
+    }
+  };
+
   const handleApproveSelected = async () => {
     try {
       const selectedIds = Object.entries(selectedQuestions)
@@ -79,13 +170,14 @@ export default function ReviewQuestions() {
       // Update selected questions to approved
       const { error: updateError } = await supabase
         .from('review_questions')
-        .update({ question_status: 'approved' })
+        .update({ question_status: 'question_approved' })
         .in('id', selectedIds);
 
       if (updateError) throw updateError;
 
       // Refresh the questions list
       fetchQuestions();
+      setSelectedQuestions({});
     } catch (error) {
       console.error('Error approving questions:', error);
       setError('Failed to approve questions');
@@ -117,7 +209,7 @@ export default function ReviewQuestions() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto mt-8">
+    <div className="max-w-6xl mx-auto mt-8">
       <h1 className="text-3xl font-bold mb-6 text-foreground">Review Questions</h1>
       <div className="mb-4">
         <Button 
@@ -129,34 +221,120 @@ export default function ReviewQuestions() {
           Approve Selected
         </Button>
       </div>
-      <table className="w-full text-left border-separate border-spacing-y-2">
-        <thead>
-          <tr>
-            <th className="text-foreground font-semibold py-2 px-4">
-              <Checkbox
-                onChange={(e) => handleSelectAll(e.target.checked)}
-                checked={questions.length > 0 && questions.every(q => selectedQuestions[q.id])}
-              />
-            </th>
-            <th className="text-foreground font-semibold py-2 px-4">Topic</th>
-            <th className="text-foreground font-semibold py-2 px-4">Question</th>
-          </tr>
-        </thead>
-        <tbody>
-          {questions.map((question) => (
-            <tr key={question.id} className="bg-transparent border-b border-gray-700">
-              <td className="text-foreground py-1 px-4">
-                <Checkbox
-                  checked={!!selectedQuestions[question.id]}
-                  onChange={(e) => handleSelectQuestion(question.id, e.target.checked)}
-                />
-              </td>
-              <td className="text-foreground py-1 px-4 align-top w-1/4">{question.topic}</td>
-              <td className="text-foreground py-1 px-4 align-top w-3/5">{question.question}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      
+      {groupedQuestions.map((batch, batchIndex) => (
+        <div key={batch.batchId} className="mb-8">
+          <div className="bg-gray-800 p-4 rounded-t-lg">
+            <h2 className="text-xl font-semibold text-white">
+              Batch ID: {batch.batchId}
+            </h2>
+            <p className="text-gray-300">Cluster: {batch.batchCluster}</p>
+          </div>
+          
+          <table className="w-full text-left border-separate border-spacing-y-2 bg-gray-900 rounded-b-lg">
+            <thead>
+              <tr>
+                <th className="text-foreground font-semibold py-2 px-4">
+                  <Checkbox
+                    onChange={(e) => {
+                      const newSelected = { ...selectedQuestions };
+                      batch.questions.forEach(q => {
+                        if (q.question_status === 'questions_generated') {
+                          newSelected[q.id] = e.target.checked;
+                        }
+                      });
+                      setSelectedQuestions(newSelected);
+                    }}
+                    checked={batch.questions.some(q => 
+                      q.question_status === 'questions_generated' && selectedQuestions[q.id]
+                    )}
+                  />
+                </th>
+                <th className="text-foreground font-semibold py-2 px-4">Topic</th>
+                <th className="text-foreground font-semibold py-2 px-4">Question</th>
+                <th className="text-foreground font-semibold py-2 px-4">Actions</th>
+                <th className="text-foreground font-semibold py-2 px-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {batch.questions.map((question) => {
+                const isApproved = question.question_status === 'question_approved';
+                const isEditing = editingQuestions.hasOwnProperty(question.id);
+                
+                return (
+                  <tr 
+                    key={question.id} 
+                    className={`border-b border-gray-700 ${
+                      isApproved ? 'opacity-60 bg-gray-800' : 'bg-transparent'
+                    }`}
+                  >
+                    <td className="text-foreground py-1 px-4">
+                      {!isApproved && (
+                        <Checkbox
+                          checked={!!selectedQuestions[question.id]}
+                          onChange={(e) => handleSelectQuestion(question.id, e.target.checked)}
+                        />
+                      )}
+                    </td>
+                    <td className="text-foreground py-1 px-4 align-top w-1/6">
+                      {question.topic}
+                    </td>
+                    <td className="text-foreground py-1 px-4 align-top w-2/5">
+                      {isEditing ? (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={editingQuestions[question.id]}
+                            onChange={(e) => handleEditQuestion(question.id, e.target.value)}
+                            className="flex-1 bg-gray-800 text-white border border-gray-600 rounded px-2 py-1"
+                          />
+                          <button
+                            onClick={() => handleSaveEdit(question.id)}
+                            className="bg-green-600 text-white px-3 py-1 rounded text-sm"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={isApproved ? 'line-through' : ''}>
+                          {question.question}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-foreground py-1 px-4 align-top w-1/6">
+                      {!isApproved && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditQuestion(question.id, question.question)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleApproveQuestion(question.id)}
+                            className="bg-green-600 text-white px-3 py-1 rounded text-sm"
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                    <td className="text-foreground py-1 px-4 align-top w-1/6">
+                      {isApproved ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">✓ Approved</span>
+                        </div>
+                      ) : (
+                        <span className="text-yellow-400">Pending</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 } 
