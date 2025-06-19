@@ -32,6 +32,7 @@ interface ReviewQuestion {
   question_status: string;
   unique_batch_id: string;
   unique_batch_cluster: string;
+  ai_response_answers?: string;
 }
 
 interface BatchGroup {
@@ -62,7 +63,7 @@ export default function ReviewQuestions() {
     try {
       const { data, error } = await supabase
         .from('review_questions')
-        .select('id, topic, question, question_status, unique_batch_id, unique_batch_cluster')
+        .select('id, topic, question, question_status, unique_batch_id, unique_batch_cluster, ai_response_answers')
         .in('question_status', ['questions_generated', 'question_approved'])
         .order('created_at', { ascending: false });
 
@@ -349,9 +350,16 @@ export default function ReviewQuestions() {
                           </button>
                         </div>
                       ) : (
-                        <span className={isApproved ? 'line-through' : ''}>
-                          {question.question}
-                        </span>
+                        <div>
+                          <span className={isApproved ? 'line-through' : ''}>
+                            {question.question}
+                          </span>
+                          {question.ai_response_answers && (
+                            <div className="mt-2 p-2 bg-green-900 rounded text-sm">
+                              <strong>Answer:</strong> {question.ai_response_answers}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="text-foreground py-1 px-4 align-top w-1/6">
@@ -373,17 +381,21 @@ export default function ReviewQuestions() {
                       )}
                       {isApproved && (
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => handleAskQuestion(question.id)}
-                            disabled={askingQuestions[question.id]}
-                            className={`px-3 py-1 rounded text-sm ${
-                              askingQuestions[question.id] 
-                                ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                                : 'bg-purple-600 text-white hover:bg-purple-700'
-                            }`}
-                          >
-                            {askingQuestions[question.id] ? 'Asking...' : 'Ask Question'}
-                          </button>
+                          {!question.ai_response_answers ? (
+                            <button
+                              onClick={() => handleAskQuestion(question.id)}
+                              disabled={askingQuestions[question.id]}
+                              className={`px-3 py-1 rounded text-sm ${
+                                askingQuestions[question.id] 
+                                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                              }`}
+                            >
+                              {askingQuestions[question.id] ? 'Asking...' : 'Ask Question'}
+                            </button>
+                          ) : (
+                            <span className="text-green-400 text-sm">✓ Answered</span>
+                          )}
                         </div>
                       )}
                     </td>
