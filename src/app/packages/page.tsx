@@ -99,7 +99,7 @@ export default function PackagesPage() {
               Choose Your <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Growth Path</span>
             </h1>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-12">
-              Scale your brand's AI visibility with our comprehensive FAQ generation packages. 
+              Scale your brand&apos;s AI visibility with our comprehensive FAQ generation packages. 
               From startup to enterprise, we have the perfect solution for your needs.
             </p>
           </div>
@@ -252,7 +252,7 @@ export default function PackagesPage() {
         <div className="mt-16 text-center">
           <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-3xl p-8 border border-gray-700/50">
             <h3 className="text-2xl font-bold text-white mb-4">
-              Ready to Transform Your Brand's AI Presence?
+              Ready to Transform Your Brand&apos;s AI Presence?
             </h3>
             <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
               Join hundreds of brands already leveraging our AI-powered FAQ generation to dominate their categories and drive organic growth.
