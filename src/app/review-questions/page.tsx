@@ -349,7 +349,7 @@ export default function ReviewQuestions() {
                         <div>
                           <span>{question.question}</span>
                           {question.ai_response_answers && (
-                            <div className="mt-2 text-sm">
+                            <div className="mt-2 p-2 bg-green-900 rounded text-sm">
                               {question.ai_response_answers}
                             </div>
                           )}

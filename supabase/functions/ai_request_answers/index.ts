@@ -150,6 +150,19 @@ serve(async (req)=>{
             generatedAnswer = messagesData.data[0].content[0].text.value;
             console.log(`Generated answer for question ${question.id}, length: ${generatedAnswer.length}`);
             console.log('EXACT TEXT FROM OPENAI:', generatedAnswer);
+            
+            // Parse the JSON response and extract only the answer text
+            try {
+              const parsedResponse = JSON.parse(generatedAnswer);
+              if (parsedResponse.answers && parsedResponse.answers.length > 0) {
+                generatedAnswer = parsedResponse.answers[0].answer;
+                console.log(`Extracted answer text for question ${question.id}:`, generatedAnswer);
+              }
+            } catch (parseError) {
+              console.log(`Could not parse JSON response for question ${question.id}, using raw response:`, parseError);
+              // If parsing fails, use the raw response as fallback
+            }
+            
             completed = true;
           } else if (statusData.status === 'failed') {
             throw new Error(`Run failed: ${statusData.last_error?.message || 'Unknown error'}`);
