@@ -112,7 +112,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <div className="absolute left-0 mt-2 w-56 bg-white text-black rounded shadow-lg z-50">
                       <Link href="/schedule" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Schedule</Link>
                       <Link href="/review-questions" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Questions</Link>
-                      <span className="block px-4 py-2 text-gray-400 cursor-not-allowed">Review Answers (coming soon)</span>
+                      <Link href="/review-answers" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Answers</Link>
                     </div>
                   )}
                 </div>

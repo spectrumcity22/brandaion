@@ -1,0 +1,2 @@
+[functions.generate_faq_batch]
+verify_jwt = false 
