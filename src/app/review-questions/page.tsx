@@ -32,6 +32,7 @@ interface ReviewQuestion {
   question_status: string;
   unique_batch_id: string;
   unique_batch_cluster: string;
+  answer_status?: string;
   ai_response_answers?: string;
 }
 
@@ -200,14 +201,9 @@ export default function ReviewQuestions() {
   const handleAskQuestion = async (questionId: number) => {
     try {
       setAskingQuestions(prev => ({ ...prev, [questionId]: true }));
-      
-      // Get the session for the webhook call (following client_configuration_form pattern)
+      setError(null); // Clear any previous error
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No session found');
-      }
-
-      // Call ai_request_answers endpoint (following exact pattern)
+      if (!session) throw new Error();
       const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers", {
         method: "POST",
         headers: {
@@ -221,18 +217,23 @@ export default function ReviewQuestions() {
           auth_user_id: user.id 
         }),
       });
-
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(`Ask question failed: ${responseData.error || 'Unknown error'}`);
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (jsonErr) {
+        await response.text(); // ignore, just to consume the body
       }
-
-      // Refresh the questions to show updated status
+      // Always refresh the questions after the call
       await fetchQuestions();
-      
+      // Find the updated question
+      const updated = questions.find(q => q.id === questionId);
+      if (!updated || updated.answer_status !== 'completed') {
+        setError('Sorry, something went wrong. Please try again.');
+      } else {
+        setError(null);
+      }
     } catch (error) {
-      console.error('Error asking question:', error);
-      setError(`Failed to ask question: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError('Sorry, something went wrong. Please try again.');
     } finally {
       setAskingQuestions(prev => ({ ...prev, [questionId]: false }));
     }
