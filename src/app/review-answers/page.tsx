@@ -210,7 +210,7 @@ export default function ReviewAnswers() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("No active session");
 
-      const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_faq_batch", {
+      const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate-faq-batch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
