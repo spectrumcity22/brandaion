@@ -147,7 +147,6 @@ export default function OrganisationForm() {
       }
 
       setMessage('✅ Organisation and brand row updated successfully!');
-      setTimeout(() => router.push('/client_brands_form'), 1000);
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {
@@ -234,6 +233,17 @@ export default function OrganisationForm() {
         </button>
 
         <div className="text-sm mt-4 text-center text-red-400">{message}</div>
+        
+        {message.includes('✅') && (
+          <div className="mt-4">
+            <button
+              onClick={() => router.push('/client_brands_form')}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Continue to Brands Form
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

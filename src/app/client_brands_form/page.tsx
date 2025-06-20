@@ -60,8 +60,7 @@ export default function ClientBrandsForm() {
     if (error) {
       setMessage('❌ Error saving brand: ' + error.message);
     } else {
-      setMessage('✅ Brand updated successfully! Redirecting...');
-      setTimeout(() => router.push('/select_package'), 1000);
+      setMessage('✅ Brand updated successfully!');
     }
   };
 
@@ -96,6 +95,17 @@ export default function ClientBrandsForm() {
           </button>
         </form>
         <div className="text-sm mt-4 text-center text-green-400">{message}</div>
+        
+        {message.includes('✅') && (
+          <div className="mt-4">
+            <button
+              onClick={() => router.push('/select_package')}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Continue to Package Selection
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

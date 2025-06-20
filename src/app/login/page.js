@@ -31,7 +31,7 @@ export default function LoginPage() {
     if (error) {
       setMessage(error.message);
     } else {
-      router.push('/onboarding_router'); // Redirect to onboarding logic
+      router.push('/dashboard'); // Redirect to dashboard instead of onboarding router
     }
   };
 

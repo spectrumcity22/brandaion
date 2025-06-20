@@ -96,7 +96,6 @@ export default function EndUserForm() {
       }
 
       setMessage('✅ Profile and organisation saved!');
-      setTimeout(() => router.push('/organisation_form'), 1000);
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {
@@ -150,7 +149,18 @@ export default function EndUserForm() {
         </button>
 
         <div className="text-sm mt-4 text-center text-red-400">{message}</div>
+        
+        {message.includes('✅') && (
+          <div className="mt-4">
+            <button
+              onClick={() => router.push('/organisation_form')}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Continue to Organization Form
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
-} 
+}

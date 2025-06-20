@@ -79,7 +79,6 @@ function InvoiceConfirmationContent() {
       const data = await response.json();
       console.log('Schedule created successfully:', data);
       setMessage('✅ Schedule created successfully!');
-      setTimeout(() => router.push('/schedule'), 1500);
     } catch (error) {
       console.error('Error creating schedule:', error);
       setMessage('❌ Failed to create schedule. Please try again.');
@@ -154,6 +153,17 @@ function InvoiceConfirmationContent() {
           >
             {creatingSchedule ? 'Creating Schedule...' : 'Create Schedule'}
           </button>
+          
+          {message.includes('✅') && (
+            <div className="mt-4">
+              <button
+                onClick={() => router.push('/schedule')}
+                className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition"
+              >
+                View Your Schedule
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

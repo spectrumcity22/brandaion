@@ -122,7 +122,6 @@ export default function Schedule() {
         setProductMessage('❌ Failed to create product: ' + errorData.error);
       } else {
         setProductMessage('✅ Product created successfully!');
-        setTimeout(() => router.push('/client_products'), 1200);
       }
     } catch (err: any) {
       setProductMessage('❌ Error: ' + err.message);
@@ -197,6 +196,17 @@ export default function Schedule() {
             {creatingProduct ? 'Creating Product...' : 'Create Product'}
           </button>
           {productMessage && <div className="mt-2 text-sm">{productMessage}</div>}
+          
+          {productMessage.includes('✅') && (
+            <div className="mt-4">
+              <button
+                onClick={() => router.push('/client_products')}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                View Products
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

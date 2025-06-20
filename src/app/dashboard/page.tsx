@@ -43,13 +43,7 @@ export default function Dashboard() {
           .eq('auth_user_id', user.id)
           .maybeSingle();
 
-        if (!endUser) {
-          // User hasn't completed onboarding, redirect to onboarding router
-          router.push('/onboarding_router');
-          return;
-        }
-
-        // Load all dashboard data
+        // Load all dashboard data (don't redirect if missing)
         const [
           invoiceResult,
           scheduleResult,
@@ -198,6 +192,92 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
+
+        {/* Setup Guidance - Show if account is not complete */}
+        {data.accountCompletion < 100 && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-xl p-6">
+              <h2 className="text-xl font-semibold text-white mb-4">Complete Your Setup</h2>
+              <div className="space-y-3">
+                {!data.user && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-red-500/20 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-300">Complete your profile</span>
+                    </div>
+                    <button
+                      onClick={() => router.push('/end_user_form')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Complete
+                    </button>
+                  </div>
+                )}
+                
+                {!data.invoice && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-yellow-500/20 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-300">Select a package</span>
+                    </div>
+                    <button
+                      onClick={() => router.push('/select_package')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Select
+                    </button>
+                  </div>
+                )}
+                
+                {!data.schedule && data.invoice && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-300">Set up your schedule</span>
+                    </div>
+                    <button
+                      onClick={() => router.push('/schedule')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Setup
+                    </button>
+                  </div>
+                )}
+                
+                {data.completedBatches === 0 && data.schedule && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-300">Generate your first FAQ batch</span>
+                    </div>
+                    <button
+                      onClick={() => router.push('/schedule')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

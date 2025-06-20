@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </>
             ) : (
               <>
-                <Link href="/onboarding_router" className="hover:text-green-400">Dashboard</Link>
+                <Link href="/dashboard" className="hover:text-green-400">Dashboard</Link>
                 {/* Account Dropdown */}
                 <div ref={accountRef} className="relative">
                   <button
