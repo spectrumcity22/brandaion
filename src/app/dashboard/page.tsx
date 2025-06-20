@@ -365,6 +365,51 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Available Packages */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">Available Packages</h2>
+            <button
+              onClick={() => router.push('/packages')}
+              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+            >
+              View All Packages →
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { tier: 'Startup', price: 99, faq_pairs: 20, color: 'from-orange-500/20 to-orange-600/20', border: 'border-orange-500/30' },
+              { tier: 'Growth', price: 199, faq_pairs: 40, color: 'from-emerald-500/20 to-emerald-600/20', border: 'border-emerald-500/30' },
+              { tier: 'Pro', price: 299, faq_pairs: 60, color: 'from-blue-500/20 to-blue-600/20', border: 'border-blue-500/30' },
+              { tier: 'Enterprise', price: 399, faq_pairs: 80, color: 'from-purple-500/20 to-purple-600/20', border: 'border-purple-500/30' }
+            ].map((pkg) => (
+              <div key={pkg.tier} className={`bg-gradient-to-br ${pkg.color} border ${pkg.border} rounded-xl p-4 relative group hover:scale-105 transition-all duration-200`}>
+                {pkg.tier === 'Pro' && (
+                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 px-2 py-1 rounded-full text-xs font-bold">
+                      Popular
+                    </span>
+                  </div>
+                )}
+                <div className="text-center">
+                  <h3 className="text-lg font-bold text-white mb-2">{pkg.tier}</h3>
+                  <div className="mb-3">
+                    <span className="text-2xl font-bold text-white">${pkg.price}</span>
+                    <span className="text-gray-300 text-sm ml-1">/month</span>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-4">{pkg.faq_pairs} FAQ pairs/month</p>
+                  <button
+                    onClick={() => router.push('/select_package')}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
+                  >
+                    {data.invoice?.package_tier === pkg.tier ? 'Current Plan' : 'Upgrade'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
