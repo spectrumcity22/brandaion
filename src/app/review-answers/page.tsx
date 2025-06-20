@@ -295,35 +295,14 @@ export default function ReviewAnswers() {
         return (
           <div key={batch.batchId} className="mb-8">
             <div className="bg-gray-800 p-4 rounded-t-lg">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-semibold text-white">
-                    Batch ID: {batch.batchId}
-                  </h2>
-                  <p className="text-gray-300">Cluster: {batch.batchCluster}</p>
-                  <p className="text-gray-300">
-                    Progress: {approvedCount}/{totalCount} answers approved
-                  </p>
-                </div>
-                {isComplete && (
-                  <Button
-                    variant="contained"
-                    color="success"
-                    onClick={() => handleProcessBatch(batch.batchId)}
-                    disabled={processingBatches[batch.batchId]}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {processingBatches[batch.batchId] ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : 'Process Batch'}
-                  </Button>
-                )}
+              <div>
+                <h2 className="text-xl font-semibold text-white">
+                  Batch ID: {batch.batchId}
+                </h2>
+                <p className="text-gray-300">Cluster: {batch.batchCluster}</p>
+                <p className="text-gray-300">
+                  Progress: {approvedCount}/{totalCount} answers approved
+                </p>
               </div>
             </div>
             
@@ -432,6 +411,28 @@ export default function ReviewAnswers() {
                 })}
               </tbody>
             </table>
+            
+            {isComplete && (
+              <div className="mt-4 flex justify-center">
+                <Button
+                  variant="contained"
+                  color="success"
+                  onClick={() => handleProcessBatch(batch.batchId)}
+                  disabled={processingBatches[batch.batchId]}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {processingBatches[batch.batchId] ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : 'Process Batch'}
+                </Button>
+              </div>
+            )}
           </div>
         );
       })}
