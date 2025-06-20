@@ -82,15 +82,6 @@ export default function FAQPairsPage() {
             }
           }
 
-          // Debug logging to see actual values
-          console.log('FAQ Pair Debug:', {
-            id: pair.id,
-            answer_status: pair.answer_status,
-            answer_status_type: typeof pair.answer_status,
-            answer_status_length: pair.answer_status?.length,
-            has_answer: !!pair.ai_response_answers
-          });
-
           return {
             id: pair.id,
             question: pair.question,
@@ -108,8 +99,8 @@ export default function FAQPairsPage() {
 
         // Calculate stats
         const total = transformedPairs.length;
-        const completed = transformedPairs.filter(p => p.answer_status === 'completed').length;
-        const pending = transformedPairs.filter(p => p.answer_status !== 'completed').length;
+        const completed = transformedPairs.filter(p => p.answer_status === 'completed' || p.answer_status === 'approved').length;
+        const pending = transformedPairs.filter(p => p.answer_status !== 'completed' && p.answer_status !== 'approved').length;
         const approved = transformedPairs.filter(p => p.question_status === 'approved').length;
 
         setStats({ total, completed, pending, approved });
@@ -131,8 +122,8 @@ export default function FAQPairsPage() {
                          pair.organisation_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'completed' && pair.answer_status === 'completed') ||
-                         (statusFilter === 'pending' && pair.answer_status !== 'completed') ||
+                         (statusFilter === 'completed' && (pair.answer_status === 'completed' || pair.answer_status === 'approved')) ||
+                         (statusFilter === 'pending' && pair.answer_status !== 'completed' && pair.answer_status !== 'approved') ||
                          (statusFilter === 'approved' && pair.question_status === 'approved');
 
     return matchesSearch && matchesStatus;
@@ -149,16 +140,6 @@ export default function FAQPairsPage() {
   };
 
   const getStatusBadge = (status: string, type: 'question' | 'answer') => {
-    // Debug logging for status badge
-    console.log('Status Badge Debug:', {
-      status,
-      type,
-      status_type: typeof status,
-      status_length: status?.length,
-      is_completed: status === 'completed',
-      is_completed_lowercase: status?.toLowerCase() === 'completed'
-    });
-
     const baseClasses = "px-2 py-1 rounded-full text-xs font-semibold";
     
     if (type === 'question') {
@@ -173,6 +154,7 @@ export default function FAQPairsPage() {
     } else {
       switch (status) {
         case 'completed':
+        case 'approved':
           return <span className={`${baseClasses} bg-blue-500/20 text-blue-400 border border-blue-500/30`}>Completed</span>;
         default:
           return <span className={`${baseClasses} bg-orange-500/20 text-orange-400 border border-orange-500/30`}>Pending</span>;
