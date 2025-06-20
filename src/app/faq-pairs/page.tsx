@@ -82,6 +82,15 @@ export default function FAQPairsPage() {
             }
           }
 
+          // Debug logging to see actual values
+          console.log('FAQ Pair Debug:', {
+            id: pair.id,
+            answer_status: pair.answer_status,
+            answer_status_type: typeof pair.answer_status,
+            answer_status_length: pair.answer_status?.length,
+            has_answer: !!pair.ai_response_answers
+          });
+
           return {
             id: pair.id,
             question: pair.question,
@@ -140,6 +149,16 @@ export default function FAQPairsPage() {
   };
 
   const getStatusBadge = (status: string, type: 'question' | 'answer') => {
+    // Debug logging for status badge
+    console.log('Status Badge Debug:', {
+      status,
+      type,
+      status_type: typeof status,
+      status_length: status?.length,
+      is_completed: status === 'completed',
+      is_completed_lowercase: status?.toLowerCase() === 'completed'
+    });
+
     const baseClasses = "px-2 py-1 rounded-full text-xs font-semibold";
     
     if (type === 'question') {
