@@ -30,26 +30,38 @@ export default function FAQBatches() {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchBatches();
     // Get user on component load
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setError('Authentication required');
+        setLoading(false);
+        return;
+      }
       setUser(user);
+      fetchBatches(user.id);
     })();
   }, []);
 
-  const fetchBatches = async () => {
+  const fetchBatches = async (userId: string) => {
     try {
+      setLoading(true);
+      setError(null);
+      
       const { data, error } = await supabase
         .from('batch_faq_pairs')
         .select('*')
-        .eq('auth_user_id', user?.id)
+        .eq('auth_user_id', userId)
         .order('batch_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       setBatches(data || []);
     } catch (error) {
+      console.error('Fetch error:', error);
       setError('Failed to load FAQ batches');
     } finally {
       setLoading(false);
