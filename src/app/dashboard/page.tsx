@@ -402,6 +402,13 @@ export default function Dashboard() {
             </button>
             
             <button
+              onClick={() => router.push('/faq-performance')}
+              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
+            >
+              Test FAQ Performance
+            </button>
+            
+            <button
               onClick={() => router.push('/schedule')}
               className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
             >
