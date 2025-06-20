@@ -395,6 +395,13 @@ export default function Dashboard() {
             </button>
             
             <button
+              onClick={() => router.push('/faq-pairs')}
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
+            >
+              View FAQ Pairs
+            </button>
+            
+            <button
               onClick={() => router.push('/schedule')}
               className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
             >
