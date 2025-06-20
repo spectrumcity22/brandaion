@@ -50,7 +50,7 @@ serve(async (req)=>{
         if (!question.ai_request_for_answers) {
           console.log(`Question ${question.id} missing ai_request_for_answers field`);
           await supabase.from('review_questions').update({
-            answer_status: 'error',
+            answer_status: 'failed',
             error_message: 'Missing ai_request_for_answers field'
           }).eq('id', question.id);
           continue;
@@ -166,7 +166,7 @@ serve(async (req)=>{
         console.log(`Storing answer in database for question ${question.id}`);
         const { error: updateError } = await supabase.from('review_questions').update({
           ai_response_answers: generatedAnswer,
-          answer_status: 'answer_generated'
+          answer_status: 'completed'
         }).eq('id', question.id);
         if (updateError) {
           throw new Error(`Failed to update database: ${updateError.message}`);
@@ -177,11 +177,11 @@ serve(async (req)=>{
         console.error(`Error processing question ${question.id}:`, errorMessage);
         await supabase.from('review_questions').update({
           error_message: `Processing failed: ${errorMessage}`,
-          answer_status: 'error'
+          answer_status: 'failed'
         }).eq('id', question.id);
       }
     }
-    return new Response('success', {
+    return new Response(JSON.stringify({ message: 'success' }), {
       headers: corsHeaders,
       status: 200
     });
