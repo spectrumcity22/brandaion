@@ -64,7 +64,7 @@ export default function ReviewQuestions() {
     try {
       const { data, error } = await supabase
         .from('review_questions')
-        .select('id, topic, question, question_status, unique_batch_id, unique_batch_cluster, ai_response_answers')
+        .select('id, topic, question, question_status, unique_batch_id, unique_batch_cluster, answer_status, ai_response_answers')
         .in('question_status', ['questions_generated', 'question_approved'])
         .order('created_at', { ascending: false });
 
@@ -199,43 +199,38 @@ export default function ReviewQuestions() {
   };
 
   const handleAskQuestion = async (questionId: number) => {
+    setAskingQuestions(prev => ({ ...prev, [questionId]: true }));
+    setError(null); 
+
     try {
-      setAskingQuestions(prev => ({ ...prev, [questionId]: true }));
-      setError(null); // Clear any previous error
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error();
+      if (!session) throw new Error("No active session");
+
       const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
-          "x-client-info": "supabase-js/2.39.3",
-          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
         },
         body: JSON.stringify({ 
           question_id: questionId,
           auth_user_id: user.id 
         }),
       });
-      let responseData;
-      try {
-        responseData = await response.json();
-      } catch (jsonErr) {
-        await response.text(); // ignore, just to consume the body
+
+      if (!response.ok) {
+        // The function might return an error, log it, but don't show a breaking error to the user
+        const errorText = await response.text();
+        console.error("API call failed but proceeding with data refresh:", errorText);
       }
-      // Always refresh the questions after the call
-      await fetchQuestions();
-      // Find the updated question
-      const updated = questions.find(q => q.id === questionId);
-      if (!updated || updated.answer_status !== 'completed') {
-        setError('Sorry, something went wrong. Please try again.');
-      } else {
-        setError(null);
-      }
+
     } catch (error) {
-      setError('Sorry, something went wrong. Please try again.');
+        console.error("Error asking question:", error)
+        // We don't set a user-facing error here. The source of truth is the data refetch.
     } finally {
-      setAskingQuestions(prev => ({ ...prev, [questionId]: false }));
+        // Always refresh data to get the latest status. This is the source of truth.
+        await fetchQuestions(); 
+        setAskingQuestions(prev => ({ ...prev, [questionId]: false }));
     }
   };
 
@@ -320,7 +315,7 @@ export default function ReviewQuestions() {
                   <tr 
                     key={question.id} 
                     className={`border-b border-gray-700 ${
-                      isApproved ? 'opacity-60 bg-gray-800' : 'bg-transparent'
+                      isApproved ? 'bg-gray-800' : 'bg-transparent'
                     }`}
                   >
                     <td className="text-foreground py-1 px-4">
@@ -380,10 +375,10 @@ export default function ReviewQuestions() {
                       )}
                       {isApproved && (
                         <div className="flex gap-2">
-                          {!question.ai_response_answers ? (
+                          {!question.ai_response_answers && question.answer_status !== 'completed' ? (
                             <button
                               onClick={() => handleAskQuestion(question.id)}
-                              disabled={askingQuestions[question.id]}
+                              disabled={askingQuestions[question.id] || question.answer_status === 'generating'}
                               className={`px-3 py-1 rounded text-sm ${
                                 askingQuestions[question.id] 
                                   ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
