@@ -13,7 +13,7 @@ interface Product {
   auth_user_id: string;
   user_email: string;
   organisation: string;
-  market: string;
+  market_name: string;
   product_name: string;
   description: string;
   keywords: string;
@@ -321,9 +321,9 @@ export default function ClientProducts() {
                   <div>
                     <label className="block text-gray-300 mb-2 font-medium">Market</label>
                     <select 
-                      name="market" 
+                      name="market_name" 
                       className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                      value={formData.market || ''} 
+                      value={formData.market_name || ''} 
                       onChange={handleChange}
                     >
                       <option value="">Select Market</option>
@@ -470,10 +470,10 @@ export default function ClientProducts() {
                       </div>
                       
                       <div className="space-y-2 text-sm">
-                        {product.market && (
+                        {product.market_name && (
                           <div className="flex items-center text-gray-300">
                             <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                            {product.market}
+                            {product.market_name}
                           </div>
                         )}
                         {product.category && (
