@@ -109,6 +109,7 @@ export default function FAQPerformancePage() {
           created_at,
           question_status,
           answer_status,
+          organisation,
           organisation_jsonld_object
         `)
         .eq('auth_user_id', user.id)
@@ -120,16 +121,23 @@ export default function FAQPerformancePage() {
       }
 
       const transformedPairs = data?.map(pair => {
-        let orgName = 'Unknown Organization';
+        let orgName = pair.organisation || 'Unknown Organization';
         let industry = 'Unknown Industry';
         
+        // Only try to extract industry from JSON-LD if needed
         if (pair.organisation_jsonld_object) {
           try {
             const orgData = typeof pair.organisation_jsonld_object === 'string' 
               ? JSON.parse(pair.organisation_jsonld_object) 
               : pair.organisation_jsonld_object;
-            orgName = orgData.name || orgData.organisation_name || 'Unknown Organization';
-            industry = orgData.industry || 'Unknown Industry';
+            
+            // Try multiple possible field names for industry
+            industry = orgData.industry || 
+                      orgData.sector || 
+                      orgData.businessType ||
+                      orgData['@industry'] ||
+                      orgData['@sector'] ||
+                      'Unknown Industry';
           } catch (e) {
             console.error('Error parsing organisation data:', e);
           }
@@ -246,6 +254,26 @@ export default function FAQPerformancePage() {
         ? prev.filter(p => p !== provider)
         : [...prev, provider]
     );
+  };
+
+  const handleFAQCheckboxClick = (e: React.MouseEvent, faqId: string) => {
+    e.stopPropagation();
+    toggleFAQSelection(faqId);
+  };
+
+  const handleProviderCheckboxClick = (e: React.MouseEvent, provider: string) => {
+    e.stopPropagation();
+    toggleProviderSelection(provider);
+  };
+
+  const handleFAQCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>, faqId: string) => {
+    e.stopPropagation();
+    toggleFAQSelection(faqId);
+  };
+
+  const handleProviderCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>, provider: string) => {
+    e.stopPropagation();
+    toggleProviderSelection(provider);
   };
 
   const selectAll = () => {
@@ -437,13 +465,13 @@ export default function FAQPerformancePage() {
                       ? 'border-green-500 bg-green-500/10'
                       : 'border-gray-600 bg-gray-800/50 hover:border-gray-500'
                   }`}
-                  onClick={() => toggleProviderSelection(key)}
+                  onClick={(e) => handleProviderCheckboxClick(e, key)}
                 >
                   <div className="flex items-center gap-3">
                     <input
                       type="checkbox"
                       checked={selectedProviders.includes(key)}
-                      onChange={() => toggleProviderSelection(key)}
+                      onChange={(e) => handleProviderCheckboxChange(e, key)}
                       className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
                     />
                     <div className="flex items-center gap-2">
@@ -529,13 +557,13 @@ export default function FAQPerformancePage() {
                       ? 'border-green-500 bg-green-500/10'
                       : 'border-gray-600 bg-gray-800/50 hover:border-gray-500'
                   }`}
-                  onClick={() => toggleFAQSelection(faq.id)}
+                  onClick={(e) => handleFAQCheckboxClick(e, faq.id)}
                 >
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       checked={selectedPairs.includes(faq.id)}
-                      onChange={() => toggleFAQSelection(faq.id)}
+                      onChange={(e) => handleFAQCheckboxChange(e, faq.id)}
                       className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
                     />
                     <div className="flex-1">
