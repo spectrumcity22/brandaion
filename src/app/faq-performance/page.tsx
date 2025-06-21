@@ -42,50 +42,6 @@ interface TestSummary {
   average_accuracy: number;
 }
 
-interface PerformanceSettings {
-  enabled_providers: string[];
-  test_schedule: 'manual' | 'weekly' | 'monthly';
-  weekly_test_day: number;
-  monthly_test_day: number;
-  max_tokens_per_test: number;
-  max_cost_per_month: number;
-  auto_test_enabled: boolean;
-}
-
-interface UserTestingSettings {
-  id: string;
-  user_id: string;
-  question_id: number;
-  package_tier: 'basic' | 'standard' | 'premium' | 'enterprise';
-  questions_per_month: number;
-  enabled_providers: string[];
-  is_active: boolean;
-  first_test_date: string | null;
-  last_test_date: string | null;
-  next_test_date: string | null;
-  test_schedule: string;
-  subscription_expires_at: string | null;
-  testing_paused_at: string | null;
-  grace_period_days: number;
-  ai_response: string | null;
-  response_analysis: any | null;
-  accuracy_score: number | null;
-  token_usage: number | null;
-  cost_usd: number | null;
-  test_month: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface PackageLimits {
-  tier: string;
-  questions_per_month: number;
-  allowed_providers: string[];
-  selected_questions: number;
-  remaining_questions: number;
-  has_exceeded: boolean;
-}
-
 const AI_PROVIDERS = {
   openai: { name: 'OpenAI GPT-4', color: 'from-blue-500 to-blue-600', icon: '🤖' },
   perplexity: { name: 'Perplexity AI', color: 'from-purple-500 to-purple-600', icon: '🔍' },
@@ -103,19 +59,6 @@ export default function FAQPerformancePage() {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
-  const [userTestingSettings, setUserTestingSettings] = useState<UserTestingSettings[]>([]);
-  const [packageLimits, setPackageLimits] = useState<PackageLimits | null>(null);
-  const [showAutomatedSetup, setShowAutomatedSetup] = useState(false);
-  const [settings, setSettings] = useState<PerformanceSettings>({
-    enabled_providers: ['openai'],
-    test_schedule: 'manual',
-    weekly_test_day: 1,
-    monthly_test_day: 1,
-    max_tokens_per_test: 1000,
-    max_cost_per_month: 50.00,
-    auto_test_enabled: false
-  });
-  const [showSettings, setShowSettings] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -191,58 +134,17 @@ export default function FAQPerformancePage() {
 
       setFaqPairs(transformedPairs);
 
-      // Load user testing settings
-      const { data: testingSettingsData, error: testingError } = await supabase
-        .from('user_testing_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (testingError) {
-        console.error('Error loading testing settings:', testingError);
-      } else {
-        setUserTestingSettings(testingSettingsData || []);
-        
-        // Calculate package limits
-        if (testingSettingsData && testingSettingsData.length > 0) {
-          const firstSetting = testingSettingsData[0];
-          const selectedCount = testingSettingsData.length;
-          const remaining = firstSetting.questions_per_month - selectedCount;
-          
-          setPackageLimits({
-            tier: firstSetting.package_tier,
-            questions_per_month: firstSetting.questions_per_month,
-            allowed_providers: firstSetting.enabled_providers,
-            selected_questions: selectedCount,
-            remaining_questions: remaining,
-            has_exceeded: remaining < 0
-          });
-        }
-      }
-
-      // Load performance settings
-      const { data: settingsData } = await supabase
-        .from('faq_performance_settings')
-        .select('*')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (settingsData) {
-        setSettings(settingsData);
-        setSelectedProviders(settingsData.enabled_providers);
-      }
-
       // Calculate stats
-      const total = transformedPairs.length;
-      const completed = transformedPairs.filter(p => p.question_status === 'question_approved').length;
-      const pending = transformedPairs.filter(p => p.question_status !== 'question_approved').length;
-      const approved = transformedPairs.filter(p => p.question_status === 'question_approved').length;
-
-      setStats({ total, completed, pending, approved });
+      setStats({
+        total: transformedPairs.length,
+        completed: transformedPairs.filter(p => p.answer_status === 'completed').length,
+        pending: transformedPairs.filter(p => p.answer_status === 'pending').length,
+        approved: transformedPairs.filter(p => p.question_status === 'question_approved').length
+      });
 
     } catch (error) {
       console.error('Error loading data:', error);
-      setError('Failed to load data');
+      setError('Failed to load FAQ pairs');
     } finally {
       setLoading(false);
     }
@@ -330,91 +232,6 @@ export default function FAQPerformancePage() {
     setSelectedPairs([]);
   };
 
-  const saveSettings = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { error } = await supabase
-        .from('faq_performance_settings')
-        .upsert({
-          auth_user_id: user.id,
-          enabled_providers: selectedProviders,
-          test_schedule: settings.test_schedule,
-          weekly_test_day: settings.weekly_test_day,
-          monthly_test_day: settings.monthly_test_day,
-          max_tokens_per_test: settings.max_tokens_per_test,
-          max_cost_per_month: settings.max_cost_per_month,
-          auto_test_enabled: settings.auto_test_enabled
-        }, { onConflict: 'auth_user_id' });
-
-      if (error) throw error;
-      setShowSettings(false);
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      setError('Failed to save settings');
-    }
-  };
-
-  const saveAutomatedTestingSetup = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Get user's package tier (you'll need to implement this based on your subscription system)
-      const packageTier = 'basic'; // Default for now
-      const questionsPerMonth = packageTier === 'basic' ? 5 : packageTier === 'standard' ? 10 : packageTier === 'premium' ? 15 : 20;
-      const allowedProviders = packageTier === 'basic' ? ['openai'] : 
-                              packageTier === 'standard' ? ['openai', 'gemini'] :
-                              packageTier === 'premium' ? ['openai', 'gemini', 'perplexity'] :
-                              ['openai', 'gemini', 'perplexity', 'claude'];
-
-      // Check if user has exceeded their limit
-      if (selectedPairs.length > questionsPerMonth) {
-        setError(`You can only select ${questionsPerMonth} questions with your ${packageTier} package. Please upgrade to select more.`);
-        return;
-      }
-
-      // Clear existing settings for this user
-      await supabase
-        .from('user_testing_settings')
-        .delete()
-        .eq('user_id', user.id);
-
-      // Create new settings for each selected question
-      const today = new Date();
-      const nextMonth = new Date();
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-
-      const settingsToInsert = selectedPairs.map(questionId => ({
-        user_id: user.id,
-        question_id: parseInt(questionId),
-        package_tier: packageTier,
-        questions_per_month: questionsPerMonth,
-        enabled_providers: allowedProviders,
-        is_active: true,
-        first_test_date: today.toISOString().split('T')[0],
-        next_test_date: nextMonth.toISOString().split('T')[0],
-        test_schedule: 'monthly',
-        grace_period_days: 7
-      }));
-
-      const { error } = await supabase
-        .from('user_testing_settings')
-        .insert(settingsToInsert);
-
-      if (error) throw error;
-
-      setShowAutomatedSetup(false);
-      setError('');
-      // Reload data to show updated settings
-      await loadData();
-    } catch (error) {
-      console.error('Error saving automated testing setup:', error);
-      setError('Failed to save automated testing setup');
-    }
-  };
-
   const getProviderColor = (provider: string) => {
     return AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]?.color || 'from-gray-500 to-gray-600';
   };
@@ -453,321 +270,127 @@ export default function FAQPerformancePage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">FAQ Performance Center</h1>
-              <p className="text-xl text-gray-300">Test your FAQ pairs across multiple AI providers and track performance metrics</p>
-            </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
-            >
-              ⚙️ Settings
-            </button>
-          </div>
+          <h1 className="text-4xl font-bold text-white mb-2">FAQ Performance Testing</h1>
+          <p className="text-gray-300 text-lg">Test your FAQ pairs against multiple AI providers to compare performance and accuracy</p>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 border border-blue-500/20 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="text-blue-400 text-2xl mr-3">📊</div>
               <div>
                 <p className="text-gray-400 text-sm">Total FAQ Pairs</p>
-                <p className="text-3xl font-bold text-white">{stats.total}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <p className="text-white text-2xl font-bold">{stats.total}</p>
               </div>
             </div>
           </div>
-
-          <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-green-500/10 to-green-600/10 border border-green-500/20 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="text-green-400 text-2xl mr-3">💡</div>
               <div>
-                <p className="text-gray-400 text-sm">Completed Answers</p>
-                <p className="text-3xl font-bold text-white">{stats.completed}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <p className="text-gray-400 text-sm">New Questions You Can Ask</p>
+                <p className="text-white text-2xl font-bold">∞</p>
               </div>
             </div>
           </div>
-
-          <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 border border-yellow-500/20 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="text-yellow-400 text-2xl mr-3">⏳</div>
               <div>
-                <p className="text-gray-400 text-sm">Selected for Testing</p>
-                <p className="text-3xl font-bold text-white">{selectedPairs.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+                <p className="text-gray-400 text-sm">Pending Answers</p>
+                <p className="text-white text-2xl font-bold">{stats.pending}</p>
               </div>
             </div>
           </div>
-
-          <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/20 rounded-lg p-6">
+            <div className="flex items-center">
+              <div className="text-purple-400 text-2xl mr-3">🎯</div>
               <div>
-                <p className="text-gray-400 text-sm">AI Providers</p>
-                <p className="text-3xl font-bold text-white">{selectedProviders.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
+                <p className="text-gray-400 text-sm">Ready for Testing</p>
+                <p className="text-white text-2xl font-bold">{stats.approved}</p>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Package Limits Panel */}
-        {packageLimits && (
-          <div className="mb-8">
-            <div className={`border rounded-xl p-6 ${
-              packageLimits.has_exceeded 
-                ? 'bg-red-900/20 border-red-500/50' 
-                : 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30'
-            }`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-white">Package Limits</h2>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                  packageLimits.has_exceeded
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-green-500/20 text-green-400 border border-green-500/30'
-                }`}>
-                  {packageLimits.tier.toUpperCase()} Package
-                </span>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Questions Per Month</p>
-                  <p className="text-2xl font-bold text-white">{packageLimits.questions_per_month}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Selected Questions</p>
-                  <p className="text-2xl font-bold text-white">{packageLimits.selected_questions}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Remaining</p>
-                  <p className={`text-2xl font-bold ${
-                    packageLimits.has_exceeded ? 'text-red-400' : 'text-white'
-                  }`}>
-                    {packageLimits.remaining_questions}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">AI Providers</p>
-                  <p className="text-2xl font-bold text-white">{packageLimits.allowed_providers.length}</p>
-                </div>
-              </div>
-              
-              {packageLimits.has_exceeded && (
-                <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <p className="text-red-400 font-medium">You have exceeded your monthly question limit!</p>
-                  </div>
-                  <p className="text-red-300 text-sm mt-2">
-                    Please upgrade your package or remove some questions from automated testing.
-                  </p>
-                </div>
-              )}
-              
-              {!packageLimits.has_exceeded && packageLimits.remaining_questions <= 2 && (
-                <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                    <p className="text-yellow-400 font-medium">Almost at your limit!</p>
-                  </div>
-                  <p className="text-yellow-300 text-sm mt-2">
-                    You have {packageLimits.remaining_questions} questions remaining this month.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Automated Testing Setup Button */}
-        {!packageLimits && (
-          <div className="mb-8">
-            <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6 text-center">
-              <h2 className="text-xl font-semibold text-white mb-4">Set Up Automated Testing</h2>
-              <p className="text-gray-300 mb-6">
-                Select questions and AI providers to automatically test your FAQ performance monthly.
-              </p>
-              <button
-                onClick={() => setShowAutomatedSetup(true)}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 transform hover:scale-105"
-              >
-                🚀 Set Up Automated Testing
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Test Summary */}
-        {testSummary && (
-          <div className="mb-8">
-            <div className="bg-gradient-to-r from-emerald-600/20 to-teal-600/20 border border-emerald-500/30 rounded-xl p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Test Results Summary</h2>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Total Tests</p>
-                  <p className="text-2xl font-bold text-white">{testSummary.total_tests}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Successful</p>
-                  <p className="text-2xl font-bold text-white">{testSummary.successful_tests}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Total Cost</p>
-                  <p className="text-2xl font-bold text-white">${testSummary.total_cost.toFixed(4)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Total Tokens</p>
-                  <p className="text-2xl font-bold text-white">{testSummary.total_tokens.toLocaleString()}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Avg Accuracy</p>
-                  <p className="text-2xl font-bold text-white">{testSummary.average_accuracy.toFixed(1)}%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* AI Provider Selection */}
-        <div className="mb-8">
-          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Select AI Providers</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
-                <div
-                  key={key}
-                  className={`border rounded-xl p-4 transition-all duration-200 ${
-                    selectedProviders.includes(key)
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-gray-600 bg-gray-800/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedProviders.includes(key)}
-                      onChange={() => toggleProviderSelection(key)}
-                      className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
-                    />
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{provider.icon}</span>
-                      <span className="text-white font-medium">{provider.name}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Test Controls */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="flex gap-2">
-                <button
-                  onClick={selectAll}
-                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={deselectAll}
-                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  Deselect All
-                </button>
-              </div>
-              <div className="text-gray-300">
-                {selectedPairs.length} FAQ pairs selected • {selectedProviders.length} AI providers
-              </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
+          <h2 className="text-xl font-semibold text-white mb-4">Select AI Providers</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
               <button
-                onClick={testFAQPerformance}
-                disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0}
-                className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
-                  testing || selectedPairs.length === 0 || selectedProviders.length === 0
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
+                key={key}
+                onClick={() => toggleProviderSelection(key)}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                  selectedProviders.includes(key)
+                    ? `bg-gradient-to-r ${provider.color} border-transparent text-white`
+                    : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:border-gray-500'
                 }`}
               >
-                {testing ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Testing...
-                  </div>
-                ) : (
-                  '🚀 Run Performance Test'
-                )}
+                <div className="text-2xl mb-2">{provider.icon}</div>
+                <div className="text-sm font-medium">{provider.name}</div>
               </button>
-            </div>
+            ))}
           </div>
         </div>
 
         {/* FAQ Pairs Selection */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">Select FAQ Pairs to Test</h2>
-          {faqPairs.length === 0 ? (
-            <div className="text-center py-16 bg-gray-900/30 border border-gray-700/50 rounded-xl">
-              <div className="w-24 h-24 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4">No FAQ Pairs Available</h3>
-              <p className="text-gray-400 mb-6">You need completed FAQ pairs to run performance tests</p>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-white">Select FAQ Pairs to Test</h2>
+            <div className="flex gap-2">
               <button
-                onClick={() => router.push('/review-questions')}
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
+                onClick={selectAll}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
               >
-                Go to Review Questions
+                Select All
+              </button>
+              <button
+                onClick={deselectAll}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm transition-colors"
+              >
+                Deselect All
               </button>
             </div>
+          </div>
+
+          {faqPairs.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-400 text-6xl mb-4">📝</div>
+              <h3 className="text-xl font-semibold text-white mb-2">No FAQ Pairs Available</h3>
+              <p className="text-gray-400">You need approved FAQ pairs to test performance. Generate some FAQ pairs first.</p>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid gap-4 max-h-96 overflow-y-auto">
               {faqPairs.map((faq) => (
                 <div
                   key={faq.id}
-                  className={`border rounded-xl p-4 transition-all duration-200 ${
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                     selectedPairs.includes(faq.id)
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-gray-600 bg-gray-800/50'
+                      ? 'bg-blue-600/20 border-blue-500'
+                      : 'bg-gray-700/30 border-gray-600 hover:border-gray-500'
                   }`}
+                  onClick={() => toggleFAQSelection(faq.id)}
                 >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedPairs.includes(faq.id)}
-                      onChange={() => toggleFAQSelection(faq.id)}
-                      className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
-                    />
+                  <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="text-white font-medium mb-2">{faq.question}</h3>
-                      <p className="text-gray-400 text-sm line-clamp-2">{faq.answer}</p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        <span>{faq.organisation_name}</span>
-                        <span>•</span>
-                        <span>{faq.industry}</span>
+                      <p className="text-gray-300 text-sm mb-2">{faq.answer}</p>
+                      <div className="flex gap-4 text-xs text-gray-400">
+                        <span>Organization: {faq.organisation_name}</span>
+                        <span>Industry: {faq.industry}</span>
+                        <span>Created: {new Date(faq.created_at).toLocaleDateString()}</span>
                       </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded border-2 ml-4 ${
+                      selectedPairs.includes(faq.id)
+                        ? 'bg-blue-500 border-blue-500'
+                        : 'border-gray-400'
+                    }`}>
+                      {selectedPairs.includes(faq.id) && (
+                        <div className="text-white text-xs flex items-center justify-center">✓</div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -776,274 +399,107 @@ export default function FAQPerformancePage() {
           )}
         </div>
 
+        {/* Test Button */}
+        <div className="text-center mb-8">
+          <button
+            onClick={testFAQPerformance}
+            disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0}
+            className={`px-8 py-4 rounded-lg text-lg font-semibold transition-all duration-200 ${
+              testing || selectedPairs.length === 0 || selectedProviders.length === 0
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
+            }`}
+          >
+            {testing ? 'Running Tests...' : 'Run Performance Test'}
+          </button>
+        </div>
+
         {/* Test Results */}
         {testResults.length > 0 && (
-          <div>
+          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
             <h2 className="text-xl font-semibold text-white mb-4">Test Results</h2>
+            
+            {testSummary && (
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-4 text-center">
+                  <p className="text-blue-400 text-sm">Total Tests</p>
+                  <p className="text-white text-2xl font-bold">{testSummary.total_tests}</p>
+                </div>
+                <div className="bg-green-600/20 border border-green-500/30 rounded-lg p-4 text-center">
+                  <p className="text-green-400 text-sm">Successful</p>
+                  <p className="text-white text-2xl font-bold">{testSummary.successful_tests}</p>
+                </div>
+                <div className="bg-yellow-600/20 border border-yellow-500/30 rounded-lg p-4 text-center">
+                  <p className="text-yellow-400 text-sm">Total Cost</p>
+                  <p className="text-white text-2xl font-bold">${testSummary.total_cost.toFixed(4)}</p>
+                </div>
+                <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-4 text-center">
+                  <p className="text-purple-400 text-sm">Total Tokens</p>
+                  <p className="text-white text-2xl font-bold">{testSummary.total_tokens.toLocaleString()}</p>
+                </div>
+                <div className="bg-orange-600/20 border border-orange-500/30 rounded-lg p-4 text-center">
+                  <p className="text-orange-400 text-sm">Avg Accuracy</p>
+                  <p className="text-white text-2xl font-bold">{testSummary.average_accuracy.toFixed(1)}%</p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               {testResults.map((result, index) => (
-                <div key={index} className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
+                <div key={index} className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                        result.status === 'success' 
-                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                      }`}>
-                        {result.status === 'success' ? '✅ Success' : '❌ Error'}
-                      </span>
-                      <span className="text-gray-400 text-sm">{getProviderName(result.provider)}</span>
+                      <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(result.provider)} flex items-center justify-center text-white text-sm font-bold`}>
+                        {getProviderIcon(result.provider)}
+                      </div>
+                      <div>
+                        <h3 className="text-white font-medium">{getProviderName(result.provider)}</h3>
+                        <p className="text-gray-400 text-sm">Question ID: {result.question_id}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-400">
-                      <span>{result.response_time_ms}ms</span>
-                      <span>•</span>
-                      <span>{result.token_usage} tokens</span>
-                      <span>•</span>
-                      <span>${result.cost_usd.toFixed(4)}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div>
-                      <h4 className="text-white font-medium mb-2">Question</h4>
-                      <p className="text-gray-300 text-sm">{result.question}</p>
-                    </div>
-                    <div>
-                      <h4 className="text-white font-medium mb-2">AI Response</h4>
-                      <p className="text-gray-300 text-sm">{result.response || 'No response'}</p>
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      result.status === 'success' ? 'bg-green-600/20 text-green-400' :
+                      result.status === 'error' ? 'bg-red-600/20 text-red-400' :
+                      'bg-yellow-600/20 text-yellow-400'
+                    }`}>
+                      {result.status}
                     </div>
                   </div>
                   
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-400">Response Time</p>
+                      <p className="text-white">{result.response_time_ms}ms</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Accuracy</p>
+                      <p className="text-white">{result.accuracy_score.toFixed(1)}%</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Tokens Used</p>
+                      <p className="text-white">{result.token_usage.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400">Cost</p>
+                      <p className="text-white">${result.cost_usd.toFixed(4)}</p>
+                    </div>
+                  </div>
+
+                  {result.response && (
+                    <div className="mt-3 p-3 bg-gray-600/20 rounded border border-gray-600">
+                      <p className="text-gray-400 text-sm mb-1">AI Response:</p>
+                      <p className="text-white text-sm">{result.response}</p>
+                    </div>
+                  )}
+
                   {result.error_message && (
-                    <div className="mt-4">
-                      <h4 className="text-red-400 font-medium mb-2">Error</h4>
+                    <div className="mt-3 p-3 bg-red-600/20 rounded border border-red-600">
+                      <p className="text-red-400 text-sm mb-1">Error:</p>
                       <p className="text-red-300 text-sm">{result.error_message}</p>
                     </div>
                   )}
-                  
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm text-gray-400">
-                      <span>Accuracy: {result.accuracy_score.toFixed(1)}%</span>
-                    </div>
-                  </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Settings Modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Performance Settings</h2>
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Test Schedule</label>
-                  <select
-                    value={settings.test_schedule}
-                    onChange={(e) => setSettings(prev => ({ ...prev, test_schedule: e.target.value as any }))}
-                    className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                  >
-                    <option value="manual">Manual Testing Only</option>
-                    <option value="weekly">Weekly Automated Testing</option>
-                    <option value="monthly">Monthly Automated Testing</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Max Tokens per Test</label>
-                  <input
-                    type="number"
-                    value={settings.max_tokens_per_test}
-                    onChange={(e) => setSettings(prev => ({ ...prev, max_tokens_per_test: parseInt(e.target.value) }))}
-                    className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                    min="100"
-                    max="8000"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Max Cost per Month ($)</label>
-                  <input
-                    type="number"
-                    value={settings.max_cost_per_month}
-                    onChange={(e) => setSettings(prev => ({ ...prev, max_cost_per_month: parseFloat(e.target.value) }))}
-                    className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                    min="1"
-                    max="1000"
-                    step="0.01"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="auto_test"
-                    checked={settings.auto_test_enabled}
-                    onChange={(e) => setSettings(prev => ({ ...prev, auto_test_enabled: e.target.checked }))}
-                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <label htmlFor="auto_test" className="text-gray-300">Enable Automated Testing</label>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-700/50">
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="px-6 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveSettings}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105"
-                >
-                  Save Settings
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Automated Testing Setup Modal */}
-        {showAutomatedSetup && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Set Up Automated Testing</h2>
-                <button
-                  onClick={() => setShowAutomatedSetup(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                {/* Package Information */}
-                <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Package Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <p className="text-gray-400 text-sm">Package Tier</p>
-                      <p className="text-xl font-bold text-white">Basic</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-gray-400 text-sm">Questions Per Month</p>
-                      <p className="text-xl font-bold text-white">5</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-gray-400 text-sm">AI Providers</p>
-                      <p className="text-xl font-bold text-white">OpenAI</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Question Selection */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Select Questions for Automated Testing</h3>
-                  <p className="text-gray-400 mb-4">Choose up to 5 questions to test monthly with OpenAI.</p>
-                  
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                    {faqPairs.map((faq) => (
-                      <div
-                        key={faq.id}
-                        className={`border rounded-xl p-4 transition-all duration-200 ${
-                          selectedPairs.includes(faq.id)
-                            ? 'border-green-500 bg-green-500/10'
-                            : 'border-gray-600 bg-gray-800/50'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedPairs.includes(faq.id)}
-                            onChange={() => toggleFAQSelection(faq.id)}
-                            disabled={selectedPairs.length >= 5 && !selectedPairs.includes(faq.id)}
-                            className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
-                          />
-                          <div className="flex-1">
-                            <h4 className="text-white font-medium mb-2">{faq.question}</h4>
-                            <p className="text-gray-400 text-sm line-clamp-2">{faq.answer}</p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                              <span>{faq.organisation_name}</span>
-                              <span>•</span>
-                              <span>{faq.industry}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {selectedPairs.length >= 5 && (
-                    <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                        <p className="text-yellow-400 font-medium">Maximum questions selected!</p>
-                      </div>
-                      <p className="text-yellow-300 text-sm mt-2">
-                        You&apos;ve reached the limit for your Basic package. Upgrade to select more questions.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Selection Summary */}
-                <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Selection Summary</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <p className="text-gray-400 text-sm">Selected Questions</p>
-                      <p className="text-2xl font-bold text-white">{selectedPairs.length}/5</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-gray-400 text-sm">AI Provider</p>
-                      <p className="text-xl font-bold text-white">OpenAI</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-gray-400 text-sm">Test Schedule</p>
-                      <p className="text-xl font-bold text-white">Monthly</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-700/50">
-                <button
-                  onClick={() => setShowAutomatedSetup(false)}
-                  className="px-6 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveAutomatedTestingSetup}
-                  disabled={selectedPairs.length === 0}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
-                    selectedPairs.length === 0
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
-                  }`}
-                >
-                  🚀 Set Up Automated Testing
-                </button>
-              </div>
             </div>
           </div>
         )}
