@@ -256,26 +256,6 @@ export default function FAQPerformancePage() {
     );
   };
 
-  const handleFAQCheckboxClick = (e: React.MouseEvent, faqId: string) => {
-    e.stopPropagation();
-    toggleFAQSelection(faqId);
-  };
-
-  const handleProviderCheckboxClick = (e: React.MouseEvent, provider: string) => {
-    e.stopPropagation();
-    toggleProviderSelection(provider);
-  };
-
-  const handleFAQCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>, faqId: string) => {
-    e.stopPropagation();
-    toggleFAQSelection(faqId);
-  };
-
-  const handleProviderCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>, provider: string) => {
-    e.stopPropagation();
-    toggleProviderSelection(provider);
-  };
-
   const selectAll = () => {
     setSelectedPairs(faqPairs.map(faq => faq.id));
   };
@@ -460,19 +440,18 @@ export default function FAQPerformancePage() {
               {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
                 <div
                   key={key}
-                  className={`border rounded-xl p-4 cursor-pointer transition-all duration-200 ${
+                  className={`border rounded-xl p-4 transition-all duration-200 ${
                     selectedProviders.includes(key)
                       ? 'border-green-500 bg-green-500/10'
-                      : 'border-gray-600 bg-gray-800/50 hover:border-gray-500'
+                      : 'border-gray-600 bg-gray-800/50'
                   }`}
-                  onClick={(e) => handleProviderCheckboxClick(e, key)}
                 >
                   <div className="flex items-center gap-3">
                     <input
                       type="checkbox"
                       checked={selectedProviders.includes(key)}
-                      onChange={(e) => handleProviderCheckboxChange(e, key)}
-                      className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
+                      onChange={() => toggleProviderSelection(key)}
+                      className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
                     />
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">{provider.icon}</span>
@@ -552,19 +531,18 @@ export default function FAQPerformancePage() {
               {faqPairs.map((faq) => (
                 <div
                   key={faq.id}
-                  className={`border rounded-xl p-4 cursor-pointer transition-all duration-200 ${
+                  className={`border rounded-xl p-4 transition-all duration-200 ${
                     selectedPairs.includes(faq.id)
                       ? 'border-green-500 bg-green-500/10'
-                      : 'border-gray-600 bg-gray-800/50 hover:border-gray-500'
+                      : 'border-gray-600 bg-gray-800/50'
                   }`}
-                  onClick={(e) => handleFAQCheckboxClick(e, faq.id)}
                 >
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
                       checked={selectedPairs.includes(faq.id)}
-                      onChange={(e) => handleFAQCheckboxChange(e, faq.id)}
-                      className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
+                      onChange={() => toggleFAQSelection(faq.id)}
+                      className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
                     />
                     <div className="flex-1">
                       <h3 className="text-white font-medium mb-2">{faq.question}</h3>
