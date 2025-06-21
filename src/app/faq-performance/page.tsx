@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 
@@ -123,11 +123,7 @@ export default function FAQPerformancePage() {
     approved: 0
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (!user || authError) {
@@ -250,7 +246,11 @@ export default function FAQPerformancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const testFAQPerformance = async () => {
     if (selectedPairs.length === 0) {
@@ -999,7 +999,7 @@ export default function FAQPerformancePage() {
                         <p className="text-yellow-400 font-medium">Maximum questions selected!</p>
                       </div>
                       <p className="text-yellow-300 text-sm mt-2">
-                        You've reached the limit for your Basic package. Upgrade to select more questions.
+                        You&apos;ve reached the limit for your Basic package. Upgrade to select more questions.
                       </p>
                     </div>
                   )}
