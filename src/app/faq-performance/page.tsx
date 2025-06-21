@@ -112,7 +112,7 @@ export default function FAQPerformancePage() {
           organisation_jsonld_object
         `)
         .eq('auth_user_id', user.id)
-        .eq('answer_status', 'completed')
+        .eq('question_status', 'question_approved')
         .order('created_at', { ascending: false });
 
       if (fetchError) {
@@ -164,9 +164,9 @@ export default function FAQPerformancePage() {
 
       // Calculate stats
       const total = transformedPairs.length;
-      const completed = transformedPairs.filter(p => p.answer_status === 'completed').length;
-      const pending = transformedPairs.filter(p => p.answer_status !== 'completed').length;
-      const approved = transformedPairs.filter(p => p.question_status === 'approved').length;
+      const completed = transformedPairs.filter(p => p.question_status === 'question_approved').length;
+      const pending = transformedPairs.filter(p => p.question_status !== 'question_approved').length;
+      const approved = transformedPairs.filter(p => p.question_status === 'question_approved').length;
 
       setStats({ total, completed, pending, approved });
 

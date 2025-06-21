@@ -90,7 +90,7 @@ serve(async (req) => {
       .select('id, question, ai_response_answers, organisation_jsonld_object')
       .in('id', question_ids)
       .eq('auth_user_id', auth_user_id)
-      .eq('answer_status', 'completed');
+      .eq('question_status', 'question_approved');
 
     if (questionsError) {
       throw new Error(`Failed to fetch questions: ${questionsError.message}`);
