@@ -62,7 +62,7 @@ export default function FAQPerformancePage() {
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
-    pending: 0,
+    selected: 0,
     approved: 0
   });
 
@@ -138,7 +138,7 @@ export default function FAQPerformancePage() {
       setStats({
         total: transformedPairs.length,
         completed: transformedPairs.filter(p => p.answer_status === 'completed').length,
-        pending: transformedPairs.filter(p => p.answer_status === 'pending').length,
+        selected: selectedPairs.length,
         approved: transformedPairs.filter(p => p.question_status === 'question_approved').length
       });
 
@@ -148,7 +148,7 @@ export default function FAQPerformancePage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, selectedPairs.length]);
 
   useEffect(() => {
     loadData();
@@ -270,127 +270,188 @@ export default function FAQPerformancePage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">FAQ Performance Testing</h1>
-          <p className="text-gray-300 text-lg">Test your FAQ pairs against multiple AI providers to compare performance and accuracy</p>
+          <h1 className="text-4xl font-bold text-white mb-2">FAQ Performance Center</h1>
+          <p className="text-xl text-gray-300">Test your FAQ pairs across multiple AI providers and track performance metrics</p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 border border-blue-500/20 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-blue-400 text-2xl mr-3">📊</div>
+          <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">Total FAQ Pairs</p>
-                <p className="text-white text-2xl font-bold">{stats.total}</p>
+                <p className="text-3xl font-bold text-white">{stats.total}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-r from-green-500/10 to-green-600/10 border border-green-500/20 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-green-400 text-2xl mr-3">💡</div>
+
+          <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">New Questions You Can Ask</p>
-                <p className="text-white text-2xl font-bold">∞</p>
+                <p className="text-3xl font-bold text-white">∞</p>
+              </div>
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 border border-yellow-500/20 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-yellow-400 text-2xl mr-3">⏳</div>
+
+          <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Pending Answers</p>
-                <p className="text-white text-2xl font-bold">{stats.pending}</p>
+                <p className="text-gray-400 text-sm">Selected for Testing</p>
+                <p className="text-3xl font-bold text-white">{stats.selected}</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
               </div>
             </div>
           </div>
-          <div className="bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/20 rounded-lg p-6">
-            <div className="flex items-center">
-              <div className="text-purple-400 text-2xl mr-3">🎯</div>
+
+          <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Ready for Testing</p>
-                <p className="text-white text-2xl font-bold">{stats.approved}</p>
+                <p className="text-gray-400 text-sm">AI Providers</p>
+                <p className="text-3xl font-bold text-white">{selectedProviders.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
               </div>
             </div>
           </div>
         </div>
 
         {/* AI Provider Selection */}
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">Select AI Providers</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
+        <div className="mb-8">
+          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Select AI Providers</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
+                <div
+                  key={key}
+                  className={`border rounded-xl p-4 transition-all duration-200 ${
+                    selectedProviders.includes(key)
+                      ? 'border-green-500 bg-green-500/10'
+                      : 'border-gray-600 bg-gray-800/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedProviders.includes(key)}
+                      onChange={() => toggleProviderSelection(key)}
+                      className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{provider.icon}</span>
+                      <span className="text-white font-medium">{provider.name}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Test Controls */}
+        <div className="mb-8">
+          <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex gap-2">
+                <button
+                  onClick={selectAll}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={deselectAll}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                  Deselect All
+                </button>
+              </div>
+              <div className="text-gray-300">
+                {selectedPairs.length} FAQ pairs selected • {selectedProviders.length} AI providers
+              </div>
               <button
-                key={key}
-                onClick={() => toggleProviderSelection(key)}
-                className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                  selectedProviders.includes(key)
-                    ? `bg-gradient-to-r ${provider.color} border-transparent text-white`
-                    : 'bg-gray-700/50 border-gray-600 text-gray-300 hover:border-gray-500'
+                onClick={testFAQPerformance}
+                disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0}
+                className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                  testing || selectedPairs.length === 0 || selectedProviders.length === 0
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
                 }`}
               >
-                <div className="text-2xl mb-2">{provider.icon}</div>
-                <div className="text-sm font-medium">{provider.name}</div>
+                {testing ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Testing...
+                  </div>
+                ) : (
+                  '🚀 Run Performance Test'
+                )}
               </button>
-            ))}
+            </div>
           </div>
         </div>
 
         {/* FAQ Pairs Selection */}
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-white">Select FAQ Pairs to Test</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={selectAll}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors"
-              >
-                Select All
-              </button>
-              <button
-                onClick={deselectAll}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm transition-colors"
-              >
-                Deselect All
-              </button>
-            </div>
-          </div>
-
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-white mb-4">Select FAQ Pairs to Test</h2>
           {faqPairs.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 text-6xl mb-4">📝</div>
-              <h3 className="text-xl font-semibold text-white mb-2">No FAQ Pairs Available</h3>
-              <p className="text-gray-400">You need approved FAQ pairs to test performance. Generate some FAQ pairs first.</p>
+            <div className="text-center py-16 bg-gray-900/30 border border-gray-700/50 rounded-xl">
+              <div className="w-24 h-24 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-4">No FAQ Pairs Available</h3>
+              <p className="text-gray-400 mb-6">You need completed FAQ pairs to run performance tests</p>
+              <button
+                onClick={() => router.push('/review-questions')}
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
+              >
+                Go to Review Questions
+              </button>
             </div>
           ) : (
-            <div className="grid gap-4 max-h-96 overflow-y-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {faqPairs.map((faq) => (
                 <div
                   key={faq.id}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                  className={`border rounded-xl p-4 transition-all duration-200 ${
                     selectedPairs.includes(faq.id)
-                      ? 'bg-blue-600/20 border-blue-500'
-                      : 'bg-gray-700/30 border-gray-600 hover:border-gray-500'
+                      ? 'border-green-500 bg-green-500/10'
+                      : 'border-gray-600 bg-gray-800/50'
                   }`}
-                  onClick={() => toggleFAQSelection(faq.id)}
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedPairs.includes(faq.id)}
+                      onChange={() => toggleFAQSelection(faq.id)}
+                      className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
+                    />
                     <div className="flex-1">
                       <h3 className="text-white font-medium mb-2">{faq.question}</h3>
-                      <p className="text-gray-300 text-sm mb-2">{faq.answer}</p>
-                      <div className="flex gap-4 text-xs text-gray-400">
-                        <span>Organization: {faq.organisation_name}</span>
-                        <span>Industry: {faq.industry}</span>
-                        <span>Created: {new Date(faq.created_at).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                        <span>{faq.organisation_name}</span>
+                        <span>•</span>
+                        <span>{faq.industry}</span>
                       </div>
-                    </div>
-                    <div className={`w-5 h-5 rounded border-2 ml-4 ${
-                      selectedPairs.includes(faq.id)
-                        ? 'bg-blue-500 border-blue-500'
-                        : 'border-gray-400'
-                    }`}>
-                      {selectedPairs.includes(faq.id) && (
-                        <div className="text-white text-xs flex items-center justify-center">✓</div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -399,105 +460,56 @@ export default function FAQPerformancePage() {
           )}
         </div>
 
-        {/* Test Button */}
-        <div className="text-center mb-8">
-          <button
-            onClick={testFAQPerformance}
-            disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0}
-            className={`px-8 py-4 rounded-lg text-lg font-semibold transition-all duration-200 ${
-              testing || selectedPairs.length === 0 || selectedProviders.length === 0
-                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl'
-            }`}
-          >
-            {testing ? 'Running Tests...' : 'Run Performance Test'}
-          </button>
-        </div>
-
         {/* Test Results */}
         {testResults.length > 0 && (
-          <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 mb-8">
+          <div>
             <h2 className="text-xl font-semibold text-white mb-4">Test Results</h2>
-            
-            {testSummary && (
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-4 text-center">
-                  <p className="text-blue-400 text-sm">Total Tests</p>
-                  <p className="text-white text-2xl font-bold">{testSummary.total_tests}</p>
-                </div>
-                <div className="bg-green-600/20 border border-green-500/30 rounded-lg p-4 text-center">
-                  <p className="text-green-400 text-sm">Successful</p>
-                  <p className="text-white text-2xl font-bold">{testSummary.successful_tests}</p>
-                </div>
-                <div className="bg-yellow-600/20 border border-yellow-500/30 rounded-lg p-4 text-center">
-                  <p className="text-yellow-400 text-sm">Total Cost</p>
-                  <p className="text-white text-2xl font-bold">${testSummary.total_cost.toFixed(4)}</p>
-                </div>
-                <div className="bg-purple-600/20 border border-purple-500/30 rounded-lg p-4 text-center">
-                  <p className="text-purple-400 text-sm">Total Tokens</p>
-                  <p className="text-white text-2xl font-bold">{testSummary.total_tokens.toLocaleString()}</p>
-                </div>
-                <div className="bg-orange-600/20 border border-orange-500/30 rounded-lg p-4 text-center">
-                  <p className="text-orange-400 text-sm">Avg Accuracy</p>
-                  <p className="text-white text-2xl font-bold">{testSummary.average_accuracy.toFixed(1)}%</p>
-                </div>
-              </div>
-            )}
-
             <div className="space-y-4">
               {testResults.map((result, index) => (
-                <div key={index} className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
+                <div key={index} className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(result.provider)} flex items-center justify-center text-white text-sm font-bold`}>
-                        {getProviderIcon(result.provider)}
-                      </div>
-                      <div>
-                        <h3 className="text-white font-medium">{getProviderName(result.provider)}</h3>
-                        <p className="text-gray-400 text-sm">Question ID: {result.question_id}</p>
-                      </div>
+                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                        result.status === 'success' 
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      }`}>
+                        {result.status === 'success' ? '✅ Success' : '❌ Error'}
+                      </span>
+                      <span className="text-gray-400 text-sm">{getProviderName(result.provider)}</span>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      result.status === 'success' ? 'bg-green-600/20 text-green-400' :
-                      result.status === 'error' ? 'bg-red-600/20 text-red-400' :
-                      'bg-yellow-600/20 text-yellow-400'
-                    }`}>
-                      {result.status}
+                    <div className="flex items-center gap-4 text-sm text-gray-400">
+                      <span>{result.response_time_ms}ms</span>
+                      <span>•</span>
+                      <span>{result.token_usage} tokens</span>
+                      <span>•</span>
+                      <span>${result.cost_usd.toFixed(4)}</span>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
-                      <p className="text-gray-400">Response Time</p>
-                      <p className="text-white">{result.response_time_ms}ms</p>
+                      <h4 className="text-white font-medium mb-2">Question</h4>
+                      <p className="text-gray-300 text-sm">{result.question}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400">Accuracy</p>
-                      <p className="text-white">{result.accuracy_score.toFixed(1)}%</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Tokens Used</p>
-                      <p className="text-white">{result.token_usage.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Cost</p>
-                      <p className="text-white">${result.cost_usd.toFixed(4)}</p>
+                      <h4 className="text-white font-medium mb-2">AI Response</h4>
+                      <p className="text-gray-300 text-sm">{result.response || 'No response'}</p>
                     </div>
                   </div>
 
-                  {result.response && (
-                    <div className="mt-3 p-3 bg-gray-600/20 rounded border border-gray-600">
-                      <p className="text-gray-400 text-sm mb-1">AI Response:</p>
-                      <p className="text-white text-sm">{result.response}</p>
-                    </div>
-                  )}
-
                   {result.error_message && (
-                    <div className="mt-3 p-3 bg-red-600/20 rounded border border-red-600">
-                      <p className="text-red-400 text-sm mb-1">Error:</p>
+                    <div className="mt-4">
+                      <h4 className="text-red-400 font-medium mb-2">Error</h4>
                       <p className="text-red-300 text-sm">{result.error_message}</p>
                     </div>
                   )}
+                  
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-sm text-gray-400">
+                      <span>Accuracy: {result.accuracy_score.toFixed(1)}%</span>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
