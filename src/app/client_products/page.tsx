@@ -118,15 +118,25 @@ export default function ClientProducts() {
         return;
       }
 
+      // For new products, don't include the ID field
+      const submitData = editingProduct 
+        ? { ...formData, auth_user_id: user.id, user_email: user.email }
+        : { 
+            auth_user_id: user.id,
+            user_email: user.email,
+            organisation: formData.organisation || '',
+            brand_id: formData.brand_id,
+            product_name: formData.product_name || '',
+            description: formData.description || '',
+            keywords: formData.keywords || '',
+            url: formData.url || '',
+            category: formData.category || '',
+            market_name: formData.market_name || ''
+          };
+
       const { data, error } = await supabase
         .from('products')
-        .upsert({
-          ...formData,
-          auth_user_id: user.id,
-          user_email: user.email,
-          organisation: formData.organisation || '',
-          brand_id: formData.brand_id,
-        })
+        .upsert(submitData)
         .select()
         .single();
 
@@ -171,7 +181,27 @@ export default function ClientProducts() {
 
   const handleNewProduct = () => {
     setEditingProduct(null);
-    setFormData({});
+    
+    // If user has existing products, clone the first one's organizational data
+    if (products.length > 0) {
+      const firstProduct = products[0];
+      setFormData({
+        user_email: firstProduct.user_email,
+        organisation: firstProduct.organisation,
+        brand_id: firstProduct.brand_id,
+        // Clear user-editable fields
+        product_name: '',
+        description: '',
+        keywords: '',
+        url: '',
+        category: '',
+        market_name: ''
+      });
+    } else {
+      // No existing products, start with empty form
+      setFormData({});
+    }
+    
     setShowForm(true);
   };
 
