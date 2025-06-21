@@ -118,10 +118,13 @@ export default function ClientProducts() {
         return;
       }
 
-      // For new products, don't include the ID field
-      const submitData = editingProduct 
-        ? { ...formData, auth_user_id: user.id, user_email: user.email }
-        : { 
+      let data, error;
+
+      if (editingProduct) {
+        // Update existing product
+        const { data: updateData, error: updateError } = await supabase
+          .from('products')
+          .update({
             auth_user_id: user.id,
             user_email: user.email,
             organisation: formData.organisation || '',
@@ -132,13 +135,35 @@ export default function ClientProducts() {
             url: formData.url || '',
             category: formData.category || '',
             market_name: formData.market_name || ''
-          };
-
-      const { data, error } = await supabase
-        .from('products')
-        .upsert(submitData)
-        .select()
-        .single();
+          })
+          .eq('id', editingProduct.id)
+          .select()
+          .single();
+        
+        data = updateData;
+        error = updateError;
+      } else {
+        // Insert new product
+        const { data: insertData, error: insertError } = await supabase
+          .from('products')
+          .insert({
+            auth_user_id: user.id,
+            user_email: user.email,
+            organisation: formData.organisation || '',
+            brand_id: formData.brand_id,
+            product_name: formData.product_name || '',
+            description: formData.description || '',
+            keywords: formData.keywords || '',
+            url: formData.url || '',
+            category: formData.category || '',
+            market_name: formData.market_name || ''
+          })
+          .select()
+          .single();
+        
+        data = insertData;
+        error = insertError;
+      }
 
       if (error) throw error;
       
