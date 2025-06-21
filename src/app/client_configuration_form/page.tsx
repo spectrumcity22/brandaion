@@ -277,7 +277,7 @@ export default function ClientConfigurationForm() {
         <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-white mb-2">AI Configuration Setup</h2>
-            <p className="text-gray-400">Select your brand, product, persona, market, and target audience to configure your AI system.</p>
+            <p className="text-gray-400">Select your brand, product, persona, market, and target audience to define your AI&apos;s context.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -410,7 +410,7 @@ export default function ClientConfigurationForm() {
                 <span className="text-blue-400 font-bold">1</span>
               </div>
               <h4 className="font-medium text-white mb-2">Configuration</h4>
-              <p>Select your brand, product, persona, market, and target audience to define your AI's context.</p>
+              <p>Select your brand, product, persona, market, and target audience to define your AI&apos;s context.</p>
             </div>
             <div>
               <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center mb-3">
