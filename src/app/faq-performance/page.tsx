@@ -52,6 +52,40 @@ interface PerformanceSettings {
   auto_test_enabled: boolean;
 }
 
+interface UserTestingSettings {
+  id: string;
+  user_id: string;
+  question_id: number;
+  package_tier: 'basic' | 'standard' | 'premium' | 'enterprise';
+  questions_per_month: number;
+  enabled_providers: string[];
+  is_active: boolean;
+  first_test_date: string | null;
+  last_test_date: string | null;
+  next_test_date: string | null;
+  test_schedule: string;
+  subscription_expires_at: string | null;
+  testing_paused_at: string | null;
+  grace_period_days: number;
+  ai_response: string | null;
+  response_analysis: any | null;
+  accuracy_score: number | null;
+  token_usage: number | null;
+  cost_usd: number | null;
+  test_month: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface PackageLimits {
+  tier: string;
+  questions_per_month: number;
+  allowed_providers: string[];
+  selected_questions: number;
+  remaining_questions: number;
+  has_exceeded: boolean;
+}
+
 const AI_PROVIDERS = {
   openai: { name: 'OpenAI GPT-4', color: 'from-blue-500 to-blue-600', icon: '🤖' },
   perplexity: { name: 'Perplexity AI', color: 'from-purple-500 to-purple-600', icon: '🔍' },
@@ -69,6 +103,9 @@ export default function FAQPerformancePage() {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
+  const [userTestingSettings, setUserTestingSettings] = useState<UserTestingSettings[]>([]);
+  const [packageLimits, setPackageLimits] = useState<PackageLimits | null>(null);
+  const [showAutomatedSetup, setShowAutomatedSetup] = useState(false);
   const [settings, setSettings] = useState<PerformanceSettings>({
     enabled_providers: ['openai'],
     test_schedule: 'manual',
@@ -157,6 +194,35 @@ export default function FAQPerformancePage() {
       }) || [];
 
       setFaqPairs(transformedPairs);
+
+      // Load user testing settings
+      const { data: testingSettingsData, error: testingError } = await supabase
+        .from('user_testing_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      if (testingError) {
+        console.error('Error loading testing settings:', testingError);
+      } else {
+        setUserTestingSettings(testingSettingsData || []);
+        
+        // Calculate package limits
+        if (testingSettingsData && testingSettingsData.length > 0) {
+          const firstSetting = testingSettingsData[0];
+          const selectedCount = testingSettingsData.length;
+          const remaining = firstSetting.questions_per_month - selectedCount;
+          
+          setPackageLimits({
+            tier: firstSetting.package_tier,
+            questions_per_month: firstSetting.questions_per_month,
+            allowed_providers: firstSetting.enabled_providers,
+            selected_questions: selectedCount,
+            remaining_questions: remaining,
+            has_exceeded: remaining < 0
+          });
+        }
+      }
 
       // Load performance settings
       const { data: settingsData } = await supabase
@@ -290,6 +356,65 @@ export default function FAQPerformancePage() {
     }
   };
 
+  const saveAutomatedTestingSetup = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get user's package tier (you'll need to implement this based on your subscription system)
+      const packageTier = 'basic'; // Default for now
+      const questionsPerMonth = packageTier === 'basic' ? 5 : packageTier === 'standard' ? 10 : packageTier === 'premium' ? 15 : 20;
+      const allowedProviders = packageTier === 'basic' ? ['openai'] : 
+                              packageTier === 'standard' ? ['openai', 'gemini'] :
+                              packageTier === 'premium' ? ['openai', 'gemini', 'perplexity'] :
+                              ['openai', 'gemini', 'perplexity', 'claude'];
+
+      // Check if user has exceeded their limit
+      if (selectedPairs.length > questionsPerMonth) {
+        setError(`You can only select ${questionsPerMonth} questions with your ${packageTier} package. Please upgrade to select more.`);
+        return;
+      }
+
+      // Clear existing settings for this user
+      await supabase
+        .from('user_testing_settings')
+        .delete()
+        .eq('user_id', user.id);
+
+      // Create new settings for each selected question
+      const today = new Date();
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+      const settingsToInsert = selectedPairs.map(questionId => ({
+        user_id: user.id,
+        question_id: parseInt(questionId),
+        package_tier: packageTier,
+        questions_per_month: questionsPerMonth,
+        enabled_providers: allowedProviders,
+        is_active: true,
+        first_test_date: today.toISOString().split('T')[0],
+        next_test_date: nextMonth.toISOString().split('T')[0],
+        test_schedule: 'monthly',
+        grace_period_days: 7
+      }));
+
+      const { error } = await supabase
+        .from('user_testing_settings')
+        .insert(settingsToInsert);
+
+      if (error) throw error;
+
+      setShowAutomatedSetup(false);
+      setError('');
+      // Reload data to show updated settings
+      await loadData();
+    } catch (error) {
+      console.error('Error saving automated testing setup:', error);
+      setError('Failed to save automated testing setup');
+    }
+  };
+
   const getProviderColor = (provider: string) => {
     return AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]?.color || 'from-gray-500 to-gray-600';
   };
@@ -400,6 +525,97 @@ export default function FAQPerformancePage() {
             </div>
           </div>
         </div>
+
+        {/* Package Limits Panel */}
+        {packageLimits && (
+          <div className="mb-8">
+            <div className={`border rounded-xl p-6 ${
+              packageLimits.has_exceeded 
+                ? 'bg-red-900/20 border-red-500/50' 
+                : 'bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-blue-500/30'
+            }`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Package Limits</h2>
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  packageLimits.has_exceeded
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    : 'bg-green-500/20 text-green-400 border border-green-500/30'
+                }`}>
+                  {packageLimits.tier.toUpperCase()} Package
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <p className="text-gray-400 text-sm">Questions Per Month</p>
+                  <p className="text-2xl font-bold text-white">{packageLimits.questions_per_month}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-gray-400 text-sm">Selected Questions</p>
+                  <p className="text-2xl font-bold text-white">{packageLimits.selected_questions}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-gray-400 text-sm">Remaining</p>
+                  <p className={`text-2xl font-bold ${
+                    packageLimits.has_exceeded ? 'text-red-400' : 'text-white'
+                  }`}>
+                    {packageLimits.remaining_questions}
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-gray-400 text-sm">AI Providers</p>
+                  <p className="text-2xl font-bold text-white">{packageLimits.allowed_providers.length}</p>
+                </div>
+              </div>
+              
+              {packageLimits.has_exceeded && (
+                <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <p className="text-red-400 font-medium">You have exceeded your monthly question limit!</p>
+                  </div>
+                  <p className="text-red-300 text-sm mt-2">
+                    Please upgrade your package or remove some questions from automated testing.
+                  </p>
+                </div>
+              )}
+              
+              {!packageLimits.has_exceeded && packageLimits.remaining_questions <= 2 && (
+                <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <p className="text-yellow-400 font-medium">Almost at your limit!</p>
+                  </div>
+                  <p className="text-yellow-300 text-sm mt-2">
+                    You have {packageLimits.remaining_questions} questions remaining this month.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Automated Testing Setup Button */}
+        {!packageLimits && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6 text-center">
+              <h2 className="text-xl font-semibold text-white mb-4">Set Up Automated Testing</h2>
+              <p className="text-gray-300 mb-6">
+                Select questions and AI providers to automatically test your FAQ performance monthly.
+              </p>
+              <button
+                onClick={() => setShowAutomatedSetup(true)}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 transform hover:scale-105"
+              >
+                🚀 Set Up Automated Testing
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Test Summary */}
         {testSummary && (
@@ -695,6 +911,137 @@ export default function FAQPerformancePage() {
                   className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105"
                 >
                   Save Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Automated Testing Setup Modal */}
+        {showAutomatedSetup && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Set Up Automated Testing</h2>
+                <button
+                  onClick={() => setShowAutomatedSetup(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Package Information */}
+                <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Package Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">Package Tier</p>
+                      <p className="text-xl font-bold text-white">Basic</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">Questions Per Month</p>
+                      <p className="text-xl font-bold text-white">5</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">AI Providers</p>
+                      <p className="text-xl font-bold text-white">OpenAI</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Question Selection */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4">Select Questions for Automated Testing</h3>
+                  <p className="text-gray-400 mb-4">Choose up to 5 questions to test monthly with OpenAI.</p>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                    {faqPairs.map((faq) => (
+                      <div
+                        key={faq.id}
+                        className={`border rounded-xl p-4 transition-all duration-200 ${
+                          selectedPairs.includes(faq.id)
+                            ? 'border-green-500 bg-green-500/10'
+                            : 'border-gray-600 bg-gray-800/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedPairs.includes(faq.id)}
+                            onChange={() => toggleFAQSelection(faq.id)}
+                            disabled={selectedPairs.length >= 5 && !selectedPairs.includes(faq.id)}
+                            className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
+                          />
+                          <div className="flex-1">
+                            <h4 className="text-white font-medium mb-2">{faq.question}</h4>
+                            <p className="text-gray-400 text-sm line-clamp-2">{faq.answer}</p>
+                            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                              <span>{faq.organisation_name}</span>
+                              <span>•</span>
+                              <span>{faq.industry}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {selectedPairs.length >= 5 && (
+                    <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <p className="text-yellow-400 font-medium">Maximum questions selected!</p>
+                      </div>
+                      <p className="text-yellow-300 text-sm mt-2">
+                        You've reached the limit for your Basic package. Upgrade to select more questions.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selection Summary */}
+                <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">Selection Summary</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">Selected Questions</p>
+                      <p className="text-2xl font-bold text-white">{selectedPairs.length}/5</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">AI Provider</p>
+                      <p className="text-xl font-bold text-white">OpenAI</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-gray-400 text-sm">Test Schedule</p>
+                      <p className="text-xl font-bold text-white">Monthly</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-700/50">
+                <button
+                  onClick={() => setShowAutomatedSetup(false)}
+                  className="px-6 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveAutomatedTestingSetup}
+                  disabled={selectedPairs.length === 0}
+                  className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 ${
+                    selectedPairs.length === 0
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
+                  }`}
+                >
+                  🚀 Set Up Automated Testing
                 </button>
               </div>
             </div>
