@@ -203,11 +203,11 @@ export default function FAQPerformancePage() {
         throw new Error('Failed to create monthly schedule');
       }
 
-      // Run immediate test with the new function
+      // Run immediate test with the correct function
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
 
-      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/test_faq_performance_v2', {
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/run_question_monitor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,14 +227,14 @@ export default function FAQPerformancePage() {
       }
 
       const result = await response.json();
-      
+
       // Clear selections and show success
       setSelectedPairs([]);
       setSelectedProviders(['openai']);
       setError('');
       
       // Show success message
-      alert(`Successfully added to monthly schedule! Initial test completed with ${result.results?.length || 0} questions tested.`);
+      alert(`Successfully added to monthly schedule! Initial test completed with ${result.results?.length || 0} questions tested. Your questions will also be automatically tested daily at 2 AM UTC.`);
 
     } catch (error) {
       console.error('Error adding to monthly schedule:', error);
