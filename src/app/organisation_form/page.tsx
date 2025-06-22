@@ -155,95 +155,169 @@ export default function OrganisationForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
-        <h2 className="text-xl font-bold mb-4">Define Your Organisation</h2>
-        <div className="text-sm text-gray-400 mb-4">
-          {orgName ? `📛 Organisation: ${orgName}` : '🔄 Loading organisation...'}
+    <div className="min-h-screen p-4 lg:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="glass-card p-8 text-center mb-8">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
+            🏢
+          </div>
+          <h1 className="text-3xl font-bold mb-2 shimmer-text">Define Your Organisation</h1>
+          <p className="text-gray-400">Complete your organisation profile to unlock premium features</p>
         </div>
-        
-        <input
-          type="url"
-          placeholder="Organisation Website URL"
-          value={orgUrl}
-          onChange={(e) => setOrgUrl(e.target.value)}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        />
-        <input
-          type="url"
-          placeholder="LinkedIn Profile URL"
-          value={linkedinUrl}
-          onChange={(e) => setLinkedinUrl(e.target.value)}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        />
-        
-        <select
-          value={industry}
-          onChange={(e) => {
-            setIndustry(e.target.value);
-            loadSubcategories(e.target.value);
-            setSubcategory(''); // Reset subcategory when industry changes
-          }}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        >
-          <option value="">Select Industry</option>
-          {industries.map((ind) => (
-            <option key={ind.id} value={ind.name}>
-              {ind.name}
-            </option>
-          ))}
-        </select>
-        
-        <select
-          value={subcategory}
-          onChange={(e) => setSubcategory(e.target.value)}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        >
-          <option value="">Select Subcategory</option>
-          {subcategories.map((sub) => (
-            <option key={sub.id} value={sub.name}>
-              {sub.name}
-            </option>
-          ))}
-        </select>
-        
-        <select
-          value={headquarters}
-          onChange={(e) => setHeadquarters(e.target.value)}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        >
-          <option value="">Select Market</option>
-          {markets.map((mkt) => (
-            <option key={mkt.id} value={mkt.name}>
-              {mkt.name}
-            </option>
-          ))}
-        </select>
 
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className={`w-full py-3 font-bold rounded-lg transition ${
-            isSubmitting
-              ? 'bg-gray-600 text-white cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600 text-black'
-          }`}
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit'}
-        </button>
+        <div className="glass-card p-8">
+          {orgName ? (
+            <div className="mb-6 p-4 glass-card text-center">
+              <div className="text-2xl mb-2">📛</div>
+              <h2 className="text-xl font-semibold mb-1">{orgName}</h2>
+              <p className="text-gray-400 text-sm">Organisation Ready for Configuration</p>
+            </div>
+          ) : (
+            <div className="mb-6 p-4 glass-card text-center">
+              <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <p className="text-gray-400">🔄 Loading organisation...</p>
+            </div>
+          )}
 
-        <div className="text-sm mt-4 text-center text-red-400">{message}</div>
-        
-        {message.includes('✅') && (
-          <div className="mt-4">
+          {message && (
+            <div className={`mb-6 p-4 rounded-lg text-center ${
+              message.includes('❌') 
+                ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+            }`}>
+              {message}
+            </div>
+          )}
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                🌐 Organisation Website URL
+              </label>
+              <input
+                type="url"
+                placeholder="https://yourcompany.com"
+                value={orgUrl}
+                onChange={(e) => setOrgUrl(e.target.value)}
+                className="glass-input w-full p-4"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                💼 LinkedIn Profile URL
+              </label>
+              <input
+                type="url"
+                placeholder="https://linkedin.com/company/yourcompany"
+                value={linkedinUrl}
+                onChange={(e) => setLinkedinUrl(e.target.value)}
+                className="glass-input w-full p-4"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                🏭 Industry
+              </label>
+              <select
+                value={industry}
+                onChange={(e) => {
+                  setIndustry(e.target.value);
+                  loadSubcategories(e.target.value);
+                  setSubcategory(''); // Reset subcategory when industry changes
+                }}
+                className="glass-input w-full p-4"
+              >
+                <option value="">Select Industry</option>
+                {industries.map((ind) => (
+                  <option key={ind.id} value={ind.name}>
+                    {ind.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                📊 Subcategory
+              </label>
+              <select
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+                className="glass-input w-full p-4"
+                disabled={!industry}
+              >
+                <option value="">{industry ? 'Select Subcategory' : 'Select Industry First'}</option>
+                {subcategories.map((sub) => (
+                  <option key={sub.id} value={sub.name}>
+                    {sub.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                🏢 Headquarters
+              </label>
+              <input
+                type="text"
+                placeholder="City, Country"
+                value={headquarters}
+                onChange={(e) => setHeadquarters(e.target.value)}
+                className="glass-input w-full p-4"
+              />
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col sm:flex-row gap-4">
             <button
-              onClick={() => router.push('/client_brands_form')}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className={`premium-button flex-1 ${isSubmitting ? 'premium-loading' : ''}`}
             >
-              Continue to Brands Form
+              {isSubmitting ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Updating Organisation...
+                </div>
+              ) : (
+                '✨ Update Organisation'
+              )}
+            </button>
+            
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="glass-input p-4 hover:bg-white/10 transition-colors"
+            >
+              🏠 Back to Dashboard
             </button>
           </div>
-        )}
+        </div>
+
+        {/* Help Section */}
+        <div className="glass-card p-8 mt-8">
+          <h2 className="text-2xl font-bold mb-6">💡 Need Help?</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-3xl mb-3">🎯</div>
+              <h3 className="font-semibold mb-2">Complete Profile</h3>
+              <p className="text-gray-400 text-sm">Fill in all fields to unlock advanced features</p>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl mb-3">🔗</div>
+              <h3 className="font-semibold mb-2">Valid URLs</h3>
+              <p className="text-gray-400 text-sm">Ensure your website and LinkedIn URLs are correct</p>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl mb-3">📈</div>
+              <h3 className="font-semibold mb-2">Better Results</h3>
+              <p className="text-gray-400 text-sm">Detailed organisation info improves FAQ quality</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
