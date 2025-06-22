@@ -1,0 +1,2 @@
+[functions.test_faq_performance_v2]
+verify_jwt = false 
