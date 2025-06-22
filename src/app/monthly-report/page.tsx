@@ -19,6 +19,27 @@ interface PerformanceLog {
   status: string;
   created_at: string;
   test_schedule: string;
+  openai_response?: string;
+  gemini_response?: string;
+  perplexity_response?: string;
+  claude_response?: string;
+  openai_accuracy_score?: number;
+  gemini_accuracy_score?: number;
+  perplexity_accuracy_score?: number;
+  claude_accuracy_score?: number;
+  openai_cost_usd?: number;
+  gemini_cost_usd?: number;
+  perplexity_cost_usd?: number;
+  claude_cost_usd?: number;
+  openai_response_time_ms?: number;
+  gemini_response_time_ms?: number;
+  perplexity_response_time_ms?: number;
+  claude_response_time_ms?: number;
+  openai_status?: string;
+  gemini_status?: string;
+  perplexity_status?: string;
+  claude_status?: string;
+  tested_llms?: string[];
 }
 
 interface MonthlyStats {
@@ -54,8 +75,9 @@ export default function MonthlyReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (monthFilter?: string) => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (!user || authError) {
@@ -66,19 +88,38 @@ export default function MonthlyReportPage() {
       // Get current month (YYYY-MM format)
       const now = new Date();
       const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
-      setSelectedMonth(currentMonth);
+      
+      // Set selected month (use filter if provided, otherwise current month)
+      const targetMonth = monthFilter || currentMonth;
+      setSelectedMonth(targetMonth);
+
+      // Get available months for the dropdown
+      const { data: monthData, error: monthError } = await supabase
+        .from('faq_performance_logs')
+        .select('created_at')
+        .eq('auth_user_id', user.id)
+        .eq('test_schedule', 'monthly')
+        .order('created_at', { ascending: false });
+
+      if (!monthError && monthData) {
+        const months = Array.from(new Set(monthData.map(log => 
+          new Date(log.created_at).toISOString().slice(0, 7)
+        ))).sort().reverse();
+        setAvailableMonths(months);
+      }
 
       // Calculate first day of next month for proper date range
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const targetDate = new Date(targetMonth + '-01');
+      const nextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
       const nextMonthStr = nextMonth.toISOString().slice(0, 7) + '-01';
 
-      // Load current month's performance logs
+      // Load selected month's performance logs
       const { data: currentMonthData, error: currentMonthError } = await supabase
         .from('faq_performance_logs')
         .select('*')
         .eq('auth_user_id', user.id)
         .eq('test_schedule', 'monthly')
-        .gte('created_at', `${currentMonth}-01`)
+        .gte('created_at', `${targetMonth}-01`)
         .lt('created_at', nextMonthStr)
         .order('created_at', { ascending: false });
 
@@ -107,18 +148,45 @@ export default function MonthlyReportPage() {
 
       setHistoricalLogs(historicalData || []);
 
-      // Calculate monthly stats
+      // Calculate monthly stats from new data structure
       if (currentMonthData && currentMonthData.length > 0) {
         const totalTests = currentMonthData.length;
-        const successfulTests = currentMonthData.filter(log => log.status === 'success');
-        const averageAccuracy = successfulTests.length > 0 
-          ? successfulTests.reduce((sum, log) => sum + log.accuracy_score, 0) / successfulTests.length 
-          : 0;
-        const averageResponseTime = successfulTests.length > 0
-          ? successfulTests.reduce((sum, log) => sum + log.response_time_ms, 0) / successfulTests.length
-          : 0;
-        const totalCost = currentMonthData.reduce((sum, log) => sum + (log.cost_usd || 0), 0);
-        const successRate = (successfulTests.length / totalTests) * 100;
+        let successfulTests = 0;
+        let totalAccuracy = 0;
+        let totalResponseTime = 0;
+        let totalCost = 0;
+
+        currentMonthData.forEach(log => {
+          // Check each provider's status
+          if (log.openai_status === 'success') {
+            successfulTests++;
+            totalAccuracy += log.openai_accuracy_score || 0;
+            totalResponseTime += log.openai_response_time_ms || 0;
+            totalCost += log.openai_cost_usd || 0;
+          }
+          if (log.gemini_status === 'success') {
+            successfulTests++;
+            totalAccuracy += log.gemini_accuracy_score || 0;
+            totalResponseTime += log.gemini_response_time_ms || 0;
+            totalCost += log.gemini_cost_usd || 0;
+          }
+          if (log.perplexity_status === 'success') {
+            successfulTests++;
+            totalAccuracy += log.perplexity_accuracy_score || 0;
+            totalResponseTime += log.perplexity_response_time_ms || 0;
+            totalCost += log.perplexity_cost_usd || 0;
+          }
+          if (log.claude_status === 'success') {
+            successfulTests++;
+            totalAccuracy += log.claude_accuracy_score || 0;
+            totalResponseTime += log.claude_response_time_ms || 0;
+            totalCost += log.claude_cost_usd || 0;
+          }
+        });
+
+        const averageAccuracy = successfulTests > 0 ? totalAccuracy / successfulTests : 0;
+        const averageResponseTime = successfulTests > 0 ? totalResponseTime / successfulTests : 0;
+        const successRate = (successfulTests / totalTests) * 100;
 
         setMonthlyStats({
           total_tests: totalTests,
@@ -128,43 +196,43 @@ export default function MonthlyReportPage() {
           success_rate: successRate
         });
 
-        // Calculate LLM comparisons
+        // Calculate LLM comparisons from new structure
         const llmStats = new Map<string, LLMComparison>();
         
         currentMonthData.forEach(log => {
-          const provider = log.ai_provider;
-          if (!llmStats.has(provider)) {
-            llmStats.set(provider, {
-              provider,
-              total_tests: 0,
-              average_accuracy: 0,
-              average_response_time: 0,
-              total_cost: 0,
-              success_rate: 0
-            });
-          }
+          // Check each provider
+          const providers = ['openai', 'gemini', 'perplexity', 'claude'];
           
-          const stats = llmStats.get(provider)!;
-          stats.total_tests++;
-          if (log.status === 'success') {
-            stats.average_accuracy += log.accuracy_score;
-            stats.average_response_time += log.response_time_ms;
-          }
-          stats.total_cost += log.cost_usd || 0;
+          providers.forEach(provider => {
+            const status = log[`${provider}_status`];
+            if (status === 'success') {
+              if (!llmStats.has(provider)) {
+                llmStats.set(provider, {
+                  provider,
+                  total_tests: 0,
+                  average_accuracy: 0,
+                  average_response_time: 0,
+                  total_cost: 0,
+                  success_rate: 0
+                });
+              }
+              
+              const stats = llmStats.get(provider)!;
+              stats.total_tests++;
+              stats.average_accuracy += log[`${provider}_accuracy_score`] || 0;
+              stats.average_response_time += log[`${provider}_response_time_ms`] || 0;
+              stats.total_cost += log[`${provider}_cost_usd`] || 0;
+            }
+          });
         });
 
         // Calculate averages
         llmStats.forEach(stats => {
-          const successfulTests = currentMonthData.filter(log => 
-            log.ai_provider === stats.provider && log.status === 'success'
-          );
-          stats.average_accuracy = successfulTests.length > 0 
-            ? stats.average_accuracy / successfulTests.length 
-            : 0;
-          stats.average_response_time = successfulTests.length > 0
-            ? stats.average_response_time / successfulTests.length
-            : 0;
-          stats.success_rate = (successfulTests.length / stats.total_tests) * 100;
+          if (stats.total_tests > 0) {
+            stats.average_accuracy = stats.average_accuracy / stats.total_tests;
+            stats.average_response_time = stats.average_response_time / stats.total_tests;
+            stats.success_rate = 100; // All tests in this calculation were successful
+          }
         });
 
         setLlmComparisons(Array.from(llmStats.values()));
@@ -181,6 +249,11 @@ export default function MonthlyReportPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleMonthChange = (month: string) => {
+    setLoading(true);
+    loadData(month);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -223,7 +296,7 @@ export default function MonthlyReportPage() {
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
           <button 
-            onClick={loadData}
+            onClick={() => loadData()}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Retry
@@ -241,6 +314,28 @@ export default function MonthlyReportPage() {
           <p className="text-gray-600 mt-2">
             {selectedMonth} - AI Performance Analysis
           </p>
+          
+          {/* Month Selector */}
+          <div className="mt-4 flex items-center space-x-4">
+            <label htmlFor="month-select" className="text-sm font-medium text-gray-700">
+              Select Month:
+            </label>
+            <select
+              id="month-select"
+              value={selectedMonth}
+              onChange={(e) => handleMonthChange(e.target.value)}
+              className="block w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+              {availableMonths.map((month) => (
+                <option key={month} value={month}>
+                  {new Date(month + '-01').toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long' 
+                  })}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Monthly Stats Overview */}
@@ -377,46 +472,85 @@ export default function MonthlyReportPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {currentMonthLogs.slice(0, 20).map((log) => (
-                    <tr key={log.id}>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs truncate">
-                          {log.question_text}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${getProviderColor(log.ai_provider)} flex items-center justify-center text-white text-xs font-bold mr-2`}>
-                            {AI_PROVIDERS[log.ai_provider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
+                  {currentMonthLogs.slice(0, 20).map((log) => {
+                    // Get the first successful provider for display
+                    const providers = ['openai', 'gemini', 'perplexity', 'claude'];
+                    let displayProvider = '';
+                    let displayAccuracy = 0;
+                    let displayResponseTime = 0;
+                    let displayCost = 0;
+                    let displayStatus = 'pending';
+
+                    for (const provider of providers) {
+                      const status = (log as any)[`${provider}_status`];
+                      if (status === 'success') {
+                        displayProvider = provider;
+                        displayAccuracy = (log as any)[`${provider}_accuracy_score`] || 0;
+                        displayResponseTime = (log as any)[`${provider}_response_time_ms`] || 0;
+                        displayCost = (log as any)[`${provider}_cost_usd`] || 0;
+                        displayStatus = status;
+                        break;
+                      }
+                    }
+
+                    // If no successful provider, show the first one with any status
+                    if (!displayProvider) {
+                      for (const provider of providers) {
+                        const status = (log as any)[`${provider}_status`];
+                        if (status) {
+                          displayProvider = provider;
+                          displayAccuracy = (log as any)[`${provider}_accuracy_score`] || 0;
+                          displayResponseTime = (log as any)[`${provider}_response_time_ms`] || 0;
+                          displayCost = (log as any)[`${provider}_cost_usd`] || 0;
+                          displayStatus = status;
+                          break;
+                        }
+                      }
+                    }
+
+                    return (
+                      <tr key={log.id}>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900 max-w-xs truncate">
+                            {log.question_text}
                           </div>
-                          <span className="text-sm text-gray-900">
-                            {getProviderName(log.ai_provider)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${getProviderColor(displayProvider)} flex items-center justify-center text-white text-xs font-bold mr-2`}>
+                              {AI_PROVIDERS[displayProvider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
+                            </div>
+                            <span className="text-sm text-gray-900">
+                              {getProviderName(displayProvider)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                          {displayAccuracy > 0 ? formatPercentage(displayAccuracy) : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                          {displayResponseTime > 0 ? formatTime(displayResponseTime) : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
+                          {displayCost > 0 ? formatCurrency(displayCost) : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            displayStatus === 'success' 
+                              ? 'bg-green-100 text-green-800' 
+                              : displayStatus === 'pending'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {displayStatus}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                        {formatPercentage(log.accuracy_score)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                        {formatTime(log.response_time_ms)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                        {formatCurrency(log.cost_usd || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          log.status === 'success' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {log.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(log.created_at).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(log.created_at).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
