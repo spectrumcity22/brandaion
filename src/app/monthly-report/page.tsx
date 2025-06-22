@@ -85,13 +85,18 @@ export default function MonthlyReportPage() {
         return;
       }
 
-      // Get current month (YYYY-MM format)
-      const now = new Date();
-      const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
-      
-      // Set selected month (use filter if provided, otherwise current month)
-      const targetMonth = monthFilter || currentMonth;
-      setSelectedMonth(targetMonth);
+      console.log('Loading data for user:', user.id);
+
+      // First, let's check if there's any data at all for this user
+      const { data: allData, error: allDataError } = await supabase
+        .from('faq_performance_logs')
+        .select('*')
+        .eq('auth_user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      console.log('All data for user:', allData);
+      console.log('All data error:', allDataError);
 
       // Get available months for the dropdown
       const { data: monthData, error: monthError } = await supabase
@@ -101,17 +106,158 @@ export default function MonthlyReportPage() {
         .eq('test_schedule', 'monthly')
         .order('created_at', { ascending: false });
 
+      console.log('Available months data:', monthData);
+      console.log('Month error:', monthError);
+
       if (!monthError && monthData) {
         const months = Array.from(new Set(monthData.map(log => 
           new Date(log.created_at).toISOString().slice(0, 7)
         ))).sort().reverse();
         setAvailableMonths(months);
+        console.log('Available months:', months);
+        
+        // If no month filter provided, use the first available month (most recent)
+        if (!monthFilter && months.length > 0) {
+          const targetMonth = months[0];
+          setSelectedMonth(targetMonth);
+          console.log('Using first available month:', targetMonth);
+          
+          // Calculate first day of next month for proper date range
+          const targetDate = new Date(targetMonth + '-01');
+          const nextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
+          const nextMonthStr = nextMonth.toISOString().slice(0, 7) + '-01';
+
+          console.log('Date range:', `${targetMonth}-01` + ' to ' + nextMonthStr);
+
+          // Load selected month's performance logs
+          const { data: currentMonthData, error: currentMonthError } = await supabase
+            .from('faq_performance_logs')
+            .select('*')
+            .eq('auth_user_id', user.id)
+            .eq('test_schedule', 'monthly')
+            .gte('created_at', `${targetMonth}-01`)
+            .lt('created_at', nextMonthStr)
+            .order('created_at', { ascending: false });
+
+          console.log('Current month data:', currentMonthData);
+          console.log('Current month error:', currentMonthError);
+
+          if (currentMonthError) {
+            throw currentMonthError;
+          }
+
+          setCurrentMonthLogs(currentMonthData || []);
+          
+          // Calculate monthly stats from new data structure
+          if (currentMonthData && currentMonthData.length > 0) {
+            const totalTests = currentMonthData.length;
+            let successfulTests = 0;
+            let totalAccuracy = 0;
+            let totalResponseTime = 0;
+            let totalCost = 0;
+
+            currentMonthData.forEach(log => {
+              // Check each provider's status
+              if (log.openai_status === 'success') {
+                successfulTests++;
+                totalAccuracy += log.openai_accuracy_score || 0;
+                totalResponseTime += log.openai_response_time_ms || 0;
+                totalCost += log.openai_cost_usd || 0;
+              }
+              if (log.gemini_status === 'success') {
+                successfulTests++;
+                totalAccuracy += log.gemini_accuracy_score || 0;
+                totalResponseTime += log.gemini_response_time_ms || 0;
+                totalCost += log.gemini_cost_usd || 0;
+              }
+              if (log.perplexity_status === 'success') {
+                successfulTests++;
+                totalAccuracy += log.perplexity_accuracy_score || 0;
+                totalResponseTime += log.perplexity_response_time_ms || 0;
+                totalCost += log.perplexity_cost_usd || 0;
+              }
+              if (log.claude_status === 'success') {
+                successfulTests++;
+                totalAccuracy += log.claude_accuracy_score || 0;
+                totalResponseTime += log.claude_response_time_ms || 0;
+                totalCost += log.claude_cost_usd || 0;
+              }
+            });
+
+            const averageAccuracy = successfulTests > 0 ? totalAccuracy / successfulTests : 0;
+            const averageResponseTime = successfulTests > 0 ? totalResponseTime / successfulTests : 0;
+            const successRate = (successfulTests / totalTests) * 100;
+
+            setMonthlyStats({
+              total_tests: totalTests,
+              average_accuracy: averageAccuracy,
+              average_response_time: averageResponseTime,
+              total_cost: totalCost,
+              success_rate: successRate
+            });
+
+            // Calculate LLM comparisons from new structure
+            const llmStats = new Map<string, LLMComparison>();
+            
+            currentMonthData.forEach(log => {
+              // Check each provider
+              const providers = ['openai', 'gemini', 'perplexity', 'claude'];
+              
+              providers.forEach(provider => {
+                const status = (log as any)[`${provider}_status`];
+                if (status === 'success') {
+                  if (!llmStats.has(provider)) {
+                    llmStats.set(provider, {
+                      provider,
+                      total_tests: 0,
+                      average_accuracy: 0,
+                      average_response_time: 0,
+                      total_cost: 0,
+                      success_rate: 0
+                    });
+                  }
+                  
+                  const stats = llmStats.get(provider)!;
+                  stats.total_tests++;
+                  stats.average_accuracy += (log as any)[`${provider}_accuracy_score`] || 0;
+                  stats.average_response_time += (log as any)[`${provider}_response_time_ms`] || 0;
+                  stats.total_cost += (log as any)[`${provider}_cost_usd`] || 0;
+                }
+              });
+            });
+
+            // Calculate averages
+            llmStats.forEach(stats => {
+              if (stats.total_tests > 0) {
+                stats.average_accuracy = stats.average_accuracy / stats.total_tests;
+                stats.average_response_time = stats.average_response_time / stats.total_tests;
+                stats.success_rate = 100; // All tests in this calculation were successful
+              }
+            });
+
+            setLlmComparisons(Array.from(llmStats.values()));
+          }
+          
+          return; // Exit early since we've loaded the data
+        }
       }
+
+      // Get current month (YYYY-MM format) - only used if no data exists
+      const now = new Date();
+      const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
+      
+      // Set selected month (use filter if provided, otherwise current month)
+      const targetMonth = monthFilter || currentMonth;
+      setSelectedMonth(targetMonth);
+
+      console.log('Target month:', targetMonth);
 
       // Calculate first day of next month for proper date range
       const targetDate = new Date(targetMonth + '-01');
       const nextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
       const nextMonthStr = nextMonth.toISOString().slice(0, 7) + '-01';
+
+      console.log('Date range:', `${targetMonth}-01` + ' to ' + nextMonthStr);
 
       // Load selected month's performance logs
       const { data: currentMonthData, error: currentMonthError } = await supabase
@@ -122,6 +268,9 @@ export default function MonthlyReportPage() {
         .gte('created_at', `${targetMonth}-01`)
         .lt('created_at', nextMonthStr)
         .order('created_at', { ascending: false });
+
+      console.log('Current month data:', currentMonthData);
+      console.log('Current month error:', currentMonthError);
 
       if (currentMonthError) {
         throw currentMonthError;
