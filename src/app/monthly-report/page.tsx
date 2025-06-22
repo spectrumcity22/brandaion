@@ -125,7 +125,7 @@ export default function MonthlyReportPage() {
           // Calculate first day of next month for proper date range
           const targetDate = new Date(targetMonth + '-01');
           const nextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
-          const nextMonthStr = nextMonth.toISOString().slice(0, 7) + '-01';
+          const nextMonthStr = nextMonth.toISOString().slice(0, 10); // Use YYYY-MM-DD format
 
           console.log('Date range:', `${targetMonth}-01` + ' to ' + nextMonthStr);
 
@@ -135,8 +135,8 @@ export default function MonthlyReportPage() {
             .select('*')
             .eq('auth_user_id', user.id)
             .eq('test_schedule', 'monthly')
-            .gte('created_at', `${targetMonth}-01`)
-            .lt('created_at', nextMonthStr)
+            .gte('created_at', `${targetMonth}-01T00:00:00Z`)
+            .lt('created_at', `${nextMonthStr}T00:00:00Z`)
             .order('created_at', { ascending: false });
 
           console.log('Current month data:', currentMonthData);
@@ -255,7 +255,7 @@ export default function MonthlyReportPage() {
       // Calculate first day of next month for proper date range
       const targetDate = new Date(targetMonth + '-01');
       const nextMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
-      const nextMonthStr = nextMonth.toISOString().slice(0, 7) + '-01';
+      const nextMonthStr = nextMonth.toISOString().slice(0, 10); // Use YYYY-MM-DD format
 
       console.log('Date range:', `${targetMonth}-01` + ' to ' + nextMonthStr);
 
@@ -265,8 +265,8 @@ export default function MonthlyReportPage() {
         .select('*')
         .eq('auth_user_id', user.id)
         .eq('test_schedule', 'monthly')
-        .gte('created_at', `${targetMonth}-01`)
-        .lt('created_at', nextMonthStr)
+        .gte('created_at', `${targetMonth}-01T00:00:00Z`)
+        .lt('created_at', `${nextMonthStr}T00:00:00Z`)
         .order('created_at', { ascending: false });
 
       console.log('Current month data:', currentMonthData);
