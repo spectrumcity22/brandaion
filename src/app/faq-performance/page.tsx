@@ -203,13 +203,38 @@ export default function FAQPerformancePage() {
         throw new Error('Failed to create monthly schedule');
       }
 
+      // Run immediate test with the new function
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session found');
+
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/test_faq_performance_v2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          auth_user_id: user.id,
+          question_ids: selectedPairs,
+          ai_providers: selectedProviders,
+          test_schedule: 'monthly'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to run initial test');
+      }
+
+      const result = await response.json();
+      
       // Clear selections and show success
       setSelectedPairs([]);
       setSelectedProviders(['openai']);
       setError('');
       
-      // TODO: Show success message
-      console.log('Successfully added to monthly schedule');
+      // Show success message
+      alert(`Successfully added to monthly schedule! Initial test completed with ${result.results?.length || 0} questions tested.`);
 
     } catch (error) {
       console.error('Error adding to monthly schedule:', error);
@@ -273,8 +298,20 @@ export default function FAQPerformancePage() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Monthly FAQ Performance Schedule</h1>
-          <p className="text-xl text-gray-300">Select questions and AI providers for monthly performance monitoring</p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">Monthly FAQ Performance Schedule</h1>
+              <p className="text-xl text-gray-300">Select questions and AI providers for monthly performance monitoring</p>
+            </div>
+            <div className="mt-4 md:mt-0">
+              <button
+                onClick={() => router.push('/monthly-report')}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
+              >
+                📊 View Monthly Report
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Stats Grid */}

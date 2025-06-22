@@ -1,0 +1,2 @@
+[functions.run_monthly_faq_tests]
+verify_jwt = false 
