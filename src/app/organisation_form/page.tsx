@@ -262,13 +262,18 @@ export default function OrganisationForm() {
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 🏢 Headquarters
               </label>
-              <input
-                type="text"
-                placeholder="City, Country"
+              <select
                 value={headquarters}
                 onChange={(e) => setHeadquarters(e.target.value)}
                 className="glass-input w-full p-4"
-              />
+              >
+                <option value="">Select Market</option>
+                {markets.map((mkt) => (
+                  <option key={mkt.id} value={mkt.name}>
+                    {mkt.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

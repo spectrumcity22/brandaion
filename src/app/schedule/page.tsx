@@ -132,9 +132,11 @@ export default function Schedule() {
 
   if (loading) {
     return (
-      <div className="w-full max-w-md mx-auto">
-        <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
-          <h1 className="text-2xl font-bold mb-4">Loading Schedule...</h1>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass-card p-8 text-center float-animation">
+          <div className="w-16 h-16 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold shimmer-text">Loading Your Schedule</h2>
+          <p className="text-gray-400 mt-2">Preparing your FAQ generation timeline...</p>
         </div>
       </div>
     );
@@ -142,10 +144,19 @@ export default function Schedule() {
 
   if (error) {
     return (
-      <div className="w-full max-w-md mx-auto">
-        <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass-card p-8 text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/20 flex items-center justify-center text-3xl">
+            ❌
+          </div>
           <h1 className="text-2xl font-bold mb-4">Error</h1>
-          <p className="text-red-400">{error}</p>
+          <p className="text-red-400 mb-6">{error}</p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="premium-button"
+          >
+            🏠 Back to Dashboard
+          </button>
         </div>
       </div>
     );
@@ -153,62 +164,163 @@ export default function Schedule() {
 
   if (!schedule || schedule.length === 0) {
     return (
-      <div className="w-full max-w-md mx-auto">
-        <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass-card p-8 text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-yellow-500/20 flex items-center justify-center text-3xl">
+            📅
+          </div>
           <h1 className="text-2xl font-bold mb-4">No Schedule Found</h1>
-          <p className="text-gray-400">Please complete the onboarding process first.</p>
+          <p className="text-gray-400 mb-6">Please complete the onboarding process first.</p>
+          <button
+            onClick={() => router.push('/end_user_form')}
+            className="premium-button"
+          >
+            🚀 Start Onboarding
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
-        <h1 className="text-2xl font-bold mb-6">Your FAQ Schedule</h1>
-        
-        <div className="space-y-6">
-          <div className="text-left">
-            <h2 className="text-lg font-semibold mb-2">FAQ Details</h2>
-            <p className="text-gray-400">Pairs per month: {schedule[0].total_faq_pairs}</p>
-            <p className="text-gray-400">Pairs per batch: {schedule[0].batch_faq_pairs}</p>
+    <div className="min-h-screen p-4 lg:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="glass-card p-8 text-center mb-8">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
+            📅
+          </div>
+          <h1 className="text-3xl font-bold mb-2 shimmer-text">Your FAQ Schedule</h1>
+          <p className="text-gray-400">Your automated FAQ generation timeline</p>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* FAQ Details */}
+          <div className="glass-card p-8">
+            <h2 className="text-2xl font-bold mb-6 flex items-center">
+              📊 FAQ Details
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-4 glass-card">
+                <span className="text-gray-400">Pairs per Month:</span>
+                <span className="font-bold text-2xl text-brand">{schedule[0].total_faq_pairs}</span>
+              </div>
+              
+              <div className="flex justify-between items-center p-4 glass-card">
+                <span className="text-gray-400">Pairs per Batch:</span>
+                <span className="font-bold text-2xl text-brand">{schedule[0].batch_faq_pairs}</span>
+              </div>
+              
+              <div className="flex justify-between items-center p-4 glass-card">
+                <span className="text-gray-400">Total Batches:</span>
+                <span className="font-semibold">{schedule.length}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="text-left">
-            <h2 className="text-lg font-semibold mb-2">Batch Dates</h2>
-            <div className="space-y-2">
-              {schedule.slice(0, 4).map((s, idx) => (
-                <p className="text-gray-400" key={s.id}>
-                  Batch {idx + 1}: {formatDate(s.batch_date)}
-                </p>
+          {/* Batch Dates */}
+          <div className="glass-card p-8">
+            <h2 className="text-2xl font-bold mb-6 flex items-center">
+              📅 Batch Schedule
+            </h2>
+            
+            <div className="space-y-3">
+              {schedule.slice(0, 6).map((s, idx) => (
+                <div key={s.id} className="flex justify-between items-center p-3 glass-card">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center text-sm font-bold mr-3">
+                      {idx + 1}
+                    </div>
+                    <span className="font-medium">Batch {idx + 1}</span>
+                  </div>
+                  <span className="text-gray-400">{formatDate(s.batch_date)}</span>
+                </div>
               ))}
+              
+              {schedule.length > 6 && (
+                <div className="text-center text-gray-400 text-sm mt-4">
+                  +{schedule.length - 6} more batches
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Product Creation */}
+        {Array.isArray(schedule) && schedule.length > 0 && (
+          <div className="glass-card p-8 mt-8">
+            <h2 className="text-2xl font-bold mb-6">🚀 Quick Actions</h2>
+            
+            {productMessage && (
+              <div className={`mb-6 p-4 rounded-lg text-center ${
+                productMessage.includes('❌') 
+                  ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                  : 'bg-green-500/10 text-green-400 border border-green-500/20'
+              }`}>
+                {productMessage}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={handleCreateProduct}
+                disabled={creatingProduct}
+                className={`premium-button flex-1 ${creatingProduct ? 'premium-loading' : ''}`}
+              >
+                {creatingProduct ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Creating Product...
+                  </div>
+                ) : (
+                  '📦 Create Product'
+                )}
+              </button>
+              
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="glass-input p-4 hover:bg-white/10 transition-colors"
+              >
+                🏠 Back to Dashboard
+              </button>
+            </div>
+            
+            {productMessage.includes('✅') && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => router.push('/client_product_persona_form')}
+                  className="premium-button"
+                >
+                  🎭 Create Product Persona
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Help Section */}
+        <div className="glass-card p-8 mt-8">
+          <h2 className="text-2xl font-bold mb-6">💡 Schedule Information</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-3xl mb-3">📅</div>
+              <h3 className="font-semibold mb-2">Automated Generation</h3>
+              <p className="text-gray-400 text-sm">FAQs will be generated automatically on schedule</p>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl mb-3">📊</div>
+              <h3 className="font-semibold mb-2">Batch Processing</h3>
+              <p className="text-gray-400 text-sm">Content is created in manageable batches</p>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl mb-3">🚀</div>
+              <h3 className="font-semibold mb-2">Ready to Use</h3>
+              <p className="text-gray-400 text-sm">Your schedule is active and ready for production</p>
             </div>
           </div>
         </div>
       </div>
-      {Array.isArray(schedule) && schedule.length > 0 && (
-        <div className="mt-6 text-center">
-          <button
-            onClick={handleCreateProduct}
-            disabled={creatingProduct}
-            className={`px-6 py-2 rounded-lg font-bold transition ${creatingProduct ? 'bg-gray-600 text-white cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-          >
-            {creatingProduct ? 'Creating Product...' : 'Create Product'}
-          </button>
-          {productMessage && <div className="mt-2 text-sm">{productMessage}</div>}
-          
-          {productMessage.includes('✅') && (
-            <div className="mt-4">
-              <button
-                onClick={() => router.push('/client_products')}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                View Products
-              </button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 } 

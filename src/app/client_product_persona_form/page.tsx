@@ -107,8 +107,6 @@ export default function ClientProductPersonaForm() {
   const [form, setForm] = useState<any>({});
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
 
   useEffect(() => {
     (async () => {
@@ -159,194 +157,6 @@ export default function ClientProductPersonaForm() {
     setIsSubmitting(false);
   };
 
-  const nextStep = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                🎯 Product Selection
-              </label>
-              <select
-                value={productId}
-                onChange={e => {
-                  setProductId(e.target.value);
-                  const selected = products.find(p => p.id === e.target.value);
-                  setOrganisationName(selected ? selected.organisation : '');
-                }}
-                className="glass-input w-full p-4"
-                required
-              >
-                <option value="">Select a product</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.product_name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                🏢 Organisation
-              </label>
-              <input
-                type="text"
-                value={organisationName}
-                readOnly
-                className="glass-input w-full p-4 text-gray-400"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                🎭 Persona Name
-              </label>
-              <input
-                type="text"
-                name="persona_name"
-                value={form.persona_name || ''}
-                onChange={handleChange}
-                className="glass-input w-full p-4"
-                placeholder="e.g. UK Brand Voice, Gen Z Playful, etc."
-              />
-            </div>
-          </div>
-        );
-      case 2:
-        return (
-          <div className="space-y-6">
-            <Dropdown
-              label="💎 Core Brand Values"
-              name="core_brand_values"
-              options={coreBrandValues}
-              value={form.core_brand_values || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="🎵 Brand Tone"
-              name="brand_tone"
-              options={brandTones}
-              value={form.brand_tone || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="🦸 Brand Archetype"
-              name="brand_archetype"
-              options={brandArchetypes}
-              value={form.brand_archetype || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="💝 Customer Emotions"
-              name="customer_emotions"
-              options={customerEmotions}
-              value={form.customer_emotions || ''}
-              onChange={handleChange}
-            />
-          </div>
-        );
-      case 3:
-        return (
-          <div className="space-y-6">
-            <Dropdown
-              label="💬 Communication Style"
-              name="communication_style"
-              options={communicationStyles}
-              value={form.communication_style || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="😄 Brand Voice Humor"
-              name="brand_voice_humor"
-              options={brandVoiceHumor}
-              value={form.brand_voice_humor || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="📚 Language Complexity"
-              name="language_complexity"
-              options={languageComplexity}
-              value={form.language_complexity || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="🎭 Emotional Expressiveness"
-              name="emotional_expressiveness"
-              options={emotionalExpressiveness}
-              value={form.emotional_expressiveness || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="👋 Customer Address Style"
-              name="customer_address_style"
-              options={customerAddressStyles}
-              value={form.customer_address_style || ''}
-              onChange={handleChange}
-            />
-          </div>
-        );
-      case 4:
-        return (
-          <div className="space-y-6">
-            <Dropdown
-              label="🎯 Brand Communication Purpose"
-              name="brand_communication_purpose"
-              options={brandCommunicationPurpose}
-              value={form.brand_communication_purpose || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="🏷️ Brand Tagline"
-              name="brand_tagline"
-              options={brandTaglines}
-              value={form.brand_tagline || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="🎨 Brand Visual Metaphor"
-              name="brand_visual_metaphor"
-              options={brandVisualMetaphors}
-              value={form.brand_visual_metaphor || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="🌍 Language/Region Preference"
-              name="language_region_preference"
-              options={languageRegionPreferences}
-              value={form.language_region_preference || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="⚔️ Competitor Voice Contrast"
-              name="competitor_voice_contrast"
-              options={competitorVoiceContrasts}
-              value={form.competitor_voice_contrast || ''}
-              onChange={handleChange}
-            />
-            <Dropdown
-              label="✍️ Copywriter Type"
-              name="copywriter_type"
-              options={copywriterTypes}
-              value={form.copywriter_type || ''}
-              onChange={handleChange}
-            />
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="min-h-screen p-4 lg:p-8">
       <div className="max-w-4xl mx-auto">
@@ -357,20 +167,6 @@ export default function ClientProductPersonaForm() {
           </div>
           <h1 className="text-3xl font-bold mb-2 shimmer-text">Create Product Persona</h1>
           <p className="text-gray-400">Define your brand voice and personality for AI-powered FAQ generation</p>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="glass-card p-8 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Step {currentStep} of {totalSteps}</h2>
-            <span className="text-sm text-gray-400">{Math.round((currentStep / totalSteps) * 100)}% Complete</span>
-          </div>
-          <div className="w-full bg-gray-700 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-brand to-brand-dark h-2 rounded-full transition-all duration-500"
-              style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-            ></div>
-          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -385,44 +181,226 @@ export default function ClientProductPersonaForm() {
               </div>
             )}
 
-            {renderStep()}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  🎯 Product
+                </label>
+                <select
+                  value={productId}
+                  onChange={e => {
+                    setProductId(e.target.value);
+                    const selected = products.find(p => p.id === e.target.value);
+                    setOrganisationName(selected ? selected.organisation : '');
+                  }}
+                  className="glass-input w-full p-4"
+                  required
+                >
+                  <option value="">Select a product</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>{p.product_name}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="flex justify-between mt-8">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  🏢 Organisation
+                </label>
+                <input
+                  type="text"
+                  value={organisationName}
+                  readOnly
+                  className="glass-input w-full p-4 text-gray-400"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  🎭 Persona Name
+                </label>
+                <input
+                  type="text"
+                  name="persona_name"
+                  value={form.persona_name || ''}
+                  onChange={handleChange}
+                  className="glass-input w-full p-4"
+                  placeholder="e.g. UK Brand Voice, Gen Z Playful, etc."
+                  required
+                />
+              </div>
+
+              <Dropdown 
+                label="💎 Core Brand Value" 
+                name="core_brand_value" 
+                options={coreBrandValues} 
+                value={form.core_brand_value || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="🎵 Brand Tone of Voice" 
+                name="brand_tone_of_voice" 
+                options={brandTones} 
+                value={form.brand_tone_of_voice || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="🦸 Brand Archetype" 
+                name="brand_archetype" 
+                options={brandArchetypes} 
+                value={form.brand_archetype || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="💝 Customer Emotions" 
+                name="customer_emotions" 
+                options={customerEmotions} 
+                value={form.customer_emotions || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="💬 Communication Style" 
+                name="communication_style" 
+                options={communicationStyles} 
+                value={form.communication_style || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="😄 Brand Voice Humor" 
+                name="brand_voice_humor" 
+                options={brandVoiceHumor} 
+                value={form.brand_voice_humor || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="📚 Language Complexity" 
+                name="language_complexity" 
+                options={languageComplexity} 
+                value={form.language_complexity || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="🎭 Emotional Expressiveness" 
+                name="emotional_expressiveness" 
+                options={emotionalExpressiveness} 
+                value={form.emotional_expressiveness || ''} 
+                onChange={handleChange} 
+              />
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  🚫 Words To Avoid
+                </label>
+                <input
+                  type="text"
+                  name="words_to_avoid"
+                  value={form.words_to_avoid || ''}
+                  onChange={handleChange}
+                  className="glass-input w-full p-4"
+                  placeholder="e.g. jargon, slang, negative words, etc."
+                />
+              </div>
+
+              <Dropdown 
+                label="👋 Customer Address Style" 
+                name="customer_address_style" 
+                options={customerAddressStyles} 
+                value={form.customer_address_style || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="🎯 Brand Communication Purpose" 
+                name="brand_communication_purpose" 
+                options={brandCommunicationPurpose} 
+                value={form.brand_communication_purpose || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="🏷️ Brand Tagline" 
+                name="brand_tagline" 
+                options={brandTaglines} 
+                value={form.brand_tagline || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="🎨 Brand Visual Metaphor" 
+                name="brand_visual_metaphor" 
+                options={brandVisualMetaphors} 
+                value={form.brand_visual_metaphor || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="🌍 Language & Region Preference" 
+                name="language_region_preference" 
+                options={languageRegionPreferences} 
+                value={form.language_region_preference || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="⚔️ Competitor Voice Contrast" 
+                name="competitor_voice_contrast" 
+                options={competitorVoiceContrasts} 
+                value={form.competitor_voice_contrast || ''} 
+                onChange={handleChange} 
+              />
+
+              <Dropdown 
+                label="✍️ Copywriter Type" 
+                name="copywriter_type" 
+                options={copywriterTypes} 
+                value={form.copywriter_type || ''} 
+                onChange={handleChange} 
+              />
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  📝 Content Do&apos;s &amp; Don&apos;ts
+                </label>
+                <textarea
+                  name="content_dos_and_donts"
+                  value={form.content_dos_and_donts || ''}
+                  onChange={handleChange}
+                  className="glass-input w-full p-4 h-24 resize-none"
+                  placeholder="List specific do&apos;s and don&apos;ts for your content..."
+                />
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`premium-button flex-1 ${isSubmitting ? 'premium-loading' : ''}`}
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Saving Persona...
+                  </div>
+                ) : (
+                  '✨ Save Persona'
+                )}
+              </button>
+              
               <button
                 type="button"
-                onClick={prevStep}
-                disabled={currentStep === 1}
-                className={`glass-input px-6 py-3 ${
-                  currentStep === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/10'
-                } transition-colors`}
+                onClick={() => router.push('/dashboard')}
+                className="glass-input p-4 hover:bg-white/10 transition-colors"
               >
-                ← Previous
+                🏠 Back to Dashboard
               </button>
-
-              {currentStep < totalSteps ? (
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  className="premium-button"
-                >
-                  Next →
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`premium-button ${isSubmitting ? 'premium-loading' : ''}`}
-                >
-                  {isSubmitting ? (
-                    <div className="flex items-center">
-                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Saving Persona...
-                    </div>
-                  ) : (
-                    '✨ Save Persona'
-                  )}
-                </button>
-              )}
             </div>
           </div>
         </form>

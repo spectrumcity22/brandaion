@@ -104,62 +104,143 @@ export default function EndUserForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="bg-gray-900 p-8 rounded-2xl shadow-lg text-center">
-        <h2 className="text-xl font-bold mb-4">Complete Your BrandAION Profile</h2>
-
-        {email && (
-          <div className="text-green-400 text-sm mb-4">
-            Logged in as: {email}
+    <div className="min-h-screen p-4 lg:p-8">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="glass-card p-8 text-center mb-8">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
+            👤
           </div>
-        )}
+          <h1 className="text-3xl font-bold mb-2 shimmer-text">Complete Your BrandAION Profile</h1>
+          <p className="text-gray-400">Set up your account to get started with AI-powered FAQ generation</p>
+        </div>
 
-        <input
-          type="text"
-          placeholder="First Name"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        />
-        <input
-          type="text"
-          placeholder="Last Name"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        />
-        <input
-          type="text"
-          placeholder="Organisation Name"
-          value={orgName}
-          onChange={(e) => setOrgName(e.target.value)}
-          className="w-full p-3 mb-4 bg-gray-800 border border-gray-700 rounded-lg text-white"
-        />
+        <div className="glass-card p-8">
+          {email && (
+            <div className="mb-6 p-4 glass-card text-center">
+              <div className="text-2xl mb-2">✅</div>
+              <h2 className="text-lg font-semibold mb-1">Logged in as</h2>
+              <p className="text-brand font-medium">{email}</p>
+            </div>
+          )}
 
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className={`w-full py-3 font-bold rounded-lg transition ${
-            isSubmitting
-              ? 'bg-gray-600 text-white cursor-not-allowed'
-              : 'bg-green-500 hover:bg-green-600 text-black'
-          }`}
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit'}
-        </button>
+          {message && (
+            <div className={`mb-6 p-4 rounded-lg text-center ${
+              message.includes('❌') 
+                ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
+                : 'bg-green-500/10 text-green-400 border border-green-500/20'
+            }`}>
+              {message}
+            </div>
+          )}
 
-        <div className="text-sm mt-4 text-center text-red-400">{message}</div>
-        
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                👤 First Name
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your first name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="glass-input w-full p-4"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                👤 Last Name
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="glass-input w-full p-4"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                🏢 Organisation Name
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your organisation name"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                className="glass-input w-full p-4"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className={`premium-button flex-1 ${isSubmitting ? 'premium-loading' : ''}`}
+            >
+              {isSubmitting ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Submitting...
+                </div>
+              ) : (
+                '✨ Complete Profile'
+              )}
+            </button>
+            
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="glass-input p-4 hover:bg-white/10 transition-colors"
+            >
+              🏠 Back to Dashboard
+            </button>
+          </div>
+        </div>
+
+        {/* Success Action */}
         {message.includes('✅') && (
-          <div className="mt-4">
+          <div className="glass-card p-8 mt-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center text-2xl">
+              🎉
+            </div>
+            <h2 className="text-xl font-semibold mb-4">Profile Created Successfully!</h2>
+            <p className="text-gray-400 mb-6">Now let&apos;s set up your organisation details</p>
             <button
               onClick={() => router.push('/organisation_form')}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+              className="premium-button"
             >
-              Continue to Organization Form
+              🏢 Continue to Organisation Form
             </button>
           </div>
         )}
+
+        {/* Help Section */}
+        <div className="glass-card p-8 mt-8">
+          <h2 className="text-2xl font-bold mb-6">💡 Getting Started</h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-3xl mb-3">👤</div>
+              <h3 className="font-semibold mb-2">Complete Profile</h3>
+              <p className="text-gray-400 text-sm">Fill in your personal and organisation details</p>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl mb-3">🏢</div>
+              <h3 className="font-semibold mb-2">Organisation Setup</h3>
+              <p className="text-gray-400 text-sm">Configure your organisation details and industry</p>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl mb-3">🚀</div>
+              <h3 className="font-semibold mb-2">Start Generating</h3>
+              <p className="text-gray-400 text-sm">Begin creating AI-powered FAQ content</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
