@@ -68,6 +68,10 @@ export default function MonthlyReportPage() {
       const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM
       setSelectedMonth(currentMonth);
 
+      // Calculate first day of next month for proper date range
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const nextMonthStr = nextMonth.toISOString().slice(0, 7) + '-01';
+
       // Load current month's performance logs
       const { data: currentMonthData, error: currentMonthError } = await supabase
         .from('faq_performance_logs')
@@ -75,7 +79,7 @@ export default function MonthlyReportPage() {
         .eq('auth_user_id', user.id)
         .eq('test_schedule', 'monthly')
         .gte('created_at', `${currentMonth}-01`)
-        .lt('created_at', `${currentMonth}-32`)
+        .lt('created_at', nextMonthStr)
         .order('created_at', { ascending: false });
 
       if (currentMonthError) {
