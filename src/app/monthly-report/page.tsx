@@ -601,7 +601,10 @@ export default function MonthlyReportPage() {
                       Question
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Provider
+                      LLM Provider
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      AI Response
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Accuracy
@@ -625,6 +628,7 @@ export default function MonthlyReportPage() {
                     // Get the first successful provider for display
                     const providers = ['openai', 'gemini', 'perplexity', 'claude'];
                     let displayProvider = '';
+                    let displayResponse = '';
                     let displayAccuracy = 0;
                     let displayResponseTime = 0;
                     let displayCost = 0;
@@ -634,6 +638,7 @@ export default function MonthlyReportPage() {
                       const status = (log as any)[`${provider}_status`];
                       if (status === 'success') {
                         displayProvider = provider;
+                        displayResponse = (log as any)[`${provider}_response`] || '';
                         displayAccuracy = (log as any)[`${provider}_accuracy_score`] || 0;
                         displayResponseTime = (log as any)[`${provider}_response_time_ms`] || 0;
                         displayCost = (log as any)[`${provider}_cost_usd`] || 0;
@@ -648,6 +653,7 @@ export default function MonthlyReportPage() {
                         const status = (log as any)[`${provider}_status`];
                         if (status) {
                           displayProvider = provider;
+                          displayResponse = (log as any)[`${provider}_response`] || '';
                           displayAccuracy = (log as any)[`${provider}_accuracy_score`] || 0;
                           displayResponseTime = (log as any)[`${provider}_response_time_ms`] || 0;
                           displayCost = (log as any)[`${provider}_cost_usd`] || 0;
@@ -658,7 +664,7 @@ export default function MonthlyReportPage() {
                     }
 
                     return (
-                      <tr key={log.id}>
+                      <tr key={log.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900 max-w-xs truncate">
                             {log.question_text}
@@ -666,12 +672,41 @@ export default function MonthlyReportPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className={`w-6 h-6 rounded-full bg-gradient-to-r ${getProviderColor(displayProvider)} flex items-center justify-center text-white text-xs font-bold mr-2`}>
+                            <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(displayProvider)} flex items-center justify-center text-white text-sm font-bold mr-3`}>
                               {AI_PROVIDERS[displayProvider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
                             </div>
-                            <span className="text-sm text-gray-900">
-                              {getProviderName(displayProvider)}
-                            </span>
+                            <div>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {getProviderName(displayProvider)}
+                              </span>
+                              <div className="text-xs text-gray-500 capitalize">
+                                {displayProvider}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="max-w-md">
+                            <div className="text-sm text-gray-900 line-clamp-3">
+                              {displayResponse ? (
+                                displayResponse.length > 150 ? 
+                                `${displayResponse.substring(0, 150)}...` : 
+                                displayResponse
+                              ) : (
+                                <span className="text-gray-400 italic">No response</span>
+                              )}
+                            </div>
+                            {displayResponse && displayResponse.length > 150 && (
+                              <button 
+                                className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                onClick={() => {
+                                  // You could add a modal here to show full response
+                                  alert(displayResponse);
+                                }}
+                              >
+                                View full response
+                              </button>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
