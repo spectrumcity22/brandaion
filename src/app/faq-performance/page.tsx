@@ -214,7 +214,7 @@ export default function FAQPerformancePage() {
         test_schedule: 'monthly'
       });
 
-      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/test_faq_performance_v2', {
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/run_question_monitor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
