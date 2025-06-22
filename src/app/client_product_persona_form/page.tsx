@@ -434,7 +434,7 @@ export default function ClientProductPersonaForm() {
             <div className="text-center">
               <div className="text-3xl mb-3">🎯</div>
               <h3 className="font-semibold mb-2">Be Specific</h3>
-              <p className="text-gray-400 text-sm">Choose options that truly reflect your brand's personality</p>
+              <p className="text-gray-400 text-sm">Choose options that truly reflect your brand&apos;s personality</p>
             </div>
             <div className="text-center">
               <div className="text-3xl mb-3">🔄</div>

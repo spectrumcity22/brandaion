@@ -252,7 +252,7 @@ function InvoiceConfirmationContent() {
 
         {/* Next Steps */}
         <div className="glass-card p-8 mt-8">
-          <h2 className="text-2xl font-bold mb-6">🎯 What's Next?</h2>
+          <h2 className="text-2xl font-bold mb-6">🎯 What&apos;s Next?</h2>
           <div className="grid md:grid-cols-3 gap-6">
             <div className="text-center">
               <div className="text-3xl mb-3">📅</div>
