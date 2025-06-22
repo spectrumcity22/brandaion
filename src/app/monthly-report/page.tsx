@@ -430,10 +430,255 @@ export default function MonthlyReportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading monthly report...</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-white mb-2">Monthly Performance Report</h1>
+            <p className="text-xl text-gray-300">
+              {selectedMonth} - AI Performance Analysis
+            </p>
+            
+            {/* Month Selector */}
+            <div className="mt-6 flex items-center space-x-4">
+              <label htmlFor="month-select" className="text-sm font-medium text-gray-300">
+                Select Month:
+              </label>
+              <select
+                id="month-select"
+                value={selectedMonth}
+                onChange={(e) => handleMonthChange(e.target.value)}
+                className="block w-48 px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm"
+              >
+                {availableMonths.map((month) => (
+                  <option key={month} value={month}>
+                    {new Date(month + '-01').toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long' 
+                    })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Monthly Stats Overview */}
+          {monthlyStats && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Total Tests</h3>
+                <p className="text-2xl font-bold text-white">{monthlyStats.total_tests}</p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Average Accuracy</h3>
+                <p className="text-2xl font-bold text-green-400">
+                  {formatPercentage(monthlyStats.average_accuracy)}
+                </p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Avg Response Time</h3>
+                <p className="text-2xl font-bold text-blue-400">
+                  {formatTime(monthlyStats.average_response_time)}
+                </p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Total Cost</h3>
+                <p className="text-2xl font-bold text-purple-400">
+                  {formatCurrency(monthlyStats.total_cost)}
+                </p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Success Rate</h3>
+                <p className="text-2xl font-bold text-green-400">
+                  {monthlyStats.success_rate.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* LLM Performance Comparison */}
+          {llmComparisons.length > 0 && (
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl mb-8">
+              <div className="px-6 py-4 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-white">LLM Performance Comparison</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-700">
+                  <thead className="bg-gray-700/50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Provider
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Tests
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Accuracy
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Response Time
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Cost
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Success Rate
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-gray-800/30 divide-y divide-gray-700">
+                    {llmComparisons.map((comparison) => (
+                      <tr key={comparison.provider} className="hover:bg-gray-700/30 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(comparison.provider)} flex items-center justify-center text-white text-sm font-bold mr-3`}>
+                              {AI_PROVIDERS[comparison.provider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
+                            </div>
+                            <span className="text-sm font-medium text-white">
+                              {getProviderName(comparison.provider)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                          {comparison.total_tests}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-400 font-medium">
+                          {formatPercentage(comparison.average_accuracy)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-400">
+                          {formatTime(comparison.average_response_time)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-400">
+                          {formatCurrency(comparison.total_cost)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-400 font-medium">
+                          {comparison.success_rate.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Test Results */}
+          {currentMonthLogs.length > 0 && (
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl">
+              <div className="px-6 py-4 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-white">Recent Test Results</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-700">
+                  <thead className="bg-gray-700/50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Question
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        LLM Provider
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        AI Response
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-gray-800/30 divide-y divide-gray-700">
+                    {currentMonthLogs.slice(0, 20).map((log) => {
+                      // Get the first successful provider for display
+                      const providers = ['openai', 'gemini', 'perplexity', 'claude'];
+                      let displayProvider = '';
+                      let displayResponse = '';
+
+                      for (const provider of providers) {
+                        const status = (log as any)[`${provider}_status`];
+                        if (status === 'success') {
+                          displayProvider = provider;
+                          displayResponse = (log as any)[`${provider}_response`] || '';
+                          break;
+                        }
+                      }
+
+                      // If no successful provider, show the first one with any status
+                      if (!displayProvider) {
+                        for (const provider of providers) {
+                          const status = (log as any)[`${provider}_status`];
+                          if (status) {
+                            displayProvider = provider;
+                            displayResponse = (log as any)[`${provider}_response`] || '';
+                            break;
+                          }
+                        }
+                      }
+
+                      return (
+                        <tr key={log.id} className="hover:bg-gray-700/30 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-300 max-w-xs truncate">
+                              {log.question_text}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(displayProvider)} flex items-center justify-center text-white text-sm font-bold mr-3`}>
+                                {AI_PROVIDERS[displayProvider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
+                              </div>
+                              <div>
+                                <span className="text-sm font-semibold text-white">
+                                  {getProviderName(displayProvider)}
+                                </span>
+                                <div className="text-xs text-gray-400 capitalize">
+                                  {displayProvider}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="max-w-2xl">
+                              <div className="text-sm text-gray-300">
+                                {displayResponse ? (
+                                  displayResponse.length > 300 ? 
+                                  `${displayResponse.substring(0, 300)}...` : 
+                                  displayResponse
+                                ) : (
+                                  <span className="text-gray-500 italic">No response</span>
+                                )}
+                              </div>
+                              {displayResponse && displayResponse.length > 300 && (
+                                <button 
+                                  className="text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
+                                  onClick={() => {
+                                    // You could add a modal here to show full response
+                                    alert(displayResponse);
+                                  }}
+                                >
+                                  View full response
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                            {new Date(log.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {currentMonthLogs.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-400">No test results found for this month.</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Monthly tests will appear here once they are run automatically.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -441,39 +686,279 @@ export default function MonthlyReportPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={() => loadData()}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Retry
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-white mb-2">Monthly Performance Report</h1>
+            <p className="text-xl text-gray-300">
+              {selectedMonth} - AI Performance Analysis
+            </p>
+            
+            {/* Month Selector */}
+            <div className="mt-6 flex items-center space-x-4">
+              <label htmlFor="month-select" className="text-sm font-medium text-gray-300">
+                Select Month:
+              </label>
+              <select
+                id="month-select"
+                value={selectedMonth}
+                onChange={(e) => handleMonthChange(e.target.value)}
+                className="block w-48 px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm"
+              >
+                {availableMonths.map((month) => (
+                  <option key={month} value={month}>
+                    {new Date(month + '-01').toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long' 
+                    })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Monthly Stats Overview */}
+          {monthlyStats && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Total Tests</h3>
+                <p className="text-2xl font-bold text-white">{monthlyStats.total_tests}</p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Average Accuracy</h3>
+                <p className="text-2xl font-bold text-green-400">
+                  {formatPercentage(monthlyStats.average_accuracy)}
+                </p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Avg Response Time</h3>
+                <p className="text-2xl font-bold text-blue-400">
+                  {formatTime(monthlyStats.average_response_time)}
+                </p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Total Cost</h3>
+                <p className="text-2xl font-bold text-purple-400">
+                  {formatCurrency(monthlyStats.total_cost)}
+                </p>
+              </div>
+              <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+                <h3 className="text-sm font-medium text-gray-400">Success Rate</h3>
+                <p className="text-2xl font-bold text-green-400">
+                  {monthlyStats.success_rate.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* LLM Performance Comparison */}
+          {llmComparisons.length > 0 && (
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl mb-8">
+              <div className="px-6 py-4 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-white">LLM Performance Comparison</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-700">
+                  <thead className="bg-gray-700/50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Provider
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Tests
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Accuracy
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Response Time
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Cost
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Success Rate
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-gray-800/30 divide-y divide-gray-700">
+                    {llmComparisons.map((comparison) => (
+                      <tr key={comparison.provider} className="hover:bg-gray-700/30 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(comparison.provider)} flex items-center justify-center text-white text-sm font-bold mr-3`}>
+                              {AI_PROVIDERS[comparison.provider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
+                            </div>
+                            <span className="text-sm font-medium text-white">
+                              {getProviderName(comparison.provider)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                          {comparison.total_tests}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-400 font-medium">
+                          {formatPercentage(comparison.average_accuracy)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-400">
+                          {formatTime(comparison.average_response_time)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-400">
+                          {formatCurrency(comparison.total_cost)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-400 font-medium">
+                          {comparison.success_rate.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Test Results */}
+          {currentMonthLogs.length > 0 && (
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl">
+              <div className="px-6 py-4 border-b border-gray-700">
+                <h2 className="text-xl font-semibold text-white">Recent Test Results</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-700">
+                  <thead className="bg-gray-700/50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Question
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        LLM Provider
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        AI Response
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        Date
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-gray-800/30 divide-y divide-gray-700">
+                    {currentMonthLogs.slice(0, 20).map((log) => {
+                      // Get the first successful provider for display
+                      const providers = ['openai', 'gemini', 'perplexity', 'claude'];
+                      let displayProvider = '';
+                      let displayResponse = '';
+
+                      for (const provider of providers) {
+                        const status = (log as any)[`${provider}_status`];
+                        if (status === 'success') {
+                          displayProvider = provider;
+                          displayResponse = (log as any)[`${provider}_response`] || '';
+                          break;
+                        }
+                      }
+
+                      // If no successful provider, show the first one with any status
+                      if (!displayProvider) {
+                        for (const provider of providers) {
+                          const status = (log as any)[`${provider}_status`];
+                          if (status) {
+                            displayProvider = provider;
+                            displayResponse = (log as any)[`${provider}_response`] || '';
+                            break;
+                          }
+                        }
+                      }
+
+                      return (
+                        <tr key={log.id} className="hover:bg-gray-700/30 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-300 max-w-xs truncate">
+                              {log.question_text}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(displayProvider)} flex items-center justify-center text-white text-sm font-bold mr-3`}>
+                                {AI_PROVIDERS[displayProvider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
+                              </div>
+                              <div>
+                                <span className="text-sm font-semibold text-white">
+                                  {getProviderName(displayProvider)}
+                                </span>
+                                <div className="text-xs text-gray-400 capitalize">
+                                  {displayProvider}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="max-w-2xl">
+                              <div className="text-sm text-gray-300">
+                                {displayResponse ? (
+                                  displayResponse.length > 300 ? 
+                                  `${displayResponse.substring(0, 300)}...` : 
+                                  displayResponse
+                                ) : (
+                                  <span className="text-gray-500 italic">No response</span>
+                                )}
+                              </div>
+                              {displayResponse && displayResponse.length > 300 && (
+                                <button 
+                                  className="text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
+                                  onClick={() => {
+                                    // You could add a modal here to show full response
+                                    alert(displayResponse);
+                                  }}
+                                >
+                                  View full response
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                            {new Date(log.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {currentMonthLogs.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-400">No test results found for this month.</p>
+              <p className="text-gray-500 text-sm mt-2">
+                Monthly tests will appear here once they are run automatically.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Monthly Performance Report</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-4xl font-bold text-white mb-2">Monthly Performance Report</h1>
+          <p className="text-xl text-gray-300">
             {selectedMonth} - AI Performance Analysis
           </p>
           
           {/* Month Selector */}
-          <div className="mt-4 flex items-center space-x-4">
-            <label htmlFor="month-select" className="text-sm font-medium text-gray-700">
+          <div className="mt-6 flex items-center space-x-4">
+            <label htmlFor="month-select" className="text-sm font-medium text-gray-300">
               Select Month:
             </label>
             <select
               id="month-select"
               value={selectedMonth}
               onChange={(e) => handleMonthChange(e.target.value)}
-              className="block w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="block w-48 px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm"
             >
               {availableMonths.map((month) => (
                 <option key={month} value={month}>
@@ -490,31 +975,31 @@ export default function MonthlyReportPage() {
         {/* Monthly Stats Overview */}
         {monthlyStats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500">Total Tests</h3>
-              <p className="text-2xl font-bold text-gray-900">{monthlyStats.total_tests}</p>
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+              <h3 className="text-sm font-medium text-gray-400">Total Tests</h3>
+              <p className="text-2xl font-bold text-white">{monthlyStats.total_tests}</p>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500">Average Accuracy</h3>
-              <p className="text-2xl font-bold text-green-600">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+              <h3 className="text-sm font-medium text-gray-400">Average Accuracy</h3>
+              <p className="text-2xl font-bold text-green-400">
                 {formatPercentage(monthlyStats.average_accuracy)}
               </p>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500">Avg Response Time</h3>
-              <p className="text-2xl font-bold text-blue-600">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+              <h3 className="text-sm font-medium text-gray-400">Avg Response Time</h3>
+              <p className="text-2xl font-bold text-blue-400">
                 {formatTime(monthlyStats.average_response_time)}
               </p>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500">Total Cost</h3>
-              <p className="text-2xl font-bold text-purple-600">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+              <h3 className="text-sm font-medium text-gray-400">Total Cost</h3>
+              <p className="text-2xl font-bold text-purple-400">
                 {formatCurrency(monthlyStats.total_cost)}
               </p>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-sm font-medium text-gray-500">Success Rate</h3>
-              <p className="text-2xl font-bold text-green-600">
+            <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl p-6 hover:border-gray-600 transition-all duration-200">
+              <h3 className="text-sm font-medium text-gray-400">Success Rate</h3>
+              <p className="text-2xl font-bold text-green-400">
                 {monthlyStats.success_rate.toFixed(1)}%
               </p>
             </div>
@@ -523,60 +1008,60 @@ export default function MonthlyReportPage() {
 
         {/* LLM Performance Comparison */}
         {llmComparisons.length > 0 && (
-          <div className="bg-white rounded-lg shadow mb-8">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">LLM Performance Comparison</h2>
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl mb-8">
+            <div className="px-6 py-4 border-b border-gray-700">
+              <h2 className="text-xl font-semibold text-white">LLM Performance Comparison</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-700">
+                <thead className="bg-gray-700/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Provider
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Tests
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Accuracy
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Response Time
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Cost
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Success Rate
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-gray-800/30 divide-y divide-gray-700">
                   {llmComparisons.map((comparison) => (
-                    <tr key={comparison.provider}>
+                    <tr key={comparison.provider} className="hover:bg-gray-700/30 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getProviderColor(comparison.provider)} flex items-center justify-center text-white text-sm font-bold mr-3`}>
                             {AI_PROVIDERS[comparison.provider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
                           </div>
-                          <span className="text-sm font-medium text-gray-900">
+                          <span className="text-sm font-medium text-white">
                             {getProviderName(comparison.provider)}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                         {comparison.total_tests}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-400 font-medium">
                         {formatPercentage(comparison.average_accuracy)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-400">
                         {formatTime(comparison.average_response_time)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-400">
                         {formatCurrency(comparison.total_cost)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-400 font-medium">
                         {comparison.success_rate.toFixed(1)}%
                       </td>
                     </tr>
@@ -589,29 +1074,29 @@ export default function MonthlyReportPage() {
 
         {/* Recent Test Results */}
         {currentMonthLogs.length > 0 && (
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Recent Test Results</h2>
+          <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl">
+            <div className="px-6 py-4 border-b border-gray-700">
+              <h2 className="text-xl font-semibold text-white">Recent Test Results</h2>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-700">
+                <thead className="bg-gray-700/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Question
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       LLM Provider
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       AI Response
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Date
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-gray-800/30 divide-y divide-gray-700">
                   {currentMonthLogs.slice(0, 20).map((log) => {
                     // Get the first successful provider for display
                     const providers = ['openai', 'gemini', 'perplexity', 'claude'];
@@ -640,9 +1125,9 @@ export default function MonthlyReportPage() {
                     }
 
                     return (
-                      <tr key={log.id} className="hover:bg-gray-50">
+                      <tr key={log.id} className="hover:bg-gray-700/30 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 max-w-xs truncate">
+                          <div className="text-sm text-gray-300 max-w-xs truncate">
                             {log.question_text}
                           </div>
                         </td>
@@ -652,10 +1137,10 @@ export default function MonthlyReportPage() {
                               {AI_PROVIDERS[displayProvider as keyof typeof AI_PROVIDERS]?.icon || '🤖'}
                             </div>
                             <div>
-                              <span className="text-sm font-semibold text-gray-900">
+                              <span className="text-sm font-semibold text-white">
                                 {getProviderName(displayProvider)}
                               </span>
-                              <div className="text-xs text-gray-500 capitalize">
+                              <div className="text-xs text-gray-400 capitalize">
                                 {displayProvider}
                               </div>
                             </div>
@@ -663,18 +1148,18 @@ export default function MonthlyReportPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="max-w-2xl">
-                            <div className="text-sm text-gray-900">
+                            <div className="text-sm text-gray-300">
                               {displayResponse ? (
                                 displayResponse.length > 300 ? 
                                 `${displayResponse.substring(0, 300)}...` : 
                                 displayResponse
                               ) : (
-                                <span className="text-gray-400 italic">No response</span>
+                                <span className="text-gray-500 italic">No response</span>
                               )}
                             </div>
                             {displayResponse && displayResponse.length > 300 && (
                               <button 
-                                className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                                className="text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
                                 onClick={() => {
                                   // You could add a modal here to show full response
                                   alert(displayResponse);
@@ -685,7 +1170,7 @@ export default function MonthlyReportPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                           {new Date(log.created_at).toLocaleDateString()}
                         </td>
                       </tr>
@@ -699,8 +1184,8 @@ export default function MonthlyReportPage() {
 
         {currentMonthLogs.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500">No test results found for this month.</p>
-            <p className="text-gray-400 text-sm mt-2">
+            <p className="text-gray-400">No test results found for this month.</p>
+            <p className="text-gray-500 text-sm mt-2">
               Monthly tests will appear here once they are run automatically.
             </p>
           </div>
