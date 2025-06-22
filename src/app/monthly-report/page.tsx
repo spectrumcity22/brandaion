@@ -607,18 +607,6 @@ export default function MonthlyReportPage() {
                       AI Response
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Accuracy
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Response Time
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cost
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Date
                     </th>
                   </tr>
@@ -629,20 +617,12 @@ export default function MonthlyReportPage() {
                     const providers = ['openai', 'gemini', 'perplexity', 'claude'];
                     let displayProvider = '';
                     let displayResponse = '';
-                    let displayAccuracy = 0;
-                    let displayResponseTime = 0;
-                    let displayCost = 0;
-                    let displayStatus = 'pending';
 
                     for (const provider of providers) {
                       const status = (log as any)[`${provider}_status`];
                       if (status === 'success') {
                         displayProvider = provider;
                         displayResponse = (log as any)[`${provider}_response`] || '';
-                        displayAccuracy = (log as any)[`${provider}_accuracy_score`] || 0;
-                        displayResponseTime = (log as any)[`${provider}_response_time_ms`] || 0;
-                        displayCost = (log as any)[`${provider}_cost_usd`] || 0;
-                        displayStatus = status;
                         break;
                       }
                     }
@@ -654,10 +634,6 @@ export default function MonthlyReportPage() {
                         if (status) {
                           displayProvider = provider;
                           displayResponse = (log as any)[`${provider}_response`] || '';
-                          displayAccuracy = (log as any)[`${provider}_accuracy_score`] || 0;
-                          displayResponseTime = (log as any)[`${provider}_response_time_ms`] || 0;
-                          displayCost = (log as any)[`${provider}_cost_usd`] || 0;
-                          displayStatus = status;
                           break;
                         }
                       }
@@ -686,17 +662,17 @@ export default function MonthlyReportPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="max-w-md">
-                            <div className="text-sm text-gray-900 line-clamp-3">
+                          <div className="max-w-2xl">
+                            <div className="text-sm text-gray-900">
                               {displayResponse ? (
-                                displayResponse.length > 150 ? 
-                                `${displayResponse.substring(0, 150)}...` : 
+                                displayResponse.length > 300 ? 
+                                `${displayResponse.substring(0, 300)}...` : 
                                 displayResponse
                               ) : (
                                 <span className="text-gray-400 italic">No response</span>
                               )}
                             </div>
-                            {displayResponse && displayResponse.length > 150 && (
+                            {displayResponse && displayResponse.length > 300 && (
                               <button 
                                 className="text-xs text-blue-600 hover:text-blue-800 mt-1"
                                 onClick={() => {
@@ -708,26 +684,6 @@ export default function MonthlyReportPage() {
                               </button>
                             )}
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                          {displayAccuracy > 0 ? formatPercentage(displayAccuracy) : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                          {displayResponseTime > 0 ? formatTime(displayResponseTime) : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                          {displayCost > 0 ? formatCurrency(displayCost) : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            displayStatus === 'success' 
-                              ? 'bg-green-100 text-green-800' 
-                              : displayStatus === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {displayStatus}
-                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(log.created_at).toLocaleDateString()}

@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const accountRef = useRef<HTMLDivElement>(null);
   const configRef = useRef<HTMLDivElement>(null);
   const batchesRef = useRef<HTMLDivElement>(null);
+  const monitoringRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -35,7 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       if (
         accountRef.current && !accountRef.current.contains(event.target as Node) &&
         configRef.current && !configRef.current.contains(event.target as Node) &&
-        batchesRef.current && !batchesRef.current.contains(event.target as Node)
+        batchesRef.current && !batchesRef.current.contains(event.target as Node) &&
+        monitoringRef.current && !monitoringRef.current.contains(event.target as Node)
       ) {
         setOpenDropdown(null);
       }
@@ -116,7 +118,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       <Link href="/review-answers" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Answers</Link>
                       <Link href="/faq-batches" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Batches</Link>
                       <Link href="/faq-pairs" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Pairs</Link>
-                      <Link href="/faq-performance" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Performance</Link>
+                    </div>
+                  )}
+                </div>
+                {/* Monitoring Dropdown */}
+                <div ref={monitoringRef} className="relative">
+                  <button
+                    className="hover:text-green-400"
+                    onClick={() => setOpenDropdown(openDropdown === 'monitoring' ? null : 'monitoring')}
+                  >
+                    Monitoring ▾
+                  </button>
+                  {openDropdown === 'monitoring' && (
+                    <div className="absolute left-0 mt-2 w-56 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/faq-performance" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Performance Setup</Link>
+                      <Link href="/monthly-report" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Monthly Performance Report</Link>
                     </div>
                   )}
                 </div>
