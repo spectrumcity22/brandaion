@@ -119,7 +119,7 @@ export default function FAQPerformancePage() {
 
   const testFAQPerformance = async () => {
     if (selectedPairs.length === 0) {
-      setError('Please select FAQ pairs to add to monthly schedule');
+      setError('Please select FAQ pairs to test');
       return;
     }
 
@@ -157,7 +157,7 @@ export default function FAQPerformancePage() {
         throw new Error(`You can only select up to ${limits.llms_limit} AI providers for your package`);
       }
 
-      // Save selected questions to monthly schedule
+      // Step 1: Save selected questions to monthly schedule
       const questionsToInsert = selectedPairs.map(questionId => ({
         user_id: user.id,
         question_id: questionId,
@@ -173,7 +173,7 @@ export default function FAQPerformancePage() {
         throw new Error('Failed to save questions to monthly schedule');
       }
 
-      // Save selected LLMs to monthly schedule
+      // Step 2: Save selected LLMs to monthly schedule
       const llmsToInsert = selectedProviders.map(provider => ({
         user_id: user.id,
         llm_provider: provider,
@@ -189,7 +189,7 @@ export default function FAQPerformancePage() {
         throw new Error('Failed to save LLMs to monthly schedule');
       }
 
-      // Create or update user monthly schedule
+      // Step 3: Create or update user monthly schedule
       const { error: scheduleError } = await supabase
         .from('user_monthly_schedule')
         .upsert({
@@ -203,11 +203,18 @@ export default function FAQPerformancePage() {
         throw new Error('Failed to create monthly schedule');
       }
 
-      // Run immediate test with the correct function
+      // Step 4: Run immediate test and get AI answers
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
 
-      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/run_question_monitor', {
+      console.log('Running immediate test with:', {
+        auth_user_id: user.id,
+        question_ids: selectedPairs,
+        ai_providers: selectedProviders,
+        test_schedule: 'monthly'
+      });
+
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/test_faq_performance_v2', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -222,23 +229,25 @@ export default function FAQPerformancePage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to run initial test');
+        const errorText = await response.text();
+        console.error('Test failed:', errorText);
+        throw new Error(`Test failed: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
+      console.log('Test completed:', result);
 
-      // Clear selections and show success
+      // Step 5: Clear selections and show success
       setSelectedPairs([]);
       setSelectedProviders(['openai']);
       setError('');
       
-      // Show success message
-      alert(`Successfully added to monthly schedule! Initial test completed with ${result.results?.length || 0} questions tested. Your questions will also be automatically tested daily at 2 AM UTC.`);
+      // Step 6: Show results to user
+      alert(`✅ Test completed successfully!\n\n📊 Results:\n- ${result.results?.length || 0} questions tested\n- ${result.summary?.successful_tests || 0} successful tests\n- Total cost: $${result.summary?.total_cost?.toFixed(4) || 0}\n- Total tokens: ${result.summary?.total_tokens || 0}\n\nYour questions will be automatically re-tested daily at 2 AM UTC.`);
 
     } catch (error) {
-      console.error('Error adding to monthly schedule:', error);
-      setError(error instanceof Error ? error.message : 'Failed to add to monthly schedule');
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to run test');
     } finally {
       setTesting(false);
     }
@@ -428,10 +437,10 @@ export default function FAQPerformancePage() {
                 {testing ? (
                   <div className="flex items-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Adding to Schedule...
+                    Running Test...
                   </div>
                 ) : (
-                  '📅 Add to Monthly Schedule'
+                  '📅 Run Test'
                 )}
               </button>
             </div>
