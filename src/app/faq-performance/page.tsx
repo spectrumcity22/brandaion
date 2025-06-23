@@ -57,10 +57,24 @@ export default function FAQPerformancePage() {
   const [error, setError] = useState('');
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [topicStats, setTopicStats] = useState<TopicStats[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [showTopicModal, setShowTopicModal] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<TopicStats | null>(null);
   const [alreadyAskedQuestions, setAlreadyAskedQuestions] = useState<string[]>([]);
+
+  // Function to map old tier names to new pack names
+  const mapTierToPack = (tier: string): string => {
+    const mapping: { [key: string]: string } = {
+      'Startup': 'pack1',
+      'Growth': 'pack2', 
+      'Pro': 'pack3',
+      'Enterprise': 'pack4'
+    };
+    return mapping[tier] || tier; // Return original if no mapping found
+  };
 
   // Generate last 12 months for filter
   const getMonthOptions = () => {
@@ -92,7 +106,7 @@ export default function FAQPerformancePage() {
       }
 
       const subscription = subscriptionData?.[0];
-      const packageTier = subscription?.package_tier || 'pack1';
+      const packageTier = mapTierToPack(subscription?.package_tier || 'pack1');
       const subscriptionStatus = subscription?.subscription_status || 'inactive';
 
       // Get package limits
