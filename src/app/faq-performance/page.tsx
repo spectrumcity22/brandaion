@@ -47,6 +47,33 @@ const AI_PROVIDERS = {
   claude: { name: 'Anthropic Claude', color: 'from-green-500 to-green-600', icon: '🧠' }
 };
 
+// Function to extract topic from question text
+const extractTopicFromQuestion = (question: string): string => {
+  const questionLower = question.toLowerCase();
+  
+  // Define topic keywords
+  const topicKeywords = {
+    'Pricing': ['price', 'cost', 'fee', 'pricing', 'subscription', 'billing', 'payment'],
+    'Features': ['feature', 'functionality', 'capability', 'what can', 'how does', 'does it'],
+    'Support': ['support', 'help', 'contact', 'customer service', 'assistance', 'troubleshoot'],
+    'Setup': ['setup', 'install', 'configuration', 'getting started', 'onboarding', 'setup'],
+    'Security': ['security', 'privacy', 'safe', 'secure', 'protection', 'data'],
+    'Integration': ['integrate', 'api', 'connect', 'webhook', 'sync', 'integration'],
+    'Performance': ['performance', 'speed', 'fast', 'slow', 'optimization', 'efficiency'],
+    'Compliance': ['compliance', 'gdpr', 'legal', 'regulation', 'certification'],
+    'Updates': ['update', 'version', 'new feature', 'release', 'upgrade'],
+    'Account': ['account', 'login', 'password', 'profile', 'settings', 'user']
+  };
+
+  for (const [topic, keywords] of Object.entries(topicKeywords)) {
+    if (keywords.some(keyword => questionLower.includes(keyword))) {
+      return topic;
+    }
+  }
+  
+  return 'General';
+};
+
 export default function FAQPerformancePage() {
   const router = useRouter();
   const [faqPairs, setFaqPairs] = useState<FAQPair[]>([]);
@@ -126,7 +153,6 @@ export default function FAQPerformancePage() {
       const transformedPairs = data?.map(pair => {
         let orgName = pair.organisation || 'Unknown Organization';
         let industry = 'Unknown Industry';
-        let topic = 'General';
         
         if (pair.organisation_jsonld_object) {
           try {
@@ -140,13 +166,13 @@ export default function FAQPerformancePage() {
                       orgData['@industry'] ||
                       orgData['@sector'] ||
                       'Unknown Industry';
-            
-            // Extract topic from industry or use a default
-            topic = industry !== 'Unknown Industry' ? industry : 'General';
           } catch (e) {
             console.error('Error parsing organisation data:', e);
           }
         }
+
+        // Extract topic from question text instead of industry
+        const topic = extractTopicFromQuestion(pair.question);
 
         return {
           id: pair.id,
@@ -228,6 +254,16 @@ export default function FAQPerformancePage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Update userStats when selectedPairs changes to show real-time remaining count
+  useEffect(() => {
+    if (userStats) {
+      setUserStats(prev => prev ? {
+        ...prev,
+        questionsRemaining: Math.max(0, prev.questionsLimit - prev.questionsAsked - selectedPairs.length)
+      } : null);
+    }
+  }, [selectedPairs, userStats]);
 
   const testFAQPerformance = async () => {
     if (selectedPairs.length === 0) {
@@ -647,14 +683,21 @@ export default function FAQPerformancePage() {
                 return (
                   <div
                     key={faq.id}
-                    className={`border rounded-xl p-4 transition-all duration-200 ${
+                    className={`border rounded-xl p-4 transition-all duration-200 relative ${
                       isAlreadyAsked
-                        ? 'border-gray-500 bg-gray-700/30 opacity-60 cursor-not-allowed'
+                        ? 'border-yellow-500 bg-yellow-500/10'
                         : isSelected
                         ? 'border-green-500 bg-green-500/10'
                         : 'border-gray-600 bg-gray-800/50'
                     }`}
                   >
+                    {/* Already Asked Badge */}
+                    {isAlreadyAsked && (
+                      <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
+                        ✓ Asked
+                      </div>
+                    )}
+                    
                     <div className="flex items-start gap-3">
                       <input
                         type="checkbox"
@@ -668,11 +711,11 @@ export default function FAQPerformancePage() {
                         <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                           <span>{faq.organisation_name}</span>
                           <span>•</span>
-                          <span>{faq.topic}</span>
+                          <span className="text-blue-400 font-medium">{faq.topic}</span>
                           {isAlreadyAsked && (
                             <>
                               <span>•</span>
-                              <span className="text-yellow-400">Already asked</span>
+                              <span className="text-yellow-400 font-semibold">Already asked this month</span>
                             </>
                           )}
                         </div>
@@ -706,17 +749,38 @@ export default function FAQPerformancePage() {
             </div>
             <div className="p-6 overflow-y-auto max-h-[60vh]">
               <div className="space-y-4">
-                {selectedTopic.questions.map((question) => (
-                  <div key={question.id} className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
-                    <h3 className="text-white font-medium mb-2">{question.question}</h3>
-                    <p className="text-gray-400 text-sm mb-2">{question.answer}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>{question.organisation_name}</span>
-                      <span>•</span>
-                      <span>{question.industry}</span>
+                {selectedTopic.questions.map((question) => {
+                  const isAlreadyAsked = alreadyAskedQuestions.includes(question.id);
+                  return (
+                    <div 
+                      key={question.id} 
+                      className={`border rounded-lg p-4 relative ${
+                        isAlreadyAsked 
+                          ? 'bg-yellow-500/10 border-yellow-500/50' 
+                          : 'bg-gray-800/50 border-gray-600'
+                      }`}
+                    >
+                      {isAlreadyAsked && (
+                        <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
+                          ✓ Asked
+                        </div>
+                      )}
+                      <h3 className="text-white font-medium mb-2">{question.question}</h3>
+                      <p className="text-gray-400 text-sm mb-2">{question.answer}</p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span>{question.organisation_name}</span>
+                        <span>•</span>
+                        <span>{question.industry}</span>
+                        {isAlreadyAsked && (
+                          <>
+                            <span>•</span>
+                            <span className="text-yellow-400 font-semibold">Already asked this month</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
