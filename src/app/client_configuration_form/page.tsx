@@ -53,15 +53,15 @@ export default function ClientConfigurationForm() {
   }, [form.brand_id]);
 
   useEffect(() => {
-    if (!form.product_id) return;
+    // Load all personas for the user (no longer filtered by product)
     (async () => {
       const { data: personasData } = await supabase
         .from("client_product_persona")
         .select("id, persona_name, persona_jsonld")
-        .eq("product_id", form.product_id);
+        .eq("auth_user_id", user.id);
       setPersonas(personasData || []);
     })();
-  }, [form.product_id]);
+  }, [user.id]);
 
   useEffect(() => {
     (async () => {
@@ -327,7 +327,6 @@ export default function ClientConfigurationForm() {
                   onChange={handleChange}
                   className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                   required
-                  disabled={!form.product_id}
                 >
                   <option value="">Select a persona</option>
                   {personas.map((persona) => (
