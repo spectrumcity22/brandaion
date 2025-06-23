@@ -24,6 +24,7 @@ interface DashboardData {
   personas: any[];
   products: any[];
   aiConfig: any;
+  aiConfigComplete: boolean;
 }
 
 export default function Dashboard() {
@@ -141,12 +142,21 @@ export default function Dashboard() {
           .eq('auth_user_id', user.id);
         if (products && products.length > 0) completionSteps++;
         
-        // Check if AI is configured
+        // Check if AI is configured - updated to check for complete configuration
         const { data: aiConfig } = await supabase
           .from('client_configuration')
-          .select('id')
-          .eq('auth_user_id', user.id);
-        if (aiConfig) completionSteps++;
+          .select('id, brand_id, persona_id, market_id, audience_id')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+        
+        // Only mark as complete if all required fields are present
+        const aiConfigComplete = aiConfig && 
+          aiConfig.brand_id && 
+          aiConfig.persona_id && 
+          aiConfig.market_id && 
+          aiConfig.audience_id;
+        
+        if (aiConfigComplete) completionSteps++;
         
         const accountCompletion = Math.round((completionSteps / totalSteps) * 100);
 
@@ -164,7 +174,8 @@ export default function Dashboard() {
           brands: brands || [],
           personas: personas || [],
           products: products || [],
-          aiConfig
+          aiConfig,
+          aiConfigComplete
         });
 
       } catch (error) {
@@ -256,40 +267,6 @@ export default function Dashboard() {
             {/* Expanded Steps */}
             {expanded && (
               <div className="space-y-3 mt-6">
-                {/* Invoice Paid Step */}
-                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      data.invoice ? 'bg-green-500/20' : 'bg-yellow-500/20'
-                    }`}>
-                      {data.invoice ? (
-                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className="text-gray-300">Invoice Paid</span>
-                  </div>
-                  {data.invoice ? (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-green-400 text-sm">Completed</span>
-                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => router.push('/invoice_confirmation')}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
-                    >
-                      Go
-                    </button>
-                  )}
-                </div>
                 {/* Setup Profile */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
@@ -474,11 +451,11 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      data.aiConfig 
+                      data.aiConfigComplete 
                         ? 'bg-green-500/20' 
                         : 'bg-pink-500/20'
                     }`}>
-                      {data.aiConfig ? (
+                      {data.aiConfigComplete ? (
                         <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
@@ -490,7 +467,7 @@ export default function Dashboard() {
                     </div>
                     <span className="text-gray-300">Configure AI</span>
                   </div>
-                  {data.aiConfig ? (
+                  {data.aiConfigComplete ? (
                     <div className="flex items-center space-x-2">
                       <span className="text-green-400 text-sm">Completed</span>
                       <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
