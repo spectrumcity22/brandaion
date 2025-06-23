@@ -604,7 +604,7 @@ export default function FAQPerformancePage() {
                 )}
                 {userStats && userStats.questionsRemaining === 0 && (
                   <div className="mt-2 text-yellow-400 text-sm font-semibold">
-                    ⚠️ You've reached your monthly quota limit. No more questions can be selected.
+                    ⚠️ You&apos;ve reached your monthly quota limit. No more questions can be selected.
                   </div>
                 )}
               </div>
