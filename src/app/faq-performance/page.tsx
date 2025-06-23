@@ -405,7 +405,7 @@ export default function FAQPerformancePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center py-32">
         <div className="text-white text-xl">Loading FAQ Performance Dashboard...</div>
       </div>
     );
@@ -413,7 +413,7 @@ export default function FAQPerformancePage() {
 
   if (error && !userStats) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-black">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 text-center">
             <h2 className="text-xl font-semibold text-red-400 mb-2">Error</h2>
@@ -425,7 +425,7 @@ export default function FAQPerformancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+    <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-black">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
