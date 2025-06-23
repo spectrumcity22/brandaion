@@ -32,12 +32,20 @@ export default function ClientConfigurationForm() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUser(user);
+      
       // Fetch brands for this user/org
       const { data: brandsData } = await supabase
         .from("brands")
         .select("id, brand_name, organisation_name, brand_jsonld_object")
         .eq("auth_user_id", user.id);
       setBrands(brandsData || []);
+      
+      // Load all personas for the user immediately
+      const { data: personasData } = await supabase
+        .from("client_product_persona")
+        .select("id, persona_name, persona_jsonld")
+        .eq("auth_user_id", user.id);
+      setPersonas(personasData || []);
     })();
   }, []);
 
@@ -51,17 +59,6 @@ export default function ClientConfigurationForm() {
       setProducts(productsData || []);
     })();
   }, [form.brand_id]);
-
-  useEffect(() => {
-    // Load all personas for the user (no longer filtered by product)
-    (async () => {
-      const { data: personasData } = await supabase
-        .from("client_product_persona")
-        .select("id, persona_name, persona_jsonld")
-        .eq("auth_user_id", user.id);
-      setPersonas(personasData || []);
-    })();
-  }, [user.id]);
 
   useEffect(() => {
     (async () => {
@@ -87,12 +84,17 @@ export default function ClientConfigurationForm() {
         .from('client_configuration')
         .upsert({
           auth_user_id: user.id,
-          product_name: products.find(p => p.id === form.product_id)?.product_name,
+          brand_id: form.brand_id,
+          product_id: form.product_id || null,
+          persona_id: form.persona_id,
+          market_id: form.market_id,
+          audience_id: form.audience_id,
+          product_name: products.find(p => p.id === form.product_id)?.product_name || null,
           persona_name: personas.find(p => p.id === form.persona_id)?.persona_name,
           audience_name: audiences.find(a => a.id === form.audience_id)?.target_audience,
           market_name: markets.find(m => m.id === form.market_id)?.name,
           brand_jsonld_object: brands.find(b => b.id === form.brand_id)?.brand_jsonld_object,
-          schema_json: products.find(p => p.id === form.product_id)?.schema_json,
+          schema_json: products.find(p => p.id === form.product_id)?.schema_json || null,
           persona_jsonld: personas.find(p => p.id === form.persona_id)?.persona_jsonld
         }, { onConflict: "auth_user_id" });
 
@@ -169,7 +171,7 @@ export default function ClientConfigurationForm() {
   const totalBrands = brands.length;
   const totalProducts = products.length;
   const totalPersonas = personas.length;
-  const isFormComplete = form.brand_id && form.product_id && form.persona_id && form.market_id && form.audience_id;
+  const isFormComplete = form.brand_id && form.persona_id && form.market_id && form.audience_id;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -301,16 +303,15 @@ export default function ClientConfigurationForm() {
               </div>
 
               <div>
-                <label className="block text-gray-300 mb-2 font-medium">Product</label>
+                <label className="block text-gray-300 mb-2 font-medium">Product (Optional)</label>
                 <select
                   name="product_id"
                   value={form.product_id || ''}
                   onChange={handleChange}
                   className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                  required
                   disabled={!form.brand_id}
                 >
-                  <option value="">Select a product</option>
+                  <option value="">Select a product (optional)</option>
                   {products.map((product) => (
                     <option key={product.id} value={product.id}>
                       {product.product_name}
