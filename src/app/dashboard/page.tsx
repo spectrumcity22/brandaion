@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -222,14 +223,28 @@ export default function Dashboard() {
           <p className="text-gray-400">Here&apos;s what&apos;s happening with your BrandAION account</p>
         </div>
 
-        {/* Account Completion */}
+        {/* Expandable Account Setup Panel */}
         <div className="mb-8">
-          <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Account Setup</h2>
-              <span className="text-2xl font-bold text-green-400">{data.accountCompletion}%</span>
+          <div className="bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-xl p-6">
+            {/* Summary Row */}
+            <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpanded((prev) => !prev)}>
+              <div className="flex items-center space-x-3">
+                <span className="text-xl font-semibold text-white">Account Setup</span>
+                <span className={`text-sm font-bold ${data.accountCompletion === 100 ? 'text-green-400' : 'text-yellow-400'}`}>{data.accountCompletion === 100 ? 'Complete' : 'Incomplete'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl font-bold text-green-400">{data.accountCompletion}%</span>
+                <button className="focus:outline-none">
+                  {expanded ? (
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+                  ) : (
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  )}
+                </button>
+              </div>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-3">
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-700 rounded-full h-3 mt-4">
               <div 
                 className="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-500"
                 style={{ width: `${data.accountCompletion}%` }}
@@ -238,15 +253,43 @@ export default function Dashboard() {
             <p className="text-gray-300 text-sm mt-2">
               {data.accountCompletion === 100 ? 'Account fully configured!' : 'Complete your setup to unlock full features'}
             </p>
-          </div>
-        </div>
-
-        {/* Setup Guidance - Show if account is not complete */}
-        {data.accountCompletion < 100 && (
-          <div className="mb-8">
-            <div className="bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-xl p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Complete Your Setup</h2>
-              <div className="space-y-3">
+            {/* Expanded Steps */}
+            {expanded && (
+              <div className="space-y-3 mt-6">
+                {/* Invoice Paid Step */}
+                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      data.invoice ? 'bg-green-500/20' : 'bg-yellow-500/20'
+                    }`}>
+                      {data.invoice ? (
+                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-gray-300">Invoice Paid</span>
+                  </div>
+                  {data.invoice ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-green-400 text-sm">Completed</span>
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => router.push('/invoice_confirmation')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Go
+                    </button>
+                  )}
+                </div>
                 {/* Setup Profile */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
@@ -283,7 +326,6 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-
                 {/* Setup Organisation */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
@@ -320,7 +362,6 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-
                 {/* Create a Brand */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
@@ -357,7 +398,6 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-
                 {/* Create a Product */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
@@ -394,7 +434,6 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-
                 {/* Create a Persona */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
@@ -431,7 +470,6 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-
                 {/* Configure AI */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
@@ -469,9 +507,9 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
