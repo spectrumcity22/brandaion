@@ -19,6 +19,25 @@ interface FAQPair {
   answer_status: string;
   organisation_name?: string;
   industry?: string;
+  topic?: string;
+}
+
+interface UserStats {
+  totalQuestions: number;
+  questionsAsked: number;
+  questionsRemaining: number;
+  totalTopics: number;
+  packageTier: string;
+  questionsLimit: number;
+  llmsLimit: number;
+  subscriptionStatus: string;
+  nextTestDate: string;
+}
+
+interface TopicStats {
+  topic: string;
+  questionCount: number;
+  questions: FAQPair[];
 }
 
 const AI_PROVIDERS = {
@@ -36,6 +55,25 @@ export default function FAQPerformancePage() {
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [topicStats, setTopicStats] = useState<TopicStats[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [showTopicModal, setShowTopicModal] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<TopicStats | null>(null);
+  const [alreadyAskedQuestions, setAlreadyAskedQuestions] = useState<string[]>([]);
+
+  // Generate last 12 months for filter
+  const getMonthOptions = () => {
+    const months = [];
+    const currentDate = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const value = date.toISOString().slice(0, 7);
+      const label = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+      months.push({ value, label });
+    }
+    return months;
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -44,6 +82,24 @@ export default function FAQPerformancePage() {
         router.push('/login');
         return;
       }
+
+      // Get user's subscription status and package limits
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .rpc('check_user_subscription_status', { user_id_param: user.id });
+
+      if (subscriptionError) {
+        console.error('Subscription check failed:', subscriptionError);
+      }
+
+      const subscription = subscriptionData?.[0];
+      const packageTier = subscription?.package_tier || 'pack1';
+      const subscriptionStatus = subscription?.subscription_status || 'inactive';
+
+      // Get package limits
+      const { data: packageLimits, error: limitsError } = await supabase
+        .rpc('get_package_limits', { package_tier: packageTier });
+
+      const limits = packageLimits?.[0] || { questions_limit: 5, llms_limit: 1 };
 
       // Load FAQ pairs
       const { data, error: fetchError } = await supabase
@@ -70,21 +126,23 @@ export default function FAQPerformancePage() {
       const transformedPairs = data?.map(pair => {
         let orgName = pair.organisation || 'Unknown Organization';
         let industry = 'Unknown Industry';
+        let topic = 'General';
         
-        // Only try to extract industry from JSON-LD if needed
         if (pair.organisation_jsonld_object) {
           try {
             const orgData = typeof pair.organisation_jsonld_object === 'string' 
               ? JSON.parse(pair.organisation_jsonld_object) 
               : pair.organisation_jsonld_object;
             
-            // Try multiple possible field names for industry
             industry = orgData.industry || 
                       orgData.sector || 
                       orgData.businessType ||
                       orgData['@industry'] ||
                       orgData['@sector'] ||
                       'Unknown Industry';
+            
+            // Extract topic from industry or use a default
+            topic = industry !== 'Unknown Industry' ? industry : 'General';
           } catch (e) {
             console.error('Error parsing organisation data:', e);
           }
@@ -99,11 +157,65 @@ export default function FAQPerformancePage() {
           question_status: pair.question_status,
           answer_status: pair.answer_status,
           organisation_name: orgName,
-          industry: industry
+          industry: industry,
+          topic: topic
         };
       }) || [];
 
       setFaqPairs(transformedPairs);
+
+      // Load already asked questions for the selected month
+      const startDate = new Date(selectedMonth + '-01');
+      const endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+      
+      const { data: askedQuestions, error: askedError } = await supabase
+        .from('faq_performance_logs')
+        .select('question_id')
+        .eq('auth_user_id', user.id)
+        .gte('test_date', startDate.toISOString())
+        .lte('test_date', endDate.toISOString())
+        .eq('test_schedule', 'monthly');
+
+      if (!askedError && askedQuestions) {
+        const askedIds = askedQuestions.map(q => q.question_id.toString());
+        setAlreadyAskedQuestions(askedIds);
+      }
+
+      // Calculate topic statistics
+      const topicMap = new Map<string, FAQPair[]>();
+      transformedPairs.forEach(pair => {
+        const topic = pair.topic || 'General';
+        if (!topicMap.has(topic)) {
+          topicMap.set(topic, []);
+        }
+        topicMap.get(topic)!.push(pair);
+      });
+
+      const topics = Array.from(topicMap.entries()).map(([topic, questions]) => ({
+        topic,
+        questionCount: questions.length,
+        questions
+      }));
+
+      setTopicStats(topics);
+
+      // Calculate user stats
+      const totalQuestions = transformedPairs.length;
+      const questionsAsked = askedQuestions?.length || 0;
+      const questionsRemaining = Math.max(0, limits.questions_limit - questionsAsked);
+      const totalTopics = topics.length;
+
+      setUserStats({
+        totalQuestions,
+        questionsAsked,
+        questionsRemaining,
+        totalTopics,
+        packageTier,
+        questionsLimit: limits.questions_limit,
+        llmsLimit: limits.llms_limit,
+        subscriptionStatus,
+        nextTestDate: subscription?.next_test_date || new Date().toISOString().split('T')[0]
+      });
 
     } catch (error) {
       console.error('Error loading data:', error);
@@ -111,7 +223,7 @@ export default function FAQPerformancePage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, selectedMonth]);
 
   useEffect(() => {
     loadData();
@@ -128,6 +240,22 @@ export default function FAQPerformancePage() {
       return;
     }
 
+    if (!userStats) {
+      setError('User stats not loaded');
+      return;
+    }
+
+    // Check if user has exceeded their quota
+    if (selectedPairs.length > userStats.questionsRemaining) {
+      setError(`You can only select up to ${userStats.questionsRemaining} more questions for this month`);
+      return;
+    }
+
+    if (selectedProviders.length > userStats.llmsLimit) {
+      setError(`You can only select up to ${userStats.llmsLimit} AI providers for your package`);
+      return;
+    }
+
     setTesting(true);
     setError('');
 
@@ -135,33 +263,11 @@ export default function FAQPerformancePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get user's package tier (default to pack1 for now)
-      const userPackage = 'pack1'; // TODO: Get from user's subscription
-
-      // Get package limits
-      const { data: packageLimits, error: limitsError } = await supabase
-        .rpc('get_package_limits', { pack_name: userPackage });
-
-      if (limitsError) {
-        throw new Error('Failed to get package limits');
-      }
-
-      const limits = packageLimits[0];
-      
-      // Check if user is within limits
-      if (selectedPairs.length > limits.questions_limit) {
-        throw new Error(`You can only select up to ${limits.questions_limit} questions for your package`);
-      }
-
-      if (selectedProviders.length > limits.llms_limit) {
-        throw new Error(`You can only select up to ${limits.llms_limit} AI providers for your package`);
-      }
-
       // Step 1: Save selected questions to monthly schedule
       const questionsToInsert = selectedPairs.map(questionId => ({
         user_id: user.id,
         question_id: questionId,
-        package_tier: userPackage,
+        package_tier: userStats.packageTier,
         is_active: true
       }));
 
@@ -177,7 +283,7 @@ export default function FAQPerformancePage() {
       const llmsToInsert = selectedProviders.map(provider => ({
         user_id: user.id,
         llm_provider: provider,
-        package_tier: userPackage,
+        package_tier: userStats.packageTier,
         is_active: true
       }));
 
@@ -194,7 +300,7 @@ export default function FAQPerformancePage() {
         .from('user_monthly_schedule')
         .upsert({
           user_id: user.id,
-          package_tier: userPackage,
+          package_tier: userStats.packageTier,
           subscription_status: 'active',
           next_test_date: new Date().toISOString().split('T')[0]
         }, { onConflict: 'user_id' });
@@ -203,16 +309,9 @@ export default function FAQPerformancePage() {
         throw new Error('Failed to create monthly schedule');
       }
 
-      // Step 4: Run immediate test and get AI answers
+      // Step 4: Run immediate test
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No session found');
-
-      console.log('Running immediate test with:', {
-        auth_user_id: user.id,
-        question_ids: selectedPairs,
-        ai_providers: selectedProviders,
-        test_schedule: 'monthly'
-      });
 
       const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/run_question_monitor', {
         method: 'POST',
@@ -230,23 +329,20 @@ export default function FAQPerformancePage() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Test failed:', errorText);
         throw new Error(`Test failed: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
       console.log('Test completed:', result);
 
-      // Step 5: Clear selections and show success
+      // Step 5: Clear selections and reload data
       setSelectedPairs([]);
       setSelectedProviders(['openai']);
-      setError('');
-      
-      // Step 6: Show results to user
-      alert(`✅ Test completed successfully!\n\n📊 Results:\n- ${result.results?.length || 0} questions tested\n- ${result.summary?.successful_tests || 0} successful tests\n- Total cost: $${result.summary?.total_cost?.toFixed(4) || 0}\n- Total tokens: ${result.summary?.total_tokens || 0}\n\nYour questions will be automatically re-tested daily at 2 AM UTC.`);
+      await loadData();
 
+      setError('');
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error running test:', error);
       setError(error instanceof Error ? error.message : 'Failed to run test');
     } finally {
       setTesting(false);
@@ -254,16 +350,22 @@ export default function FAQPerformancePage() {
   };
 
   const toggleFAQSelection = (faqId: string) => {
+    if (alreadyAskedQuestions.includes(faqId)) {
+      setError('This question has already been asked this month');
+      return;
+    }
+
     setSelectedPairs(prev => 
       prev.includes(faqId) 
         ? prev.filter(id => id !== faqId)
         : [...prev, faqId]
     );
+    setError('');
   };
 
   const toggleProviderSelection = (provider: string) => {
     setSelectedProviders(prev => 
-      prev.includes(provider)
+      prev.includes(provider) 
         ? prev.filter(p => p !== provider)
         : [...prev, provider]
     );
@@ -281,15 +383,25 @@ export default function FAQPerformancePage() {
     return AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]?.name || provider;
   };
 
+  const openTopicModal = (topic: TopicStats) => {
+    setSelectedTopic(topic);
+    setShowTopicModal(true);
+  };
+
+  const closeTopicModal = () => {
+    setShowTopicModal(false);
+    setSelectedTopic(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading Monthly FAQ Performance Schedule...</div>
+        <div className="text-white text-xl">Loading FAQ Performance Dashboard...</div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !userStats) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -309,79 +421,135 @@ export default function FAQPerformancePage() {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
             <div>
-              <h1 className="text-4xl font-bold text-white mb-2">Monthly FAQ Performance Schedule</h1>
-              <p className="text-xl text-gray-300">Select questions and AI providers for monthly performance monitoring</p>
+              <h1 className="text-4xl font-bold text-white mb-2">FAQ Performance Dashboard</h1>
+              <p className="text-xl text-gray-300">Monitor and test your FAQ performance across AI providers</p>
             </div>
-            <div className="mt-4 md:mt-0">
+            <div className="mt-4 md:mt-0 flex gap-4">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-gray-800/50 border border-gray-600 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {getMonthOptions().map(month => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
+                ))}
+              </select>
               <button
                 onClick={() => router.push('/monthly-report')}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
               >
-                📊 View Monthly Report
+                📊 Monthly Report
               </button>
             </div>
           </div>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 bg-red-900/20 border border-red-500/50 rounded-lg p-4">
+            <p className="text-red-400">{error}</p>
+          </div>
+        )}
+
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Package Limit</p>
-                <p className="text-3xl font-bold text-white">5</p>
-                <p className="text-xs text-gray-500">questions</p>
+        {userStats && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm">Package Limit</p>
+                  <p className="text-3xl font-bold text-white">{userStats.questionsLimit}</p>
+                  <p className="text-xs text-gray-500">questions/month</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            </div>
+
+            <div className={`bg-gradient-to-br ${userStats.questionsRemaining <= 0 ? 'from-red-600/20 to-pink-600/20 border-red-500/30' : 'from-green-600/20 to-emerald-600/20 border-green-500/30'} border rounded-xl p-6`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm">Questions Remaining</p>
+                  <p className={`text-3xl font-bold ${userStats.questionsRemaining <= 0 ? 'text-red-400' : 'text-white'}`}>
+                    {userStats.questionsRemaining}
+                  </p>
+                  <p className="text-xs text-gray-500">of {userStats.questionsLimit} limit</p>
+                </div>
+                <div className={`w-12 h-12 ${userStats.questionsRemaining <= 0 ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-lg flex items-center justify-center`}>
+                  {userStats.questionsRemaining <= 0 ? (
+                    <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm">Total Topics</p>
+                  <p className="text-3xl font-bold text-white">{userStats.totalTopics}</p>
+                  <p className="text-xs text-gray-500">categories</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-xl p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm">Subscription</p>
+                  <p className={`text-2xl font-bold ${userStats.subscriptionStatus === 'active' ? 'text-green-400' : 'text-red-400'}`}>
+                    {userStats.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
+                  </p>
+                  <p className="text-xs text-gray-500">{userStats.packageTier}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Selected Questions</p>
-                <p className="text-3xl font-bold text-white">{selectedPairs.length}</p>
-                <p className="text-xs text-gray-500">of 5 limit</p>
-              </div>
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">LLM Limit</p>
-                <p className="text-3xl font-bold text-white">1</p>
-                <p className="text-xs text-gray-500">provider</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Selected LLMs</p>
-                <p className="text-3xl font-bold text-white">{selectedProviders.length}</p>
-                <p className="text-xs text-gray-500">of 1 limit</p>
-              </div>
-              <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
+        {/* Topics Overview */}
+        <div className="mb-8">
+          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Topics Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {topicStats.map((topic) => (
+                <div
+                  key={topic.topic}
+                  className="bg-gray-800/50 border border-gray-600 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all duration-200"
+                  onClick={() => openTopicModal(topic)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-white font-medium">{topic.topic}</h3>
+                      <p className="text-gray-400 text-sm">{topic.questionCount} questions</p>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -405,7 +573,8 @@ export default function FAQPerformancePage() {
                       type="checkbox"
                       checked={selectedProviders.includes(key)}
                       onChange={() => toggleProviderSelection(key)}
-                      className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
+                      disabled={selectedProviders.length >= (userStats?.llmsLimit || 1) && !selectedProviders.includes(key)}
+                      className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
                     />
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">{provider.icon}</span>
@@ -424,12 +593,15 @@ export default function FAQPerformancePage() {
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="text-gray-300">
                 {selectedPairs.length} FAQ pairs selected • {selectedProviders.length} AI providers
+                {userStats && userStats.questionsRemaining <= 0 && (
+                  <span className="ml-4 text-red-400 font-semibold">⚠️ Monthly quota exceeded!</span>
+                )}
               </div>
               <button
                 onClick={testFAQPerformance}
-                disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0}
+                disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) <= 0}
                 className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
-                  testing || selectedPairs.length === 0 || selectedProviders.length === 0
+                  testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) <= 0
                     ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
                 }`}
@@ -468,37 +640,88 @@ export default function FAQPerformancePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {faqPairs.map((faq) => (
-                <div
-                  key={faq.id}
-                  className={`border rounded-xl p-4 transition-all duration-200 ${
-                    selectedPairs.includes(faq.id)
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-gray-600 bg-gray-800/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedPairs.includes(faq.id)}
-                      onChange={() => toggleFAQSelection(faq.id)}
-                      className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <h3 className="text-white font-medium mb-2">{faq.question}</h3>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        <span>{faq.organisation_name}</span>
-                        <span>•</span>
-                        <span>{faq.industry}</span>
+              {faqPairs.map((faq) => {
+                const isAlreadyAsked = alreadyAskedQuestions.includes(faq.id);
+                const isSelected = selectedPairs.includes(faq.id);
+                
+                return (
+                  <div
+                    key={faq.id}
+                    className={`border rounded-xl p-4 transition-all duration-200 ${
+                      isAlreadyAsked
+                        ? 'border-gray-500 bg-gray-700/30 opacity-60 cursor-not-allowed'
+                        : isSelected
+                        ? 'border-green-500 bg-green-500/10'
+                        : 'border-gray-600 bg-gray-800/50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleFAQSelection(faq.id)}
+                        disabled={isAlreadyAsked}
+                        className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
+                      />
+                      <div className="flex-1">
+                        <h3 className="text-white font-medium mb-2">{faq.question}</h3>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                          <span>{faq.organisation_name}</span>
+                          <span>•</span>
+                          <span>{faq.topic}</span>
+                          {isAlreadyAsked && (
+                            <>
+                              <span>•</span>
+                              <span className="text-yellow-400">Already asked</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
+
+      {/* Topic Modal */}
+      {showTopicModal && selectedTopic && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white">{selectedTopic.topic}</h2>
+                <button
+                  onClick={closeTopicModal}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-gray-400 mt-2">{selectedTopic.questionCount} questions in this topic</p>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="space-y-4">
+                {selectedTopic.questions.map((question) => (
+                  <div key={question.id} className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
+                    <h3 className="text-white font-medium mb-2">{question.question}</h3>
+                    <p className="text-gray-400 text-sm mb-2">{question.answer}</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span>{question.organisation_name}</span>
+                      <span>•</span>
+                      <span>{question.industry}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
