@@ -47,33 +47,6 @@ const AI_PROVIDERS = {
   claude: { name: 'Anthropic Claude', color: 'from-green-500 to-green-600', icon: '🧠' }
 };
 
-// Function to extract topic from question text
-const extractTopicFromQuestion = (question: string): string => {
-  const questionLower = question.toLowerCase();
-  
-  // Define topic keywords
-  const topicKeywords = {
-    'Pricing': ['price', 'cost', 'fee', 'pricing', 'subscription', 'billing', 'payment'],
-    'Features': ['feature', 'functionality', 'capability', 'what can', 'how does', 'does it'],
-    'Support': ['support', 'help', 'contact', 'customer service', 'assistance', 'troubleshoot'],
-    'Setup': ['setup', 'install', 'configuration', 'getting started', 'onboarding', 'setup'],
-    'Security': ['security', 'privacy', 'safe', 'secure', 'protection', 'data'],
-    'Integration': ['integrate', 'api', 'connect', 'webhook', 'sync', 'integration'],
-    'Performance': ['performance', 'speed', 'fast', 'slow', 'optimization', 'efficiency'],
-    'Compliance': ['compliance', 'gdpr', 'legal', 'regulation', 'certification'],
-    'Updates': ['update', 'version', 'new feature', 'release', 'upgrade'],
-    'Account': ['account', 'login', 'password', 'profile', 'settings', 'user']
-  };
-
-  for (const [topic, keywords] of Object.entries(topicKeywords)) {
-    if (keywords.some(keyword => questionLower.includes(keyword))) {
-      return topic;
-    }
-  }
-  
-  return 'General';
-};
-
 export default function FAQPerformancePage() {
   const router = useRouter();
   const [faqPairs, setFaqPairs] = useState<FAQPair[]>([]);
@@ -140,7 +113,8 @@ export default function FAQPerformancePage() {
           question_status,
           answer_status,
           organisation,
-          organisation_jsonld_object
+          organisation_jsonld_object,
+          topic
         `)
         .eq('auth_user_id', user.id)
         .eq('question_status', 'question_approved')
@@ -171,8 +145,8 @@ export default function FAQPerformancePage() {
           }
         }
 
-        // Extract topic from question text instead of industry
-        const topic = extractTopicFromQuestion(pair.question);
+        // Use the actual topic from the database instead of extracting from question text
+        const topic = pair.topic || 'General';
 
         return {
           id: pair.id,
