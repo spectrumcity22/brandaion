@@ -374,10 +374,10 @@ export default function FAQPerformancePage() {
 
     // Check if adding this question would exceed quota
     const wouldExceedQuota = !selectedPairs.includes(faqId) && 
-      userStats && selectedPairs.length >= userStats.questionsRemaining;
+      userStats && questionsRemaining <= 0;
 
     if (wouldExceedQuota && userStats) {
-      setError(`⚠️ Warning: You can only select up to ${userStats.questionsRemaining} questions this month. You have ${userStats.questionsAsked} already asked and ${userStats.questionsLimit} total limit.`);
+      setError(`⚠️ Warning: You can only select up to ${userStats.questionsLimit} questions this month. You have ${userStats.questionsAsked} already asked and ${userStats.questionsLimit} total limit.`);
       return;
     }
 
@@ -418,6 +418,14 @@ export default function FAQPerformancePage() {
     setShowTopicModal(false);
     setSelectedTopic(null);
   };
+
+  // Compute real-time questions remaining (accounting for currently selected questions)
+  const getQuestionsRemaining = () => {
+    if (!userStats) return 0;
+    return userStats.questionsLimit - userStats.questionsAsked - selectedPairs.length;
+  };
+
+  const questionsRemaining = getQuestionsRemaining();
 
   if (loading) {
     return (
@@ -497,17 +505,17 @@ export default function FAQPerformancePage() {
               </div>
             </div>
 
-            <div className={`bg-gradient-to-br ${userStats.questionsRemaining < 0 ? 'from-red-600/20 to-pink-600/20 border-red-500/30' : 'from-green-600/20 to-emerald-600/20 border-green-500/30'} border rounded-xl p-6`}>
+            <div className={`bg-gradient-to-br ${questionsRemaining < 0 ? 'from-red-600/20 to-pink-600/20 border-red-500/30' : 'from-green-600/20 to-emerald-600/20 border-green-500/30'} border rounded-xl p-6`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Questions Remaining</p>
-                  <p className={`text-3xl font-bold ${userStats.questionsRemaining < 0 ? 'text-red-400' : 'text-white'}`}>
-                    {userStats.questionsRemaining}
+                  <p className={`text-3xl font-bold ${questionsRemaining < 0 ? 'text-red-400' : 'text-white'}`}>
+                    {questionsRemaining}
                   </p>
                   <p className="text-xs text-gray-500">of {userStats.questionsLimit} limit</p>
                 </div>
-                <div className={`w-12 h-12 ${userStats.questionsRemaining < 0 ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-lg flex items-center justify-center`}>
-                  {userStats.questionsRemaining < 0 ? (
+                <div className={`w-12 h-12 ${questionsRemaining < 0 ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-lg flex items-center justify-center`}>
+                  {questionsRemaining < 0 ? (
                     <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
@@ -596,27 +604,27 @@ export default function FAQPerformancePage() {
                   <span>{selectedPairs.length} FAQ pairs selected • {selectedProviders.length} AI providers</span>
                   {userStats && (
                     <span className={`text-sm font-medium ${
-                      userStats.questionsRemaining < 0 
+                      questionsRemaining < 0 
                         ? 'text-red-400' 
-                        : userStats.questionsRemaining === 0 
+                        : questionsRemaining === 0 
                         ? 'text-yellow-400' 
                         : 'text-green-400'
                     }`}>
-                      {userStats.questionsRemaining < 0 
-                        ? `⚠️ ${Math.abs(userStats.questionsRemaining)} over quota` 
-                        : userStats.questionsRemaining === 0 
+                      {questionsRemaining < 0 
+                        ? `⚠️ ${Math.abs(questionsRemaining)} over quota` 
+                        : questionsRemaining === 0 
                         ? '⚠️ Quota reached' 
-                        : `${userStats.questionsRemaining} remaining`
+                        : `${questionsRemaining} remaining`
                       }
                     </span>
                   )}
                 </div>
-                {userStats && userStats.questionsRemaining < 0 && (
+                {userStats && questionsRemaining < 0 && (
                   <div className="mt-2 text-red-400 text-sm font-semibold">
                     ⚠️ Monthly quota exceeded! Please upgrade your package or wait until next month.
                   </div>
                 )}
-                {userStats && userStats.questionsRemaining === 0 && (
+                {userStats && questionsRemaining === 0 && (
                   <div className="mt-2 text-yellow-400 text-sm font-semibold">
                     ⚠️ You&apos;ve reached your monthly quota limit. No more questions can be selected.
                   </div>
