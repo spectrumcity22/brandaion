@@ -118,6 +118,18 @@ export default function ClientProducts() {
         return;
       }
 
+      // Fetch organisation_id for the user
+      const { data: org, error: orgError } = await supabase
+        .from('client_organisation')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+      if (orgError || !org) {
+        setError('No organisation found for this user.');
+        setSaving(false);
+        return;
+      }
+
       let data, error;
 
       if (editingProduct) {
@@ -128,6 +140,7 @@ export default function ClientProducts() {
             auth_user_id: user.id,
             user_email: user.email,
             organisation: formData.organisation || '',
+            organisation_id: org.id,
             brand_id: formData.brand_id,
             product_name: formData.product_name || '',
             description: formData.description || '',
@@ -150,6 +163,7 @@ export default function ClientProducts() {
             auth_user_id: user.id,
             user_email: user.email,
             organisation: formData.organisation || '',
+            organisation_id: org.id,
             brand_id: formData.brand_id,
             product_name: formData.product_name || '',
             description: formData.description || '',
