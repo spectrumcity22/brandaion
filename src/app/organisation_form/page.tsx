@@ -147,6 +147,11 @@ export default function OrganisationForm() {
       }
 
       setMessage('✅ Organisation and brand row updated successfully!');
+      
+      // Auto-redirect to products page after 2 seconds
+      setTimeout(() => {
+        router.push('/client_products');
+      }, 2000);
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {
@@ -210,11 +215,14 @@ export default function OrganisationForm() {
               </label>
               <input
                 type="url"
-                placeholder="https://linkedin.com/company/yourcompany"
+                placeholder="https://www.linkedin.com/company/yourcompany"
                 value={linkedinUrl}
                 onChange={(e) => setLinkedinUrl(e.target.value)}
                 className="glass-input w-full p-4"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Just add your company name after https://www.linkedin.com/company/
+              </p>
             </div>
 
             <div>

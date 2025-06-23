@@ -87,15 +87,31 @@ export default function EndUserForm() {
       if (!existingOrg) {
         const { data: orgData, error: orgError } = await supabase
           .from('client_organisation')
-          .insert([{ organisation_name: orgName, auth_user_id }])
+          .insert({ 
+            organisation_name: orgName, 
+            auth_user_id: auth_user_id 
+          })
           .select()
           .single();
 
-        if (orgError || !orgData?.id) throw orgError;
+        if (orgError) {
+          console.error('Organisation insert error:', orgError);
+          throw new Error(`Failed to create organisation: ${orgError.message}`);
+        }
+        
+        if (!orgData?.id) {
+          throw new Error('Organisation was created but no ID returned');
+        }
+        
         localStorage.setItem('organisation_id', orgData.id);
       }
 
       setMessage('✅ Profile and organisation saved!');
+      
+      // Auto-redirect to organisation form after 2 seconds
+      setTimeout(() => {
+        router.push('/organisation_form');
+      }, 2000);
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {

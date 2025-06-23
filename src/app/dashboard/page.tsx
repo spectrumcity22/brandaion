@@ -12,19 +12,18 @@ const supabase = createBrowserClient(
 interface DashboardData {
   user: any;
   invoice: any;
-  endUser: any;
-  organisation: any;
-  brands: any[];
-  personas: any[];
-  products: any[];
-  configuration: any;
+  schedule: any;
   totalFaqPairs: number;
   pendingQuestions: number;
   pendingAnswers: number;
   completedBatches: number;
-  recentBatches: any[];
-  performanceStats: any;
   accountCompletion: number;
+  profileComplete: boolean;
+  organisationConfigured: boolean;
+  brands: any[];
+  personas: any[];
+  products: any[];
+  aiConfig: any;
 }
 
 export default function Dashboard() {
@@ -43,20 +42,20 @@ export default function Dashboard() {
           return;
         }
 
-        // Load all dashboard data
+        // Check if user has completed onboarding
+        const { data: endUser } = await supabase
+          .from('end_users')
+          .select('id, first_name, last_name, org_name')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+
+        // Load all dashboard data (don't redirect if missing)
         const [
           invoiceResult,
-          endUserResult,
-          organisationResult,
-          brandsResult,
-          personasResult,
-          productsResult,
-          configurationResult,
+          scheduleResult,
           faqPairsResult,
           pendingQuestionsResult,
-          pendingAnswersResult,
-          recentBatchesResult,
-          performanceResult
+          pendingAnswersResult
         ] = await Promise.all([
           // Get latest invoice
           supabase
@@ -66,44 +65,13 @@ export default function Dashboard() {
             .order('inserted_at', { ascending: false })
             .limit(1),
           
-          // Get end user profile
+          // Get schedule
           supabase
-            .from('end_users')
+            .from('schedule')
             .select('*')
             .eq('auth_user_id', user.id)
-            .maybeSingle(),
-          
-          // Get organisation
-          supabase
-            .from('client_organisation')
-            .select('*')
-            .eq('auth_user_id', user.id)
-            .maybeSingle(),
-          
-          // Get brands
-          supabase
-            .from('client_brands')
-            .select('*')
-            .eq('auth_user_id', user.id),
-          
-          // Get personas
-          supabase
-            .from('client_product_persona')
-            .select('*')
-            .eq('auth_user_id', user.id),
-          
-          // Get products
-          supabase
-            .from('client_products')
-            .select('*')
-            .eq('auth_user_id', user.id),
-          
-          // Get AI configuration
-          supabase
-            .from('client_configuration')
-            .select('*')
-            .eq('auth_user_id', user.id)
-            .maybeSingle(),
+            .order('inserted_at', { ascending: false })
+            .limit(1),
           
           // Get total FAQ pairs produced
           supabase
@@ -124,68 +92,78 @@ export default function Dashboard() {
             .select('id')
             .eq('auth_user_id', user.id)
             .eq('answer_status', 'completed')
-            .not('ai_response_answers', 'is', null),
-          
-          // Get recent batches
-          supabase
-            .from('batch_faq_pairs')
-            .select('*')
-            .eq('auth_user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(5),
-          
-          // Get performance stats
-          supabase
-            .from('faq_performance_logs')
-            .select('*')
-            .eq('auth_user_id', user.id)
-            .eq('test_schedule', 'monthly')
-            .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+            .not('ai_response_answers', 'is', null)
         ]);
 
         const invoice = invoiceResult.data?.[0];
-        const endUser = endUserResult.data;
-        const organisation = organisationResult.data;
-        const brands = brandsResult.data || [];
-        const personas = personasResult.data || [];
-        const products = productsResult.data || [];
-        const configuration = configurationResult.data;
+        const schedule = scheduleResult.data?.[0];
         const totalFaqPairs = faqPairsResult.data?.reduce((sum, batch) => sum + batch.faq_count_in_batch, 0) || 0;
         const pendingQuestions = pendingQuestionsResult.data?.length || 0;
         const pendingAnswers = pendingAnswersResult.data?.length || 0;
         const completedBatches = faqPairsResult.data?.length || 0;
-        const recentBatches = recentBatchesResult.data || [];
-        const performanceStats = performanceResult.data || [];
 
-        // Calculate account completion percentage (6 steps)
+        // Calculate account completion percentage - updated logic
         let completionSteps = 0;
-        let totalSteps = 6;
+        let totalSteps = 6; // Updated to 6 steps
         
-        if (endUser) completionSteps++;
-        if (organisation) completionSteps++;
-        if (brands.length > 0) completionSteps++;
-        if (personas.length > 0) completionSteps++;
-        if (products.length > 0) completionSteps++;
-        if (configuration) completionSteps++;
+        // Check if profile is complete (has first_name, last_name, org_name)
+        const profileComplete = endUser && endUser.first_name && endUser.last_name && endUser.org_name;
+        if (profileComplete) completionSteps++;
+        
+        // Check if organisation is configured
+        const { data: organisation } = await supabase
+          .from('client_organisation')
+          .select('id, organisation_url, industry, headquarters')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+        const organisationConfigured = organisation && organisation.organisation_url && organisation.industry && organisation.headquarters;
+        if (organisationConfigured) completionSteps++;
+        
+        // Check if brands exist
+        const { data: brands } = await supabase
+          .from('brands')
+          .select('id')
+          .eq('auth_user_id', user.id);
+        if (brands && brands.length > 0) completionSteps++;
+        
+        // Check if persona exists
+        const { data: personas } = await supabase
+          .from('client_product_persona')
+          .select('id')
+          .eq('auth_user_id', user.id);
+        if (personas && personas.length > 0) completionSteps++;
+        
+        // Check if products exist
+        const { data: products } = await supabase
+          .from('products')
+          .select('id')
+          .eq('auth_user_id', user.id);
+        if (products && products.length > 0) completionSteps++;
+        
+        // Check if AI is configured
+        const { data: aiConfig } = await supabase
+          .from('client_configuration')
+          .select('id')
+          .eq('auth_user_id', user.id);
+        if (aiConfig) completionSteps++;
         
         const accountCompletion = Math.round((completionSteps / totalSteps) * 100);
 
         setData({
           user,
           invoice,
-          endUser,
-          organisation,
-          brands,
-          personas,
-          products,
-          configuration,
+          schedule,
           totalFaqPairs,
           pendingQuestions,
           pendingAnswers,
           completedBatches,
-          recentBatches,
-          performanceStats,
-          accountCompletion
+          accountCompletion,
+          profileComplete,
+          organisationConfigured,
+          brands: brands || [],
+          personas: personas || [],
+          products: products || [],
+          aiConfig
         });
 
       } catch (error) {
@@ -269,15 +247,15 @@ export default function Dashboard() {
             <div className="bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-xl p-6">
               <h2 className="text-xl font-semibold text-white mb-4">Complete Your Setup</h2>
               <div className="space-y-3">
-                {!data.endUser && (
+                {!data.user && (
                   <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-red-500/20 rounded-full flex items-center justify-center">
                         <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                         </svg>
                       </div>
-                      <span className="text-gray-300">Create Profile</span>
+                      <span className="text-gray-300">Complete your profile</span>
                     </div>
                     <button
                       onClick={() => router.push('/end_user_form')}
@@ -288,97 +266,59 @@ export default function Dashboard() {
                   </div>
                 )}
                 
-                {!data.organisation && (
+                {!data.invoice && (
                   <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-yellow-500/20 rounded-full flex items-center justify-center">
                         <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                         </svg>
                       </div>
-                      <span className="text-gray-300">Create Organisation</span>
+                      <span className="text-gray-300">Select a package</span>
                     </div>
                     <button
-                      onClick={() => router.push('/organisation_form')}
+                      onClick={() => router.push('/select_package')}
                       className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
                     >
-                      Complete
+                      Select
                     </button>
                   </div>
                 )}
                 
-                {data.brands.length === 0 && (
+                {!data.schedule && data.invoice && (
                   <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-blue-500/20 rounded-full flex items-center justify-center">
                         <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                       </div>
-                      <span className="text-gray-300">Create Brands</span>
+                      <span className="text-gray-300">Set up your schedule</span>
                     </div>
                     <button
-                      onClick={() => router.push('/client_brands_form')}
+                      onClick={() => router.push('/schedule')}
                       className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
                     >
-                      Complete
+                      Setup
                     </button>
                   </div>
                 )}
                 
-                {data.personas.length === 0 && (
-                  <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                      </div>
-                      <span className="text-gray-300">Create Persona</span>
-                    </div>
-                    <button
-                      onClick={() => router.push('/client_product_persona_form')}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
-                    >
-                      Complete
-                    </button>
-                  </div>
-                )}
-                
-                {data.products.length === 0 && (
+                {data.completedBatches === 0 && data.schedule && (
                   <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
                         <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                       </div>
-                      <span className="text-gray-300">Create Products</span>
+                      <span className="text-gray-300">Generate your first FAQ batch</span>
                     </div>
                     <button
-                      onClick={() => router.push('/client_products')}
+                      onClick={() => router.push('/schedule')}
                       className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
                     >
-                      Complete
-                    </button>
-                  </div>
-                )}
-                
-                {!data.configuration && (
-                  <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-indigo-500/20 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                        </svg>
-                      </div>
-                      <span className="text-gray-300">Configure AI</span>
-                    </div>
-                    <button
-                      onClick={() => router.push('/client_configuration_form')}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
-                    >
-                      Complete
+                      Generate
                     </button>
                   </div>
                 )}
@@ -454,15 +394,7 @@ export default function Dashboard() {
         {data.invoice && (
           <div className="mb-8">
             <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-white">Your Package</h2>
-                <button
-                  onClick={() => router.push('/packages')}
-                  className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
-                >
-                  Change Package →
-                </button>
-              </div>
+              <h2 className="text-xl font-semibold text-white mb-4">Your Package</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <p className="text-gray-400 text-sm">Package Tier</p>
@@ -481,105 +413,48 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Batches & Monitoring Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Recent Batches */}
-          <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Recent Batches</h2>
-              <button
-                onClick={() => router.push('/faq-batches')}
-                className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
-              >
-                View All →
-              </button>
-            </div>
-            {data.recentBatches.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <p className="text-gray-400">No batches yet</p>
-                <button
-                  onClick={() => router.push('/schedule')}
-                  className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors"
-                >
-                  Generate First Batch
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {data.recentBatches.map((batch) => (
-                  <div key={batch.id} className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
-                    <div>
-                      <p className="text-white font-medium">{batch.product || 'Unknown Product'}</p>
-                      <p className="text-gray-400 text-sm">{batch.faq_count_in_batch} FAQ pairs</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-gray-300 text-sm">{new Date(batch.created_at).toLocaleDateString()}</p>
-                      <span className="inline-block bg-green-600 text-white px-2 py-1 rounded text-xs">
-                        ✓ Completed
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* Available Packages */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">Available Packages</h2>
+            <button
+              onClick={() => router.push('/packages')}
+              className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+            >
+              View All Packages →
+            </button>
           </div>
-
-          {/* Performance Monitoring */}
-          <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Performance Monitoring</h2>
-              <button
-                onClick={() => router.push('/monthly-report')}
-                className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
-              >
-                View Report →
-              </button>
-            </div>
-            {data.performanceStats.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <p className="text-gray-400">No performance data yet</p>
-                <button
-                  onClick={() => router.push('/faq-performance')}
-                  className="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors"
-                >
-                  Set Up Monitoring
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-                    <p className="text-2xl font-bold text-white">{data.performanceStats.length}</p>
-                    <p className="text-gray-400 text-sm">Tests This Month</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { tier: 'Startup', price: 99, faq_pairs: 20, color: 'from-orange-500/20 to-orange-600/20', border: 'border-orange-500/30' },
+              { tier: 'Growth', price: 199, faq_pairs: 40, color: 'from-emerald-500/20 to-emerald-600/20', border: 'border-emerald-500/30' },
+              { tier: 'Pro', price: 299, faq_pairs: 60, color: 'from-blue-500/20 to-blue-600/20', border: 'border-blue-500/30' },
+              { tier: 'Enterprise', price: 399, faq_pairs: 80, color: 'from-purple-500/20 to-purple-600/20', border: 'border-purple-500/30' }
+            ].map((pkg) => (
+              <div key={pkg.tier} className={`bg-gradient-to-br ${pkg.color} border ${pkg.border} rounded-xl p-4 relative group hover:scale-105 transition-all duration-200`}>
+                {pkg.tier === 'Pro' && (
+                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 px-2 py-1 rounded-full text-xs font-bold">
+                      Popular
+                    </span>
                   </div>
-                  <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-                    <p className="text-2xl font-bold text-white">
-                      {Math.round(data.performanceStats.reduce((sum: number, test: any) => {
-                        const scores = [test.openai_accuracy_score, test.gemini_accuracy_score, test.perplexity_accuracy_score, test.claude_accuracy_score].filter(Boolean);
-                        return sum + (scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0);
-                      }, 0) / data.performanceStats.length)}%
-                    </p>
-                    <p className="text-gray-400 text-sm">Avg Accuracy</p>
+                )}
+                <div className="text-center">
+                  <h3 className="text-lg font-bold text-white mb-2">{pkg.tier}</h3>
+                  <div className="mb-3">
+                    <span className="text-2xl font-bold text-white">${pkg.price}</span>
+                    <span className="text-gray-300 text-sm ml-1">/month</span>
                   </div>
-                </div>
-                <div className="text-center p-3 bg-gray-800/30 rounded-lg">
-                  <p className="text-lg font-semibold text-white">Latest Test Results</p>
-                  <p className="text-gray-400 text-sm mt-1">
-                    {data.performanceStats[0]?.tested_llms?.join(', ') || 'No providers tested'}
-                  </p>
+                  <p className="text-gray-300 text-sm mb-4">{pkg.faq_pairs} FAQ pairs/month</p>
+                  <button
+                    onClick={() => router.push('/select_package')}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
+                  >
+                    {data.invoice?.package_tier === pkg.tier ? 'Current Plan' : 'Upgrade'}
+                  </button>
                 </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
 
@@ -650,14 +525,7 @@ export default function Dashboard() {
               onClick={() => router.push('/organisation_form')}
               className="bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600/50 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
             >
-              Organisation Settings
-            </button>
-            
-            <button
-              onClick={() => router.push('/client_brands_form')}
-              className="bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600/50 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
-            >
-              Manage Brands
+              Organization Settings
             </button>
             
             <button
