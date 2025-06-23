@@ -200,30 +200,28 @@ export default function FAQPerformancePage() {
       setTopicStats(topics);
 
       // Calculate user stats
-      const totalQuestions = transformedPairs.length;
       const questionsAsked = askedQuestions?.length || 0;
-      const questionsRemaining = Math.max(0, limits.questions_limit - questionsAsked);
-      const totalTopics = topics.length;
+      const questionsRemaining = limits.questions_limit - questionsAsked;
 
       setUserStats({
-        totalQuestions,
-        questionsAsked,
-        questionsRemaining,
-        totalTopics,
-        packageTier,
+        totalQuestions: transformedPairs.length,
+        questionsAsked: questionsAsked,
+        questionsRemaining: questionsRemaining,
+        totalTopics: topics.length,
+        packageTier: packageTier,
         questionsLimit: limits.questions_limit,
         llmsLimit: limits.llms_limit,
-        subscriptionStatus,
-        nextTestDate: subscription?.next_test_date || new Date().toISOString().split('T')[0]
+        subscriptionStatus: subscriptionStatus,
+        nextTestDate: new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1).toISOString().split('T')[0]
       });
 
     } catch (error) {
       console.error('Error loading data:', error);
-      setError('Failed to load FAQ pairs');
+      setError('Failed to load FAQ data. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [router, selectedMonth]);
+  }, [selectedMonth, router]);
 
   useEffect(() => {
     loadData();
@@ -256,6 +254,11 @@ export default function FAQPerformancePage() {
     }
 
     // Check if user has exceeded their quota
+    if (userStats.questionsRemaining < 0) {
+      setError('You have exceeded your monthly quota. Please upgrade your package or wait until next month.');
+      return;
+    }
+
     if (selectedPairs.length > userStats.questionsRemaining) {
       setError(`You can only select up to ${userStats.questionsRemaining} more questions for this month`);
       return;
@@ -345,12 +348,8 @@ export default function FAQPerformancePage() {
       const result = await response.json();
       console.log('Test completed:', result);
 
-      // Step 5: Clear selections and reload data
-      setSelectedPairs([]);
-      setSelectedProviders(['openai']);
-      await loadData();
-
-      setError('');
+      // Step 5: Redirect to monthly report
+      router.push('/monthly-report');
     } catch (error) {
       console.error('Error running test:', error);
       setError(error instanceof Error ? error.message : 'Failed to run test');
@@ -425,326 +424,240 @@ export default function FAQPerformancePage() {
   }
 
   return (
-    <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">FAQ Performance Dashboard</h1>
-              <p className="text-xl text-gray-300">Monitor and test your FAQ performance across AI providers</p>
-            </div>
-            <div className="mt-4 md:mt-0 flex gap-4">
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-gray-800/50 border border-gray-600 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {getMonthOptions().map(month => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => router.push('/monthly-report')}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
-              >
-                📊 Monthly Report
-              </button>
-            </div>
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">FAQ Performance Dashboard</h1>
+            <p className="text-xl text-gray-300">Monitor and test your FAQ performance across AI providers</p>
           </div>
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 bg-red-900/20 border border-red-500/50 rounded-lg p-4">
-            <p className="text-red-400">{error}</p>
-          </div>
-        )}
-
-        {/* Stats Grid */}
-        {userStats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-400 text-sm">Package Limit</p>
-                  <p className="text-3xl font-bold text-white">{userStats.questionsLimit}</p>
-                  <p className="text-xs text-gray-500">questions/month</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className={`bg-gradient-to-br ${userStats.questionsRemaining < 0 ? 'from-red-600/20 to-pink-600/20 border-red-500/30' : 'from-green-600/20 to-emerald-600/20 border-green-500/30'} border rounded-xl p-6`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-400 text-sm">Questions Remaining</p>
-                  <p className={`text-3xl font-bold ${userStats.questionsRemaining < 0 ? 'text-red-400' : 'text-white'}`}>
-                    {userStats.questionsRemaining}
-                  </p>
-                  <p className="text-xs text-gray-500">of {userStats.questionsLimit} limit</p>
-                </div>
-                <div className={`w-12 h-12 ${userStats.questionsRemaining < 0 ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-lg flex items-center justify-center`}>
-                  {userStats.questionsRemaining < 0 ? (
-                    <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-400 text-sm">Total Topics</p>
-                  <p className="text-3xl font-bold text-white">{userStats.totalTopics}</p>
-                  <p className="text-xs text-gray-500">categories</p>
-                </div>
-                <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-xl p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-400 text-sm">Subscription</p>
-                  <p className={`text-2xl font-bold ${userStats.subscriptionStatus === 'active' ? 'text-green-400' : 'text-red-400'}`}>
-                    {userStats.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
-                  </p>
-                  <p className="text-xs text-gray-500">{userStats.packageTier}</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* AI Provider Selection */}
-        <div className="mb-8">
-          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Select AI Providers</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
-                <div
-                  key={key}
-                  className={`border rounded-xl p-4 transition-all duration-200 ${
-                    selectedProviders.includes(key)
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-gray-600 bg-gray-800/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedProviders.includes(key)}
-                      onChange={() => toggleProviderSelection(key)}
-                      disabled={selectedProviders.length >= (userStats?.llmsLimit || 1) && !selectedProviders.includes(key)}
-                      className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
-                    />
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{provider.icon}</span>
-                      <span className="text-white font-medium">{provider.name}</span>
-                    </div>
-                  </div>
-                </div>
+          <div className="mt-4 md:mt-0 flex gap-4">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-gray-800/50 border border-gray-600 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {getMonthOptions().map(month => (
+                <option key={month.value} value={month.value}>
+                  {month.label}
+                </option>
               ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Test Controls */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="text-gray-300">
-                {selectedPairs.length} FAQ pairs selected • {selectedProviders.length} AI providers
-                {userStats && userStats.questionsRemaining < 0 && (
-                  <span className="ml-4 text-red-400 font-semibold">⚠️ Monthly quota exceeded!</span>
-                )}
-              </div>
-              <button
-                onClick={testFAQPerformance}
-                disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) < 0}
-                className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
-                  testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) < 0
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
-                }`}
-              >
-                {testing ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Running Test...
-                  </div>
-                ) : (
-                  '📅 Run Test'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* FAQ Pairs Selection */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">Select FAQ Pairs for Monthly Monitoring</h2>
-          {faqPairs.length === 0 ? (
-            <div className="text-center py-16 bg-gray-900/30 border border-gray-700/50 rounded-xl">
-              <div className="w-24 h-24 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4">No FAQ Pairs Available</h3>
-              <p className="text-gray-400 mb-6">You need completed FAQ pairs to set up monthly monitoring</p>
-              <button
-                onClick={() => router.push('/review-questions')}
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
-              >
-                Go to Review Questions
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {faqPairs.map((faq) => {
-                const isAlreadyAsked = alreadyAskedQuestions.includes(faq.id);
-                const isSelected = selectedPairs.includes(faq.id);
-                
-                return (
-                  <div
-                    key={faq.id}
-                    className={`border rounded-xl p-4 transition-all duration-200 relative ${
-                      isAlreadyAsked
-                        ? 'border-yellow-500 bg-yellow-500/10'
-                        : isSelected
-                        ? 'border-green-500 bg-green-500/10'
-                        : 'border-gray-600 bg-gray-800/50'
-                    }`}
-                  >
-                    {/* Already Asked Badge */}
-                    {isAlreadyAsked && (
-                      <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
-                        ✓ Asked
-                      </div>
-                    )}
-                    
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleFAQSelection(faq.id)}
-                        disabled={isAlreadyAsked}
-                        className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
-                      />
-                      <div className="flex-1">
-                        <h3 className="text-white font-medium mb-2">{faq.question}</h3>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                          <span>{faq.organisation_name}</span>
-                          <span>•</span>
-                          <span className="text-blue-400 font-medium">{faq.topic}</span>
-                          {isAlreadyAsked && (
-                            <>
-                              <span>•</span>
-                              <span className="text-yellow-400 font-semibold">Already asked this month</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Topics Overview - Moved below questions */}
-        <div className="mb-8">
-          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Topics Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {topicStats.map((topic) => (
-                <div
-                  key={topic.topic}
-                  className="bg-gray-800/50 border border-gray-600 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all duration-200"
-                  onClick={() => openTopicModal(topic)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-white font-medium">{topic.topic}</h3>
-                      <p className="text-gray-400 text-sm">{topic.questionCount} questions</p>
-                    </div>
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              ))}
-            </div>
+            </select>
+            <button
+              onClick={() => router.push('/monthly-report')}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
+            >
+              📊 Monthly Report
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Topic Modal */}
-      {showTopicModal && selectedTopic && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-700">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">{selectedTopic.topic}</h2>
-                <button
-                  onClick={closeTopicModal}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 bg-red-900/20 border border-red-500/50 rounded-lg p-4">
+          <p className="text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Stats Grid */}
+      {userStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm">Package Limit</p>
+                <p className="text-3xl font-bold text-white">{userStats.questionsLimit}</p>
+                <p className="text-xs text-gray-500">questions/month</p>
               </div>
-              <p className="text-gray-400 mt-2">{selectedTopic.questionCount} questions in this topic</p>
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
             </div>
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
-              <div className="space-y-4">
-                {selectedTopic.questions.map((question) => {
-                  const isAlreadyAsked = alreadyAskedQuestions.includes(question.id);
-                  return (
-                    <div 
-                      key={question.id} 
-                      className={`border rounded-lg p-4 relative ${
-                        isAlreadyAsked 
-                          ? 'bg-yellow-500/10 border-yellow-500/50' 
-                          : 'bg-gray-800/50 border-gray-600'
-                      }`}
-                    >
-                      {isAlreadyAsked && (
-                        <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
-                          ✓ Asked
-                        </div>
-                      )}
-                      <h3 className="text-white font-medium mb-2">{question.question}</h3>
-                      <p className="text-gray-400 text-sm mb-2">{question.answer}</p>
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                        <span>{question.organisation_name}</span>
+          </div>
+
+          <div className={`bg-gradient-to-br ${userStats.questionsRemaining < 0 ? 'from-red-600/20 to-pink-600/20 border-red-500/30' : 'from-green-600/20 to-emerald-600/20 border-green-500/30'} border rounded-xl p-6`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm">Questions Remaining</p>
+                <p className={`text-3xl font-bold ${userStats.questionsRemaining < 0 ? 'text-red-400' : 'text-white'}`}>
+                  {userStats.questionsRemaining}
+                </p>
+                <p className="text-xs text-gray-500">of {userStats.questionsLimit} limit</p>
+              </div>
+              <div className={`w-12 h-12 ${userStats.questionsRemaining < 0 ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-lg flex items-center justify-center`}>
+                {userStats.questionsRemaining < 0 ? (
+                  <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm">Total Topics</p>
+                <p className="text-3xl font-bold text-white">{userStats.totalTopics}</p>
+                <p className="text-xs text-gray-500">categories</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border border-orange-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm">Subscription</p>
+                <p className={`text-2xl font-bold ${userStats.subscriptionStatus === 'active' ? 'text-green-400' : 'text-red-400'}`}>
+                  {userStats.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
+                </p>
+                <p className="text-xs text-gray-500">{userStats.packageTier}</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Provider Selection */}
+      <div className="mb-8">
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Select AI Providers</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
+              <div
+                key={key}
+                className={`border rounded-xl p-4 transition-all duration-200 ${
+                  selectedProviders.includes(key)
+                    ? 'border-green-500 bg-green-500/10'
+                    : 'border-gray-600 bg-gray-800/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedProviders.includes(key)}
+                    onChange={() => toggleProviderSelection(key)}
+                    disabled={selectedProviders.length >= (userStats?.llmsLimit || 1) && !selectedProviders.includes(key)}
+                    className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{provider.icon}</span>
+                    <span className="text-white font-medium">{provider.name}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Test Controls */}
+      <div className="mb-8">
+        <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 border border-gray-600/50 rounded-xl p-6">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="text-gray-300">
+              {selectedPairs.length} FAQ pairs selected • {selectedProviders.length} AI providers
+              {userStats && userStats.questionsRemaining < 0 && (
+                <span className="ml-4 text-red-400 font-semibold">⚠️ Monthly quota exceeded!</span>
+              )}
+            </div>
+            <button
+              onClick={testFAQPerformance}
+              disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) < 0}
+              className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
+                testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) < 0
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
+              }`}
+            >
+              {testing ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Running Test...
+                </div>
+              ) : (
+                '📅 Run Test'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* FAQ Pairs Selection */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">Select FAQ Pairs for Monthly Monitoring</h2>
+        {faqPairs.length === 0 ? (
+          <div className="text-center py-16 bg-gray-900/30 border border-gray-700/50 rounded-xl">
+            <div className="w-24 h-24 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-4">No FAQ Pairs Available</h3>
+            <p className="text-gray-400 mb-6">You need completed FAQ pairs to set up monthly monitoring</p>
+            <button
+              onClick={() => router.push('/review-questions')}
+              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
+            >
+              Go to Review Questions
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {faqPairs.map((faq) => {
+              const isAlreadyAsked = alreadyAskedQuestions.includes(faq.id);
+              const isSelected = selectedPairs.includes(faq.id);
+              
+              return (
+                <div
+                  key={faq.id}
+                  className={`border rounded-xl p-4 transition-all duration-200 relative ${
+                    isAlreadyAsked
+                      ? 'border-yellow-500 bg-yellow-500/10'
+                      : isSelected
+                      ? 'border-green-500 bg-green-500/10'
+                      : 'border-gray-600 bg-gray-800/50'
+                  }`}
+                >
+                  {/* Already Asked Badge */}
+                  {isAlreadyAsked && (
+                    <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
+                      ✓ Asked
+                    </div>
+                  )}
+                  
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleFAQSelection(faq.id)}
+                      disabled={isAlreadyAsked}
+                      className="mt-1 w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 cursor-pointer disabled:opacity-50"
+                    />
+                    <div className="flex-1">
+                      <h3 className="text-white font-medium mb-2">{faq.question}</h3>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                        <span>{faq.organisation_name}</span>
                         <span>•</span>
-                        <span>{question.industry}</span>
+                        <span className="text-blue-400 font-medium">{faq.topic}</span>
                         {isAlreadyAsked && (
                           <>
                             <span>•</span>
@@ -753,13 +666,97 @@ export default function FAQPerformancePage() {
                         )}
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Topics Overview - Moved below questions */}
+      <div className="mb-8">
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Topics Overview</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {topicStats.map((topic) => (
+              <div
+                key={topic.topic}
+                className="bg-gray-800/50 border border-gray-600 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all duration-200"
+                onClick={() => openTopicModal(topic)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-white font-medium">{topic.topic}</h3>
+                    <p className="text-gray-400 text-sm">{topic.questionCount} questions</p>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Topic Modal */}
+    {showTopicModal && selectedTopic && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+          <div className="p-6 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">{selectedTopic.topic}</h2>
+              <button
+                onClick={closeTopicModal}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-gray-400 mt-2">{selectedTopic.questionCount} questions in this topic</p>
+          </div>
+          <div className="p-6 overflow-y-auto max-h-[60vh]">
+            <div className="space-y-4">
+              {selectedTopic.questions.map((question) => {
+                const isAlreadyAsked = alreadyAskedQuestions.includes(question.id);
+                return (
+                  <div 
+                    key={question.id} 
+                    className={`border rounded-lg p-4 relative ${
+                      isAlreadyAsked 
+                        ? 'bg-yellow-500/10 border-yellow-500/50' 
+                        : 'bg-gray-800/50 border-gray-600'
+                    }`}
+                  >
+                    {isAlreadyAsked && (
+                      <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
+                        ✓ Asked
+                      </div>
+                    )}
+                    <h3 className="text-white font-medium mb-2">{question.question}</h3>
+                    <p className="text-gray-400 text-sm mb-2">{question.answer}</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span>{question.organisation_name}</span>
+                      <span>•</span>
+                      <span>{question.industry}</span>
+                      {isAlreadyAsked && (
+                        <>
+                          <span>•</span>
+                          <span className="text-yellow-400 font-semibold">Already asked this month</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
-} 
+      </div>
+    )}
+  </div>
+); }
