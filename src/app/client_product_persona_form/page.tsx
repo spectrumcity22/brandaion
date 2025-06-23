@@ -101,8 +101,6 @@ const copywriterTypes = [
 export default function ClientProductPersonaForm() {
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<any>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [productId, setProductId] = useState('');
   const [organisationName, setOrganisationName] = useState('');
   const [form, setForm] = useState<any>({});
   const [message, setMessage] = useState('');
@@ -116,14 +114,16 @@ export default function ClientProductPersonaForm() {
         return;
       }
       setSessionUser(user);
-      // Fetch products for this user
-      const { data: productsData } = await supabase
-        .from('products')
-        .select('id, product_name, organisation')
-        .eq('auth_user_id', user.id);
-      setProducts(productsData || []);
-      if (productsData && productsData.length > 0) {
-        setOrganisationName(productsData[0].organisation || '');
+      
+      // Get organisation name from client_organisation
+      const { data: orgData } = await supabase
+        .from('client_organisation')
+        .select('organisation_name')
+        .eq('auth_user_id', user.id)
+        .single();
+      
+      if (orgData) {
+        setOrganisationName(orgData.organisation_name || '');
       }
     })();
   }, [router]);
@@ -136,8 +136,8 @@ export default function ClientProductPersonaForm() {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage('Saving...');
-    if (!sessionUser || !productId) {
-      setMessage('Please select a product.');
+    if (!sessionUser) {
+      setMessage('Please log in.');
       setIsSubmitting(false);
       return;
     }
@@ -146,7 +146,6 @@ export default function ClientProductPersonaForm() {
       .insert({
         auth_user_id: sessionUser.id,
         organisation_name: organisationName,
-        product_id: productId,
         ...form
       });
     if (error) {
@@ -165,7 +164,7 @@ export default function ClientProductPersonaForm() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
             🎭
           </div>
-          <h1 className="text-3xl font-bold mb-2 shimmer-text">Create Product Persona</h1>
+          <h1 className="text-3xl font-bold mb-2 shimmer-text">Create Persona</h1>
           <p className="text-gray-400">Define your brand voice and personality for AI-powered FAQ generation</p>
         </div>
 
@@ -182,27 +181,6 @@ export default function ClientProductPersonaForm() {
             )}
 
             <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  🎯 Product
-                </label>
-                <select
-                  value={productId}
-                  onChange={e => {
-                    setProductId(e.target.value);
-                    const selected = products.find(p => p.id === e.target.value);
-                    setOrganisationName(selected ? selected.organisation : '');
-                  }}
-                  className="glass-input w-full p-4"
-                  required
-                >
-                  <option value="">Select a product</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.product_name}</option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   🏢 Organisation

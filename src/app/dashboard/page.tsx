@@ -546,7 +546,7 @@ export default function Dashboard() {
               onClick={() => router.push('/client_product_persona_form')}
               className="bg-gray-800/50 hover:bg-gray-700/50 border border-gray-600/50 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200"
             >
-              Create Persona
+              Manage Personas
             </button>
             
             <button
