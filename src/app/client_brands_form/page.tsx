@@ -37,6 +37,7 @@ export default function ClientBrandsForm() {
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [formData, setFormData] = useState<Partial<Brand>>({});
   const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -146,12 +147,20 @@ export default function ClientBrandsForm() {
 
       if (error) throw error;
       
+      // Show success message
+      setError(''); // Clear any previous errors
+      setSuccess(true);
+      
       // Refresh data
       await loadData();
       setShowForm(false);
       setEditingBrand(null);
       setFormData({});
-      setError('');
+      
+      // Auto-redirect to products page after 3 seconds
+      setTimeout(() => {
+        router.push('/client_products');
+      }, 3000);
     } catch (err) {
       console.error('Error saving brand:', err);
       setError('Error saving brand.');
@@ -219,6 +228,13 @@ export default function ClientBrandsForm() {
         {error && (
           <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-lg">
             <p className="text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* Success Message */}
+        {success && (
+          <div className="mb-6 p-4 bg-green-900/20 border border-green-500/50 rounded-lg">
+            <p className="text-green-400">✅ Brand saved successfully! Redirecting to Products page...</p>
           </div>
         )}
 

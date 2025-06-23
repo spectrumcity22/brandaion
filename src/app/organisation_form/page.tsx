@@ -148,9 +148,9 @@ export default function OrganisationForm() {
 
       setMessage('✅ Organisation and brand row updated successfully!');
       
-      // Auto-redirect to products page after 2 seconds
+      // Auto-redirect to brands page after 2 seconds
       setTimeout(() => {
-        router.push('/client_products');
+        router.push('/client_brands_form');
       }, 2000);
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
