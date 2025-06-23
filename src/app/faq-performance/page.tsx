@@ -507,17 +507,17 @@ export default function FAQPerformancePage() {
               </div>
             </div>
 
-            <div className={`bg-gradient-to-br ${userStats.questionsRemaining <= 0 ? 'from-red-600/20 to-pink-600/20 border-red-500/30' : 'from-green-600/20 to-emerald-600/20 border-green-500/30'} border rounded-xl p-6`}>
+            <div className={`bg-gradient-to-br ${userStats.questionsRemaining < 0 ? 'from-red-600/20 to-pink-600/20 border-red-500/30' : 'from-green-600/20 to-emerald-600/20 border-green-500/30'} border rounded-xl p-6`}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm">Questions Remaining</p>
-                  <p className={`text-3xl font-bold ${userStats.questionsRemaining <= 0 ? 'text-red-400' : 'text-white'}`}>
+                  <p className={`text-3xl font-bold ${userStats.questionsRemaining < 0 ? 'text-red-400' : 'text-white'}`}>
                     {userStats.questionsRemaining}
                   </p>
                   <p className="text-xs text-gray-500">of {userStats.questionsLimit} limit</p>
                 </div>
-                <div className={`w-12 h-12 ${userStats.questionsRemaining <= 0 ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-lg flex items-center justify-center`}>
-                  {userStats.questionsRemaining <= 0 ? (
+                <div className={`w-12 h-12 ${userStats.questionsRemaining < 0 ? 'bg-red-500/20' : 'bg-green-500/20'} rounded-lg flex items-center justify-center`}>
+                  {userStats.questionsRemaining < 0 ? (
                     <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
@@ -564,32 +564,6 @@ export default function FAQPerformancePage() {
           </div>
         )}
 
-        {/* Topics Overview */}
-        <div className="mb-8">
-          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Topics Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {topicStats.map((topic) => (
-                <div
-                  key={topic.topic}
-                  className="bg-gray-800/50 border border-gray-600 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all duration-200"
-                  onClick={() => openTopicModal(topic)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-white font-medium">{topic.topic}</h3>
-                      <p className="text-gray-400 text-sm">{topic.questionCount} questions</p>
-                    </div>
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {/* AI Provider Selection */}
         <div className="mb-8">
           <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
@@ -629,15 +603,15 @@ export default function FAQPerformancePage() {
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="text-gray-300">
                 {selectedPairs.length} FAQ pairs selected • {selectedProviders.length} AI providers
-                {userStats && userStats.questionsRemaining <= 0 && (
+                {userStats && userStats.questionsRemaining < 0 && (
                   <span className="ml-4 text-red-400 font-semibold">⚠️ Monthly quota exceeded!</span>
                 )}
               </div>
               <button
                 onClick={testFAQPerformance}
-                disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) <= 0}
+                disabled={testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) < 0}
                 className={`px-8 py-3 rounded-xl font-semibold transition-all duration-200 ${
-                  testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) <= 0
+                  testing || selectedPairs.length === 0 || selectedProviders.length === 0 || (userStats?.questionsRemaining || 0) < 0
                     ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white transform hover:scale-105'
                 }`}
@@ -726,6 +700,32 @@ export default function FAQPerformancePage() {
               })}
             </div>
           )}
+        </div>
+
+        {/* Topics Overview - Moved below questions */}
+        <div className="mb-8">
+          <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Topics Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {topicStats.map((topic) => (
+                <div
+                  key={topic.topic}
+                  className="bg-gray-800/50 border border-gray-600 rounded-xl p-4 cursor-pointer hover:border-blue-500/50 transition-all duration-200"
+                  onClick={() => openTopicModal(topic)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-white font-medium">{topic.topic}</h3>
+                      <p className="text-gray-400 text-sm">{topic.questionCount} questions</p>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
