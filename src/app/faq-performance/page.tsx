@@ -699,64 +699,64 @@ export default function FAQPerformancePage() {
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Topic Modal */}
-    {showTopicModal && selectedTopic && (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
-          <div className="p-6 border-b border-gray-700">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white">{selectedTopic.topic}</h2>
-              <button
-                onClick={closeTopicModal}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      {/* Topic Modal */}
+      {showTopicModal && selectedTopic && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-white">{selectedTopic.topic}</h2>
+                <button
+                  onClick={closeTopicModal}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-gray-400 mt-2">{selectedTopic.questionCount} questions in this topic</p>
             </div>
-            <p className="text-gray-400 mt-2">{selectedTopic.questionCount} questions in this topic</p>
-          </div>
-          <div className="p-6 overflow-y-auto max-h-[60vh]">
-            <div className="space-y-4">
-              {selectedTopic.questions.map((question) => {
-                const isAlreadyAsked = alreadyAskedQuestions.includes(question.id);
-                return (
-                  <div 
-                    key={question.id} 
-                    className={`border rounded-lg p-4 relative ${
-                      isAlreadyAsked 
-                        ? 'bg-yellow-500/10 border-yellow-500/50' 
-                        : 'bg-gray-800/50 border-gray-600'
-                    }`}
-                  >
-                    {isAlreadyAsked && (
-                      <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
-                        ✓ Asked
-                      </div>
-                    )}
-                    <h3 className="text-white font-medium mb-2">{question.question}</h3>
-                    <p className="text-gray-400 text-sm mb-2">{question.answer}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>{question.organisation_name}</span>
-                      <span>•</span>
-                      <span>{question.industry}</span>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="space-y-4">
+                {selectedTopic.questions.map((question) => {
+                  const isAlreadyAsked = alreadyAskedQuestions.includes(question.id);
+                  return (
+                    <div 
+                      key={question.id} 
+                      className={`border rounded-lg p-4 relative ${
+                        isAlreadyAsked 
+                          ? 'bg-yellow-500/10 border-yellow-500/50' 
+                          : 'bg-gray-800/50 border-gray-600'
+                      }`}
+                    >
                       {isAlreadyAsked && (
-                        <>
-                          <span>•</span>
-                          <span className="text-yellow-400 font-semibold">Already asked this month</span>
-                        </>
+                        <div className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
+                          ✓ Asked
+                        </div>
                       )}
+                      <h3 className="text-white font-medium mb-2">{question.question}</h3>
+                      <p className="text-gray-400 text-sm mb-2">{question.answer}</p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span>{question.organisation_name}</span>
+                        <span>•</span>
+                        <span>{question.industry}</span>
+                        {isAlreadyAsked && (
+                          <>
+                            <span>•</span>
+                            <span className="text-yellow-400 font-semibold">Already asked this month</span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    )}
-  </div>
-); }
+      )}
+    </div>
+  );
+}
