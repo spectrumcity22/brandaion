@@ -1,10 +1,8 @@
--- Drop any existing triggers and functions
+-- Drop existing trigger and function
 DROP TRIGGER IF EXISTS tr_process_stripe_webhook ON stripe_webhook_log;
-DROP TRIGGER IF EXISTS tr_set_invoice_auth_user ON invoices;
 DROP FUNCTION IF EXISTS process_stripe_webhook CASCADE;
-DROP FUNCTION IF EXISTS set_invoice_auth_user CASCADE;
 
--- Create function to process stripe webhooks
+-- Create fixed function to process stripe webhooks
 CREATE OR REPLACE FUNCTION process_stripe_webhook()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -20,14 +18,14 @@ DECLARE
   billing_period_end timestamp with time zone;
 BEGIN
   -- Process both invoice.paid and checkout.session.completed events
-  IF NEW.payload->>'type' NOT IN ('invoice.paid', 'checkout.session.completed') THEN
+  IF NEW.type NOT IN ('invoice.paid', 'checkout.session.completed') THEN
     RETURN NEW;
   END IF;
 
   session := NEW.payload -> 'data' -> 'object';
   
   -- Handle different event types
-  IF NEW.payload->>'type' = 'invoice.paid' THEN
+  IF NEW.type = 'invoice.paid' THEN
     -- Invoice paid event
     invoice_id := session ->> 'id';
     user_email := session ->> 'customer_email';
@@ -37,7 +35,7 @@ BEGIN
     paid_at := to_timestamp((session ->> 'created')::integer);
     billing_period_start := to_timestamp((session ->> 'period_start')::integer);
     billing_period_end := to_timestamp((session ->> 'period_end')::integer);
-  ELSIF NEW.payload->>'type' = 'checkout.session.completed' THEN
+  ELSIF NEW.type = 'checkout.session.completed' THEN
     -- Checkout session completed event
     invoice_id := crypto.random_uuid()::text;
     user_email := session -> 'customer_details' ->> 'email';
@@ -99,35 +97,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create function to set auth_user_id on invoices
-CREATE OR REPLACE FUNCTION set_invoice_auth_user()
-RETURNS TRIGGER AS $$
-DECLARE
-    found_auth_user_id UUID;
-BEGIN
-    -- Look up the auth_user_id from end_users table using the email
-    SELECT auth_user_id INTO found_auth_user_id
-    FROM end_users
-    WHERE email = NEW.user_email
-    LIMIT 1;
-
-    -- If we found a matching user, set the auth_user_id
-    IF found_auth_user_id IS NOT NULL THEN
-        NEW.auth_user_id := found_auth_user_id;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create trigger to process stripe webhooks
+-- Recreate trigger
 CREATE TRIGGER tr_process_stripe_webhook
     AFTER INSERT ON stripe_webhook_log
     FOR EACH ROW
-    EXECUTE FUNCTION process_stripe_webhook();
-
--- Create trigger to set auth_user_id on invoices
-CREATE TRIGGER tr_set_invoice_auth_user
-    BEFORE INSERT ON invoices
-    FOR EACH ROW
-    EXECUTE FUNCTION set_invoice_auth_user(); 
+    EXECUTE FUNCTION process_stripe_webhook(); 

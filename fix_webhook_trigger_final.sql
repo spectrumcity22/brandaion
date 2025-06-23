@@ -1,49 +1,39 @@
--- Drop any existing triggers and functions
-DROP TRIGGER IF EXISTS tr_process_stripe_webhook ON stripe_webhook_log;
-DROP TRIGGER IF EXISTS tr_set_invoice_auth_user ON invoices;
-DROP FUNCTION IF EXISTS process_stripe_webhook CASCADE;
-DROP FUNCTION IF EXISTS set_invoice_auth_user CASCADE;
-
--- Create function to process stripe webhooks
+-- Create working function to process stripe webhooks
 CREATE OR REPLACE FUNCTION process_stripe_webhook()
 RETURNS TRIGGER AS $$
 DECLARE
   session jsonb;
   invoice_id text;
-  package_data record;
   user_email text;
   amount_cents integer;
   stripe_payment_id text;
-  stripe_subscription_id text;
   paid_at timestamp with time zone;
   billing_period_start timestamp with time zone;
   billing_period_end timestamp with time zone;
 BEGIN
   -- Process both invoice.paid and checkout.session.completed events
-  IF NEW.payload->>'type' NOT IN ('invoice.paid', 'checkout.session.completed') THEN
+  IF NEW.type NOT IN ('invoice.paid', 'checkout.session.completed') THEN
     RETURN NEW;
   END IF;
 
   session := NEW.payload -> 'data' -> 'object';
   
   -- Handle different event types
-  IF NEW.payload->>'type' = 'invoice.paid' THEN
+  IF NEW.type = 'invoice.paid' THEN
     -- Invoice paid event
     invoice_id := session ->> 'id';
     user_email := session ->> 'customer_email';
     amount_cents := (session ->> 'amount_paid')::integer;
     stripe_payment_id := session ->> 'id';
-    stripe_subscription_id := session ->> 'subscription';
     paid_at := to_timestamp((session ->> 'created')::integer);
     billing_period_start := to_timestamp((session ->> 'period_start')::integer);
     billing_period_end := to_timestamp((session ->> 'period_end')::integer);
-  ELSIF NEW.payload->>'type' = 'checkout.session.completed' THEN
+  ELSIF NEW.type = 'checkout.session.completed' THEN
     -- Checkout session completed event
-    invoice_id := crypto.random_uuid()::text;
+    invoice_id := gen_random_uuid()::text;
     user_email := session -> 'customer_details' ->> 'email';
     amount_cents := (session ->> 'amount_total')::integer;
     stripe_payment_id := session ->> 'id';
-    stripe_subscription_id := session ->> 'subscription';
     paid_at := to_timestamp((session ->> 'created')::integer);
     
     -- For checkout sessions, we need to calculate billing periods
@@ -52,23 +42,15 @@ BEGIN
     billing_period_end := billing_period_start + interval '1 month';
   END IF;
 
-  -- Get package details based on amount
-  SELECT * INTO package_data
-  FROM packages
-  WHERE amount_cents = amount_cents;
-
-  -- Create invoice
+  -- Create invoice - let SQL functions handle package_tier, organisation, etc.
   INSERT INTO invoices (
     id,
     user_email,
     amount_cents,
     stripe_payment_id,
-    stripe_subscription_id,
     billing_period_start,
     billing_period_end,
     paid_at,
-    status,
-    package_tier,
     faq_pairs_pm,
     faq_per_batch,
     inserted_at,
@@ -78,14 +60,11 @@ BEGIN
     user_email,
     amount_cents,
     stripe_payment_id,
-    stripe_subscription_id,
     billing_period_start,
     billing_period_end,
     paid_at,
-    'active',
-    COALESCE(package_data.tier, 'Startup'),
-    COALESCE(package_data.faq_pairs_pm, 20),
-    COALESCE(package_data.faq_per_batch, 5),
+    20,  -- Default FAQ pairs per month
+    5,   -- Default FAQ per batch
     NOW(),
     false
   );
@@ -99,35 +78,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create function to set auth_user_id on invoices
-CREATE OR REPLACE FUNCTION set_invoice_auth_user()
-RETURNS TRIGGER AS $$
-DECLARE
-    found_auth_user_id UUID;
-BEGIN
-    -- Look up the auth_user_id from end_users table using the email
-    SELECT auth_user_id INTO found_auth_user_id
-    FROM end_users
-    WHERE email = NEW.user_email
-    LIMIT 1;
-
-    -- If we found a matching user, set the auth_user_id
-    IF found_auth_user_id IS NOT NULL THEN
-        NEW.auth_user_id := found_auth_user_id;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
 -- Create trigger to process stripe webhooks
 CREATE TRIGGER tr_process_stripe_webhook
     AFTER INSERT ON stripe_webhook_log
     FOR EACH ROW
-    EXECUTE FUNCTION process_stripe_webhook();
-
--- Create trigger to set auth_user_id on invoices
-CREATE TRIGGER tr_set_invoice_auth_user
-    BEFORE INSERT ON invoices
-    FOR EACH ROW
-    EXECUTE FUNCTION set_invoice_auth_user(); 
+    EXECUTE FUNCTION process_stripe_webhook(); 

@@ -1,10 +1,9 @@
--- Drop any existing triggers and functions
+-- Fix stripe webhook handler to process checkout.session.completed events
+-- Drop existing function and trigger
 DROP TRIGGER IF EXISTS tr_process_stripe_webhook ON stripe_webhook_log;
-DROP TRIGGER IF EXISTS tr_set_invoice_auth_user ON invoices;
 DROP FUNCTION IF EXISTS process_stripe_webhook CASCADE;
-DROP FUNCTION IF EXISTS set_invoice_auth_user CASCADE;
 
--- Create function to process stripe webhooks
+-- Create updated function to process both invoice.paid and checkout.session.completed events
 CREATE OR REPLACE FUNCTION process_stripe_webhook()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -99,35 +98,29 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create function to set auth_user_id on invoices
-CREATE OR REPLACE FUNCTION set_invoice_auth_user()
-RETURNS TRIGGER AS $$
-DECLARE
-    found_auth_user_id UUID;
-BEGIN
-    -- Look up the auth_user_id from end_users table using the email
-    SELECT auth_user_id INTO found_auth_user_id
-    FROM end_users
-    WHERE email = NEW.user_email
-    LIMIT 1;
-
-    -- If we found a matching user, set the auth_user_id
-    IF found_auth_user_id IS NOT NULL THEN
-        NEW.auth_user_id := found_auth_user_id;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create trigger to process stripe webhooks
+-- Recreate trigger
 CREATE TRIGGER tr_process_stripe_webhook
     AFTER INSERT ON stripe_webhook_log
     FOR EACH ROW
     EXECUTE FUNCTION process_stripe_webhook();
 
--- Create trigger to set auth_user_id on invoices
-CREATE TRIGGER tr_set_invoice_auth_user
-    BEFORE INSERT ON invoices
-    FOR EACH ROW
-    EXECUTE FUNCTION set_invoice_auth_user(); 
+-- Test the fix by processing the existing unprocessed webhook
+-- This will process the checkout.session.completed event that was logged
+UPDATE stripe_webhook_log 
+SET processed = false 
+WHERE payload->>'type' = 'checkout.session.completed' 
+  AND processed = true
+  AND payload->'data'->'object'->>'id' = 'cs_test_a1HrUCMEvN2XB4J2B5UMLZrWOspuMVYN2ly55bUVT13gIWXVGSlkeNjRMb';
+
+-- Verify the fix worked
+SELECT 
+    COUNT(*) as total_webhooks,
+    COUNT(CASE WHEN processed = true THEN 1 END) as processed_webhooks,
+    COUNT(CASE WHEN processed = false THEN 1 END) as unprocessed_webhooks
+FROM stripe_webhook_log;
+
+-- Check if invoice was created
+SELECT 
+    COUNT(*) as total_invoices,
+    COUNT(CASE WHEN stripe_payment_id = 'cs_test_a1HrUCMEvN2XB4J2B5UMLZrWOspuMVYN2ly55bUVT13gIWXVGSlkeNjRMb' THEN 1 END) as matching_invoices
+FROM invoices; 

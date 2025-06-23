@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-console.log('Initializing with URL:', supabaseUrl); // Debug log
+console.log('Initializing with URL:', supabaseUrl);
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
@@ -13,43 +13,22 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   }
 });
 
-interface WebhookLog {
-  id: string;
-  payload: {
-    id: string;
-    type: string;
-    data: {
-      object: {
-        id: string;
-        customer: string;
-        customer_email: string;
-        amount_paid: number;
-        currency: string;
-        status: string;
-        subscription: string;
-        period_start: number;
-        period_end: number;
-        lines: {
-          data: Array<{
-            description: string;
-            amount: number;
-            metadata?: {
-              faq_pairs_pm?: string;
-              faq_per_batch?: string;
-            };
-          }>;
-        };
-        created: number;
-      };
-    };
-  };
-  processed: boolean;
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+};
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: corsHeaders
+    });
+  }
+
   try {
     console.log('Function started'); // Debug log
-    
+
     // 1. Fetch unprocessed webhook logs
     const { data: logs, error: fetchError } = await supabase
       .from('stripe_webhook_log')
@@ -57,64 +36,95 @@ serve(async (req) => {
       .eq('processed', false);
 
     if (fetchError) {
-      console.error('Error fetching webhook logs:', fetchError); // Debug log
+      console.error('Error fetching webhook logs:', fetchError);
       return new Response(JSON.stringify({
         error: fetchError.message
       }), {
         status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: corsHeaders
       });
     }
 
     if (!logs || logs.length === 0) {
-      console.log('No unprocessed logs found'); // Debug log
+      console.log('No unprocessed logs found');
       return new Response('No unprocessed logs found', {
-        status: 200
+        status: 200,
+        headers: corsHeaders
       });
     }
 
-    console.log('Found logs:', logs); // Debug log
+    console.log('Found logs:', logs);
     const results = [];
 
     for (const log of logs) {
       try {
-        console.log('Processing log:', log.id); // Debug log
-        console.log('Payload type:', log.payload.type); // Debug log
+        console.log('Processing log:', log.id);
+        console.log('Payload type:', log.payload.type);
 
-        // Only process checkout.session.completed events
-        if (log.payload.type !== 'checkout.session.completed') {
-          console.log('Skipping - not checkout.session.completed'); // Debug log
+        // Process both invoice.paid and checkout.session.completed events
+        if (![
+          'invoice.paid',
+          'checkout.session.completed'
+        ].includes(log.payload.type)) {
+          console.log('Skipping - not a supported event type');
           continue;
         }
 
         const session = log.payload.data.object;
-        const customerEmail = session.customer_details?.email || session.customer_email;
-        const amount_cents = session.amount_total;
-        const paid_at = session.created ? new Date(session.created * 1000).toISOString() : null;
-        const stripe_payment_id = session.id;
+        let invoiceData = {};
 
-        // Log values before insert
-        console.log('About to insert invoice with:', {
-          user_email: customerEmail,
-          amount_cents,
-          paid_at,
-          stripe_payment_id
-        });
+        if (log.payload.type === 'invoice.paid') {
+          // Handle invoice.paid event
+          invoiceData = {
+            id: session.id,
+            user_email: session.customer_email,
+            amount_cents: session.amount_paid,
+            stripe_payment_id: session.id,
+            paid_at: session.created ? new Date(session.created * 1000).toISOString() : null,
+            billing_period_start: session.period_start ? new Date(session.period_start * 1000).toISOString() : null,
+            billing_period_end: session.period_end ? new Date(session.period_end * 1000).toISOString() : null
+          };
+        } else if (log.payload.type === 'checkout.session.completed') {
+          // Handle checkout.session.completed event
+          const paidAt = session.created ? new Date(session.created * 1000) : new Date();
+          const billingPeriodStart = paidAt;
+          const billingPeriodEnd = new Date(paidAt.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+          
+          invoiceData = {
+            id: crypto.randomUUID(),
+            user_email: session.customer_details?.email || session.customer_email,
+            amount_cents: session.amount_total,
+            stripe_payment_id: session.id,
+            paid_at: paidAt.toISOString(),
+            billing_period_start: billingPeriodStart.toISOString(),
+            billing_period_end: billingPeriodEnd.toISOString()
+          };
+        }
 
-        // Create invoice record with only required fields
+        // Get package details based on amount
+        const { data: packageData } = await supabase
+          .from('packages')
+          .select('*')
+          .eq('amount_cents', invoiceData.amount_cents)
+          .single();
+
+        // Create complete invoice record - only use existing columns
         const { error: invoiceError } = await supabase
           .from('invoices')
-          .insert([
-            {
-              id: crypto.randomUUID(),
-              user_email: customerEmail,
-              amount_cents: amount_cents,
-              paid_at: paid_at,
-              stripe_payment_id: stripe_payment_id
-            }
-          ]);
+          .insert([{
+            id: invoiceData.id,
+            user_email: invoiceData.user_email,
+            amount_cents: invoiceData.amount_cents,
+            stripe_payment_id: invoiceData.stripe_payment_id,
+            billing_period_start: invoiceData.billing_period_start,
+            billing_period_end: invoiceData.billing_period_end,
+            paid_at: invoiceData.paid_at,
+            package_tier: packageData?.tier || 'Startup',
+            faq_pairs_pm: packageData?.faq_pairs_pm || 20,
+            faq_per_batch: packageData?.faq_per_batch || 5,
+            inserted_at: new Date().toISOString(),
+            sent_to_schedule: false
+          }]);
 
         if (invoiceError) {
           console.error('Invoice insert error details:', JSON.stringify(invoiceError, null, 2));
@@ -136,34 +146,41 @@ serve(async (req) => {
         results.push({
           success: true,
           log_id: log.id,
+          event_type: log.payload.type,
           message: 'Processed successfully'
         });
+
+        console.log(`✅ Processed ${log.payload.type} event for ${invoiceData.user_email}`);
+
       } catch (error) {
-        console.error('Error processing log:', log.id, error); // Debug log
+        console.error('Error processing log:', log.id, error);
         results.push({
           success: false,
           log_id: log.id,
+          event_type: log.payload.type,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     }
 
     return new Response(JSON.stringify({
-      results
+      results,
+      total_processed: results.filter((r) => r.success).length,
+      total_failed: results.filter((r) => !r.success).length
     }), {
       headers: {
+        ...corsHeaders,
         'Content-Type': 'application/json'
       },
       status: 200
     });
+
   } catch (error) {
-    console.error('Function error:', error); // Debug log
+    console.error('Function error:', error);
     return new Response(JSON.stringify({
       error: error instanceof Error ? error.message : 'Unknown error'
     }), {
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: corsHeaders,
       status: 500
     });
   }
