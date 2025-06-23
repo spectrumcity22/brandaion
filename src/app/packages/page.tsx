@@ -164,7 +164,7 @@ export default function PackagesPage() {
 
                 {/* CTA Button */}
                 <Link
-                  href="/select_package"
+                  href={pkg.tier === 'Startup' ? 'https://buy.stripe.com/test_3cI8wR0Kk2oW18K9N65J602' : '/select_package'}
                   className="block w-full bg-white text-gray-900 font-bold py-3 px-6 rounded-xl text-center hover:bg-gray-100 transition-colors duration-200 transform hover:scale-105"
                 >
                   Get Started
