@@ -50,19 +50,19 @@ export default function OrganisationForm() {
       }
       setSessionUser(user);
 
-      // Get organization details
+      // Get organization details (if they exist)
       const { data: org, error } = await supabase
         .from('client_organisation')
         .select('id, organisation_name')
         .eq('auth_user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!error && org) {
         setOrgId(org.id);
         setOrgName(org.organisation_name);
       } else {
-        setMessage('❌ No organisation found for this user.');
-        return;
+        // No organization exists yet - this is fine for new users
+        console.log('No existing organization found - will create new one');
       }
 
       // Load reference data
@@ -98,38 +98,86 @@ export default function OrganisationForm() {
   };
 
   const handleSubmit = async () => {
+    if (!orgName || !orgUrl || !linkedinUrl || !industry || !subcategory || !headquarters) {
+      setMessage('Please fill in all fields.');
+      return;
+    }
+
     if (!sessionUser) {
-      setMessage('❌ You must be logged in.');
+      setMessage('User not authenticated.');
       return;
     }
-    if (!orgId || !orgUrl || !linkedinUrl || !industry || !subcategory || !headquarters) {
-      setMessage('❌ All fields are required.');
-      return;
-    }
+
     setIsSubmitting(true);
-    setMessage('Submitting...');
+    setMessage('Creating organisation...');
+
     try {
-      // Update the organization with names, not IDs
-      const { error: updateError } = await supabase
-        .from('client_organisation')
+      // Step 1: Create or update the organization record
+      let organizationId = orgId;
+      
+      if (!orgId) {
+        // Create new organization
+        const { data: newOrg, error: createError } = await supabase
+          .from('client_organisation')
+          .insert({
+            organisation_name: orgName,
+            organisation_url: orgUrl,
+            linkedin_url: linkedinUrl,
+            industry: industry,
+            subcategory: subcategory,
+            headquarters: headquarters,
+            auth_user_id: sessionUser.id,
+            is_active: true
+          })
+          .select('id')
+          .single();
+
+        if (createError) throw createError;
+        organizationId = newOrg.id;
+        setMessage('✅ Organisation created! Linking to profile...');
+      } else {
+        // Update existing organization
+        const { error: updateError } = await supabase
+          .from('client_organisation')
+          .update({
+            organisation_name: orgName,
+            organisation_url: orgUrl,
+            linkedin_url: linkedinUrl,
+            industry: industry,
+            subcategory: subcategory,
+            headquarters: headquarters,
+            is_active: true
+          })
+          .eq('id', orgId);
+        
+        if (updateError) throw updateError;
+        setMessage('✅ Organisation updated! Linking to profile...');
+      }
+
+      // Step 2: Wait 2 seconds for database to commit
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Step 3: Link organization to end_user
+      const { error: linkError } = await supabase
+        .from('end_users')
         .update({
-          organisation_url: orgUrl,
-          linkedin_url: linkedinUrl,
-          industry: industry,
-          subcategory: subcategory,
-          headquarters: headquarters,
-          is_active: true
+          org_name: orgName,
+          organisation_id: organizationId
         })
         .eq('auth_user_id', sessionUser.id);
-      if (updateError) throw updateError;
 
-      // Call the edge function to create a brand row with JWT
+      if (linkError) throw linkError;
+
+      setMessage('✅ Organisation and profile linked successfully!');
+
+      // Step 4: Call the edge function to create a brand row with JWT
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setMessage('❌ Could not get user session for brand creation.');
         setIsSubmitting(false);
         return;
       }
+      
       const brandRes = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/creation_of_brand_row', {
         method: 'POST',
         headers: {
@@ -137,16 +185,17 @@ export default function OrganisationForm() {
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          organisation_id: orgId,
+          organisation_id: organizationId,
           organisation_name: orgName
         })
       });
+      
       if (!brandRes.ok) {
         const errorData = await brandRes.json();
         throw new Error(errorData.error || 'Failed to create brand row');
       }
 
-      setMessage('✅ Organisation and brand row updated successfully!');
+      setMessage('✅ Organisation, profile, and brand row created successfully!');
       
       // Auto-redirect to brands page after 2 seconds
       setTimeout(() => {

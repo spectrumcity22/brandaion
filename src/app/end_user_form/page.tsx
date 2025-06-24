@@ -13,10 +13,8 @@ const supabase = createBrowserClient(
 export default function EndUserForm() {
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<User | null>(null);
-  const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [orgName, setOrgName] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -27,13 +25,12 @@ export default function EndUserForm() {
         router.push('/login');
       } else {
         setSessionUser(user);
-        setEmail(user.email || '');
       }
     })();
   }, [router]);
 
   const handleSubmit = async () => {
-    if (!firstName || !lastName || !orgName) {
+    if (!firstName || !lastName) {
       setMessage('Please fill in all fields.');
       return;
     }
@@ -60,7 +57,6 @@ export default function EndUserForm() {
           email: sessionUser.email || '',
           first_name: firstName,
           last_name: lastName,
-          org_name: orgName,
           status: 'active',
         });
         if (insertError) throw insertError;
@@ -71,42 +67,13 @@ export default function EndUserForm() {
             email: sessionUser.email || '',
             first_name: firstName,
             last_name: lastName,
-            org_name: orgName,
             status: 'active',
           })
           .eq('auth_user_id', auth_user_id);
         if (updateError) throw updateError;
       }
 
-      const { data: existingOrg } = await supabase
-        .from('client_organisation')
-        .select('id')
-        .eq('auth_user_id', auth_user_id)
-        .maybeSingle();
-
-      if (!existingOrg) {
-        const { data: orgData, error: orgError } = await supabase
-          .from('client_organisation')
-          .insert({ 
-            organisation_name: orgName, 
-            auth_user_id: auth_user_id 
-          })
-          .select()
-          .single();
-
-        if (orgError) {
-          console.error('Organisation insert error:', orgError);
-          throw new Error(`Failed to create organisation: ${orgError.message}`);
-        }
-        
-        if (!orgData?.id) {
-          throw new Error('Organisation was created but no ID returned');
-        }
-        
-        localStorage.setItem('organisation_id', orgData.id);
-      }
-
-      setMessage('✅ Profile and organisation saved!');
+      setMessage('✅ Profile saved!');
       
       // Auto-redirect to organisation form after 2 seconds
       setTimeout(() => {
@@ -132,11 +99,11 @@ export default function EndUserForm() {
         </div>
 
         <div className="glass-card p-8">
-          {email && (
+          {sessionUser && (
             <div className="mb-6 p-4 glass-card text-center">
               <div className="text-2xl mb-2">✅</div>
               <h2 className="text-lg font-semibold mb-1">Logged in as</h2>
-              <p className="text-brand font-medium">{email}</p>
+              <p className="text-brand font-medium">{sessionUser.email}</p>
             </div>
           )}
 
@@ -174,20 +141,6 @@ export default function EndUserForm() {
                 placeholder="Enter your last name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="glass-input w-full p-4"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                🏢 Organisation Name
-              </label>
-              <input
-                type="text"
-                placeholder="Enter your organisation name"
-                value={orgName}
-                onChange={(e) => setOrgName(e.target.value)}
                 className="glass-input w-full p-4"
                 required
               />
