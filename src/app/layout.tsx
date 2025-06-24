@@ -14,14 +14,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [loggedIn, setLoggedIn] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const [accountOpen, setAccountOpen] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
-  const [batchesOpen, setBatchesOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const accountRef = useRef<HTMLDivElement>(null);
-  const configRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const schedulingRef = useRef<HTMLDivElement>(null);
   const batchesRef = useRef<HTMLDivElement>(null);
   const monitoringRef = useRef<HTMLDivElement>(null);
+  const adminRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -34,10 +32,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     function handleClickOutside(event: MouseEvent) {
       if (
-        accountRef.current && !accountRef.current.contains(event.target as Node) &&
-        configRef.current && !configRef.current.contains(event.target as Node) &&
+        profileRef.current && !profileRef.current.contains(event.target as Node) &&
+        schedulingRef.current && !schedulingRef.current.contains(event.target as Node) &&
         batchesRef.current && !batchesRef.current.contains(event.target as Node) &&
-        monitoringRef.current && !monitoringRef.current.contains(event.target as Node)
+        monitoringRef.current && !monitoringRef.current.contains(event.target as Node) &&
+        adminRef.current && !adminRef.current.contains(event.target as Node)
       ) {
         setOpenDropdown(null);
       }
@@ -70,40 +69,44 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             ) : (
               <>
                 <Link href="/dashboard" className="hover:text-green-400">Dashboard</Link>
-                <Link href="/packages" className="hover:text-green-400">Packages</Link>
-                {/* Account Dropdown */}
-                <div ref={accountRef} className="relative">
+                
+                {/* Profile Dropdown */}
+                <div ref={profileRef} className="relative">
                   <button
                     className="hover:text-green-400"
-                    onClick={() => setOpenDropdown(openDropdown === 'account' ? null : 'account')}
+                    onClick={() => setOpenDropdown(openDropdown === 'profile' ? null : 'profile')}
                   >
-                    Account ▾
+                    Profile ▾
                   </button>
-                  {openDropdown === 'account' && (
-                    <div className="absolute left-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
-                      <Link href="/end_user_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Profile</Link>
-                      <Link href="/organisation_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Organization</Link>
-                      <Link href="/invoice_confirmation" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Invoice</Link>
-                    </div>
-                  )}
-                </div>
-                {/* Configuration Dropdown */}
-                <div ref={configRef} className="relative">
-                  <button
-                    className="hover:text-green-400"
-                    onClick={() => setOpenDropdown(openDropdown === 'config' ? null : 'config')}
-                  >
-                    Configuration ▾
-                  </button>
-                  {openDropdown === 'config' && (
+                  {openDropdown === 'profile' && (
                     <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/end_user_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>User Profile</Link>
+                      <Link href="/organisation_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Organisation</Link>
                       <Link href="/client_brands_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Brand Management</Link>
-                      <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Personas</Link>
-                      <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Configure AI</Link>
                       <Link href="/client_products" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Product Management</Link>
+                      <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Persona Management</Link>
+                      <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Configure AI</Link>
                     </div>
                   )}
                 </div>
+                
+                {/* Scheduling Dropdown */}
+                <div ref={schedulingRef} className="relative">
+                  <button
+                    className="hover:text-green-400"
+                    onClick={() => setOpenDropdown(openDropdown === 'scheduling' ? null : 'scheduling')}
+                  >
+                    Scheduling ▾
+                  </button>
+                  {openDropdown === 'scheduling' && (
+                    <div className="absolute left-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/packages" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Select Package</Link>
+                      <Link href="/invoice_confirmation" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Invoices</Link>
+                      <Link href="/schedule" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Schedule</Link>
+                    </div>
+                  )}
+                </div>
+                
                 {/* Batches Dropdown */}
                 <div ref={batchesRef} className="relative">
                   <button
@@ -113,15 +116,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     Batches ▾
                   </button>
                   {openDropdown === 'batches' && (
-                    <div className="absolute left-0 mt-2 w-56 bg-white text-black rounded shadow-lg z-50">
-                      <Link href="/schedule" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Schedule</Link>
+                    <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
                       <Link href="/review-questions" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Questions</Link>
                       <Link href="/review-answers" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Answers</Link>
-                      <Link href="/faq-batches" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Batches</Link>
                       <Link href="/faq-pairs" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Pairs</Link>
                     </div>
                   )}
                 </div>
+                
                 {/* Monitoring Dropdown */}
                 <div ref={monitoringRef} className="relative">
                   <button
@@ -137,6 +139,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     </div>
                   )}
                 </div>
+                
+                {/* Admin Dropdown */}
+                <div ref={adminRef} className="relative">
+                  <button
+                    className="hover:text-green-400"
+                    onClick={() => setOpenDropdown(openDropdown === 'admin' ? null : 'admin')}
+                  >
+                    Admin ▾
+                  </button>
+                  {openDropdown === 'admin' && (
+                    <div className="absolute left-0 mt-2 w-56 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/faq-batches" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Batches</Link>
+                      <Link href="/llm-discovery-construction" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>LLM Discovery Construction</Link>
+                      <Link href="/llm-discovery" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>LLM Discovery System</Link>
+                    </div>
+                  )}
+                </div>
+                
                 <button onClick={handleLogout} className="hover:text-red-400">Log Out</button>
               </>
             )}
