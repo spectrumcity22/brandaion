@@ -278,6 +278,9 @@ export default function LLMDiscoveryConstruction() {
 
       if (faqError) throw faqError;
 
+      console.log('FAQ Batches found:', faqBatches?.length || 0);
+      console.log('FAQ Batches data:', faqBatches);
+
       updateStep('populate_faq', { progress: 30 });
 
       if (!faqBatches || faqBatches.length === 0) {
@@ -290,11 +293,10 @@ export default function LLMDiscoveryConstruction() {
       }
 
       // Get organization and brand data for context
-      const { data: org, error: orgError } = await supabase
+      const { data: orgs, error: orgError } = await supabase
         .from('client_organisation')
         .select('id, organisation_jsonld_object')
-        .eq('auth_user_id', user.id)
-        .single();
+        .eq('auth_user_id', user.id);
 
       if (orgError) throw orgError;
 
@@ -325,23 +327,27 @@ export default function LLMDiscoveryConstruction() {
       // Process each batch
       let processedCount = 0;
       let errorCount = 0;
+      const errors: string[] = [];
 
       for (const batch of faqBatches) {
         try {
           const weekStart = new Date(batch.created_at);
           weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week
 
+          // Use first organization if available, otherwise null
+          const org = orgs && orgs.length > 0 ? orgs[0] : null;
+
           const { error: insertError } = await supabase
             .from('llm_discovery_faq_objects')
             .upsert({
               batch_faq_pairs_id: batch.id,
               auth_user_id: user.id,
-              client_organisation_id: org?.id,
+              client_organisation_id: org?.id || null,
               brand_id: brands && brands.length > 0 ? brands[0]?.id : null,
               product_id: null, // Will need to be linked properly in future
               week_start_date: weekStart.toISOString().split('T')[0],
               faq_json_object: batch.faq_pairs_object,
-              organization_jsonld: safeJsonParse(org?.organisation_jsonld_object),
+              organization_jsonld: org ? safeJsonParse(org.organisation_jsonld_object) : null,
               brand_jsonld: brands && brands.length > 0 ? safeJsonParse(brands[0]?.brand_jsonld_object) : null,
               product_jsonld: null,
               last_generated: new Date().toISOString()
@@ -353,9 +359,12 @@ export default function LLMDiscoveryConstruction() {
             processedCount++;
           } else {
             errorCount++;
+            errors.push(`Batch ${batch.id}: ${insertError.message}`);
           }
         } catch (batchError) {
           errorCount++;
+          const errorMsg = batchError instanceof Error ? batchError.message : 'Unknown error';
+          errors.push(`Batch ${batch.id}: ${errorMsg}`);
           console.error(`Error processing batch ${batch.id}:`, batchError);
         }
       }
@@ -366,7 +375,8 @@ export default function LLMDiscoveryConstruction() {
         result: { 
           batches_processed: processedCount,
           batches_with_errors: errorCount,
-          total_batches: faqBatches.length
+          total_batches: faqBatches.length,
+          errors: errors.length > 0 ? errors.slice(0, 3) : undefined // Show first 3 errors
         }
       });
 
