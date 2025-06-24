@@ -510,17 +510,6 @@ export default function ClientProducts() {
                             </a>
                           </div>
                         )}
-                        <div className="pt-2 border-t border-gray-600/30">
-                          <button
-                            onClick={() => router.push('/client_product_persona_form')}
-                            className="text-purple-400 hover:text-purple-300 text-xs transition-colors flex items-center"
-                          >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            Manage Personas
-                          </button>
-                        </div>
                       </div>
                     </div>
                   ))}
@@ -548,6 +537,15 @@ export default function ClientProducts() {
             </button>
           </div>
         )}
+
+        <div className="flex justify-end mt-8">
+          <button
+            onClick={() => router.push('/client_product_persona_form')}
+            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
+          >
+            + Create Persona (Next Step)
+          </button>
+        </div>
       </div>
     </div>
   );
