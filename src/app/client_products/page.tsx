@@ -146,8 +146,7 @@ export default function ClientProducts() {
             description: formData.description || '',
             keywords: formData.keywords || '',
             url: formData.url || '',
-            category: formData.category || '',
-            market_name: formData.market_name || ''
+            category: formData.category || ''
           })
           .eq('id', editingProduct.id)
           .select()
@@ -169,8 +168,7 @@ export default function ClientProducts() {
             description: formData.description || '',
             keywords: formData.keywords || '',
             url: formData.url || '',
-            category: formData.category || '',
-            market_name: formData.market_name || ''
+            category: formData.category || ''
           })
           .select()
           .single();
