@@ -4,11 +4,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    const { slug } = params;
+    const { slug } = await params;
     
     // Get the file type from the URL path
     const url = new URL(request.url);
@@ -128,11 +128,11 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies });
-    const { slug } = params;
+    const { slug } = await params;
     
     // Get the file type from the URL path
     const url = new URL(request.url);
