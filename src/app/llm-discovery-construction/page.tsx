@@ -198,10 +198,25 @@ export default function LLMDiscoveryConstruction() {
 
       updateStep('populate_static', { progress: 70 });
 
+      // Helper function to safely parse JSON
+      const safeJsonParse = (data: any) => {
+        if (!data) return null;
+        if (typeof data === 'object') return data;
+        if (typeof data === 'string') {
+          try {
+            return JSON.parse(data);
+          } catch (error) {
+            console.warn('Failed to parse JSON string:', error);
+            return null;
+          }
+        }
+        return null;
+      };
+
       // Prepare JSON-LD data
-      const organizationJsonld = org?.organisation_jsonld_object || null;
-      const brandJsonld = brands && brands.length > 0 ? brands[0]?.brand_jsonld_object : null;
-      const productJsonld = products && products.length > 0 ? products[0]?.schema_json : null;
+      const organizationJsonld = safeJsonParse(org?.organisation_jsonld_object);
+      const brandJsonld = brands && brands.length > 0 ? safeJsonParse(brands[0]?.brand_jsonld_object) : null;
+      const productJsonld = products && products.length > 0 ? safeJsonParse(products[0]?.schema_json) : null;
 
       // Insert or update static discovery object
       const { error: upsertError } = await supabase
@@ -292,6 +307,21 @@ export default function LLMDiscoveryConstruction() {
 
       updateStep('populate_faq', { progress: 50 });
 
+      // Helper function to safely parse JSON
+      const safeJsonParse = (data: any) => {
+        if (!data) return null;
+        if (typeof data === 'object') return data;
+        if (typeof data === 'string') {
+          try {
+            return JSON.parse(data);
+          } catch (error) {
+            console.warn('Failed to parse JSON string:', error);
+            return null;
+          }
+        }
+        return null;
+      };
+
       // Process each batch
       let processedCount = 0;
       let errorCount = 0;
@@ -311,8 +341,8 @@ export default function LLMDiscoveryConstruction() {
               product_id: null, // Will need to be linked properly in future
               week_start_date: weekStart.toISOString().split('T')[0],
               faq_json_object: batch.faq_pairs_object,
-              organization_jsonld: org?.organisation_jsonld_object,
-              brand_jsonld: brands && brands.length > 0 ? brands[0]?.brand_jsonld_object : null,
+              organization_jsonld: safeJsonParse(org?.organisation_jsonld_object),
+              brand_jsonld: brands && brands.length > 0 ? safeJsonParse(brands[0]?.brand_jsonld_object) : null,
               product_jsonld: null,
               last_generated: new Date().toISOString()
             }, {
