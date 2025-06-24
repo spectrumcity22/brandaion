@@ -44,6 +44,16 @@ interface DiscoveryStats {
   recent_updates: (DiscoveryObject | FAQObject)[];
 }
 
+interface DirectoryItem {
+  name: string;
+  type: 'file' | 'folder';
+  path: string;
+  jsonData?: any;
+  children?: DirectoryItem[];
+  icon: string;
+  color: string;
+}
+
 export default function LLMDiscoveryDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<DiscoveryStats | null>(null);
@@ -52,10 +62,210 @@ export default function LLMDiscoveryDashboard() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [regenerationResults, setRegenerationResults] = useState<any>(null);
+  const [directoryStructure, setDirectoryStructure] = useState<DirectoryItem[]>([]);
+  const [hoveredItem, setHoveredItem] = useState<DirectoryItem | null>(null);
+  const [showDirectoryPanel, setShowDirectoryPanel] = useState(false);
 
   useEffect(() => {
     loadStats();
   }, []);
+
+  const generateDirectoryStructure = (staticObjects: DiscoveryObject[], faqObjects: FAQObject[]) => {
+    const structure: DirectoryItem[] = [
+      {
+        name: 'data',
+        type: 'folder',
+        path: '/data',
+        icon: '📁',
+        color: 'text-blue-400',
+        children: [
+          {
+            name: 'platform-llms.txt',
+            type: 'file',
+            path: '/data/platform-llms.txt',
+            icon: '📄',
+            color: 'text-green-400',
+            jsonData: {
+              description: 'Platform-level LLM discovery index',
+              content: 'Contains all available LLM providers and their capabilities',
+              last_updated: new Date().toISOString()
+            }
+          },
+          {
+            name: 'organizations',
+            type: 'folder',
+            path: '/data/organizations',
+            icon: '🏢',
+            color: 'text-purple-400',
+            children: []
+          }
+        ]
+      }
+    ];
+
+    // Add organization data
+    if (staticObjects && staticObjects.length > 0) {
+      const org = staticObjects[0]; // Use first organization
+      const orgName = org.organization_jsonld?.name || 'organization';
+      const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      
+      const orgFolder: DirectoryItem = {
+        name: orgSlug,
+        type: 'folder',
+        path: `/data/organizations/${orgSlug}`,
+        icon: '🏢',
+        color: 'text-purple-400',
+        children: [
+          {
+            name: 'organization-llms.txt',
+            type: 'file',
+            path: `/data/organizations/${orgSlug}/organization-llms.txt`,
+            icon: '📄',
+            color: 'text-green-400',
+            jsonData: {
+              description: 'Organization-specific LLM discovery index',
+              organization: orgName,
+              last_updated: org.last_generated
+            }
+          },
+          {
+            name: 'organization.jsonld',
+            type: 'file',
+            path: `/data/organizations/${orgSlug}/organization.jsonld`,
+            icon: '🔗',
+            color: 'text-yellow-400',
+            jsonData: org.organization_jsonld || {
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": orgName,
+              "description": "Organization JSON-LD data"
+            }
+          },
+          {
+            name: 'brands',
+            type: 'folder',
+            path: `/data/organizations/${orgSlug}/brands`,
+            icon: '🏷️',
+            color: 'text-orange-400',
+            children: []
+          }
+        ]
+      };
+
+      // Add brand data if available
+      if (org.brand_jsonld) {
+        const brandName = org.brand_jsonld.name || 'brand-1';
+        const brandSlug = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        
+        const brandFolder: DirectoryItem = {
+          name: brandSlug,
+          type: 'folder',
+          path: `/data/organizations/${orgSlug}/brands/${brandSlug}`,
+          icon: '🏷️',
+          color: 'text-orange-400',
+          children: [
+            {
+              name: 'brands-llms.txt',
+              type: 'file',
+              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brands-llms.txt`,
+              icon: '📄',
+              color: 'text-green-400',
+              jsonData: {
+                description: 'Brand-specific LLM discovery index',
+                brand: brandName,
+                last_updated: org.last_generated
+              }
+            },
+            {
+              name: 'brand.jsonld',
+              type: 'file',
+              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brand.jsonld`,
+              icon: '🔗',
+              color: 'text-yellow-400',
+              jsonData: org.brand_jsonld
+            },
+            {
+              name: 'products',
+              type: 'folder',
+              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products`,
+              icon: '📦',
+              color: 'text-red-400',
+              children: []
+            }
+          ]
+        };
+
+        // Add product data if available
+        if (org.product_jsonld) {
+          const productName = org.product_jsonld.name || 'product-1';
+          const productSlug = productName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+          
+          const productFolder: DirectoryItem = {
+            name: productSlug,
+            type: 'folder',
+            path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}`,
+            icon: '📦',
+            color: 'text-red-400',
+            children: [
+              {
+                name: 'products-llms.txt',
+                type: 'file',
+                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/products-llms.txt`,
+                icon: '📄',
+                color: 'text-green-400',
+                jsonData: {
+                  description: 'Product-specific LLM discovery index',
+                  product: productName,
+                  last_updated: org.last_generated
+                }
+              },
+              {
+                name: 'product.jsonld',
+                type: 'file',
+                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/product.jsonld`,
+                icon: '🔗',
+                color: 'text-yellow-400',
+                jsonData: org.product_jsonld
+              },
+              {
+                name: 'faqs',
+                type: 'folder',
+                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs`,
+                icon: '❓',
+                color: 'text-cyan-400',
+                children: []
+              }
+            ]
+          };
+
+          // Add FAQ data if available
+          if (faqObjects && faqObjects.length > 0) {
+            const faqFile: DirectoryItem = {
+              name: 'faq.jsonld',
+              type: 'file',
+              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs/faq.jsonld`,
+              icon: '🔗',
+              color: 'text-yellow-400',
+              jsonData: faqObjects[0].faq_json_object || {
+                description: 'FAQ data for this product',
+                faq_count: faqObjects.length,
+                last_updated: faqObjects[0].last_generated
+              }
+            };
+            productFolder.children!.push(faqFile);
+          }
+
+          brandFolder.children!.push(productFolder);
+        }
+
+        orgFolder.children!.push(brandFolder);
+      }
+
+      structure[0].children![1].children!.push(orgFolder);
+    }
+
+    return structure;
+  };
 
   const loadStats = async () => {
     try {
@@ -97,6 +307,10 @@ export default function LLMDiscoveryDashboard() {
       };
 
       setStats(stats);
+
+      // Generate directory structure
+      const directoryStructure = generateDirectoryStructure(staticObjects || [], faqObjects || []);
+      setDirectoryStructure(directoryStructure);
 
     } catch (err) {
       console.error('Error loading stats:', err);
@@ -170,6 +384,56 @@ export default function LLMDiscoveryDashboard() {
       'faq': 'bg-green-500/20 text-green-400',
     };
     return colors[type] || 'bg-gray-500/20 text-gray-400';
+  };
+
+  const renderDirectoryTree = (items: DirectoryItem[], level: number = 0) => {
+    return items.map((item, index) => (
+      <div key={item.path} className="relative">
+        <div
+          className={`flex items-center py-1 px-2 rounded cursor-pointer transition-colors ${
+            hoveredItem?.path === item.path 
+              ? 'bg-gray-700/50' 
+              : 'hover:bg-gray-700/30'
+          }`}
+          style={{ paddingLeft: `${level * 20 + 8}px` }}
+          onMouseEnter={() => setHoveredItem(item)}
+          onMouseLeave={() => setHoveredItem(null)}
+        >
+          <span className={`mr-2 ${item.color}`}>{item.icon}</span>
+          <span className="text-gray-300 font-mono text-sm">{item.name}</span>
+          {item.type === 'folder' && (
+            <span className="ml-2 text-gray-500 text-xs">/</span>
+          )}
+        </div>
+        
+        {item.children && item.children.length > 0 && (
+          <div className="ml-4">
+            {renderDirectoryTree(item.children, level + 1)}
+          </div>
+        )}
+      </div>
+    ));
+  };
+
+  const renderJSONPreview = () => {
+    if (!hoveredItem || !hoveredItem.jsonData) return null;
+
+    return (
+      <div className="absolute right-0 top-0 w-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-white font-semibold text-sm">{hoveredItem.name}</h4>
+          <span className="text-gray-400 text-xs">{hoveredItem.type}</span>
+        </div>
+        <div className="bg-gray-800 rounded p-3 max-h-64 overflow-y-auto">
+          <pre className="text-xs text-gray-300 whitespace-pre-wrap">
+            {JSON.stringify(hoveredItem.jsonData, null, 2)}
+          </pre>
+        </div>
+        <div className="mt-2 text-xs text-gray-400">
+          Path: {hoveredItem.path}
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -267,6 +531,31 @@ export default function LLMDiscoveryDashboard() {
             </div>
           </div>
         )}
+
+        {/* Directory Structure Panel */}
+        <div className="mb-8 bg-gray-800/50 border border-gray-700 rounded-lg p-6 relative">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-white">📁 Directory Structure Mockup</h3>
+            <button
+              onClick={() => setShowDirectoryPanel(!showDirectoryPanel)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              {showDirectoryPanel ? 'Hide' : 'Show'} Panel
+            </button>
+          </div>
+          
+          {showDirectoryPanel && (
+            <div className="relative">
+              <div className="bg-gray-900/50 border border-gray-600 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <div className="text-sm text-gray-400 mb-3">
+                  Hover over items to view JSON data
+                </div>
+                {renderDirectoryTree(directoryStructure)}
+              </div>
+              {renderJSONPreview()}
+            </div>
+          )}
+        </div>
 
         {/* Recent Updates */}
         {stats && stats.recent_updates.length > 0 && (
