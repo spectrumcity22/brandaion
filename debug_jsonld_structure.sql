@@ -6,21 +6,21 @@ SELECT
     'client_organisation' as table_name,
     COUNT(*) as total_records,
     COUNT(CASE WHEN organisation_jsonld_object IS NOT NULL THEN 1 END) as with_jsonld,
-    COUNT(CASE WHEN organisation_jsonld_object IS NOT NULL AND jsonb_typeof(organisation_jsonld_object) = 'object' THEN 1 END) as valid_jsonld
+    COUNT(CASE WHEN organisation_jsonld_object IS NOT NULL AND organisation_jsonld_object::jsonb IS NOT NULL THEN 1 END) as valid_jsonld
 FROM client_organisation;
 
 SELECT 
     'brands' as table_name,
     COUNT(*) as total_records,
     COUNT(CASE WHEN brand_jsonld_object IS NOT NULL THEN 1 END) as with_jsonld,
-    COUNT(CASE WHEN brand_jsonld_object IS NOT NULL AND jsonb_typeof(brand_jsonld_object) = 'object' THEN 1 END) as valid_jsonld
+    COUNT(CASE WHEN brand_jsonld_object IS NOT NULL AND brand_jsonld_object::jsonb IS NOT NULL THEN 1 END) as valid_jsonld
 FROM brands;
 
 SELECT 
     'products' as table_name,
     COUNT(*) as total_records,
     COUNT(CASE WHEN schema_json IS NOT NULL THEN 1 END) as with_jsonld,
-    COUNT(CASE WHEN schema_json IS NOT NULL AND jsonb_typeof(schema_json) = 'object' THEN 1 END) as valid_jsonld
+    COUNT(CASE WHEN schema_json IS NOT NULL AND schema_json::jsonb IS NOT NULL THEN 1 END) as valid_jsonld
 FROM products;
 
 -- 2. Show sample data from source tables
@@ -30,7 +30,11 @@ SELECT
     organisation_name,
     organisation_jsonld_object,
     CASE 
-        WHEN organisation_jsonld_object IS NOT NULL THEN jsonb_typeof(organisation_jsonld_object)
+        WHEN organisation_jsonld_object IS NOT NULL THEN 
+            CASE 
+                WHEN organisation_jsonld_object::jsonb IS NOT NULL THEN 'valid_jsonb'
+                ELSE 'invalid_jsonb'
+            END
         ELSE 'NULL'
     END as jsonld_type
 FROM client_organisation 
@@ -43,7 +47,11 @@ SELECT
     brand_name,
     brand_jsonld_object,
     CASE 
-        WHEN brand_jsonld_object IS NOT NULL THEN jsonb_typeof(brand_jsonld_object)
+        WHEN brand_jsonld_object IS NOT NULL THEN 
+            CASE 
+                WHEN brand_jsonld_object::jsonb IS NOT NULL THEN 'valid_jsonb'
+                ELSE 'invalid_jsonb'
+            END
         ELSE 'NULL'
     END as jsonld_type
 FROM brands 
@@ -56,7 +64,11 @@ SELECT
     product_name,
     schema_json,
     CASE 
-        WHEN schema_json IS NOT NULL THEN jsonb_typeof(schema_json)
+        WHEN schema_json IS NOT NULL THEN 
+            CASE 
+                WHEN schema_json::jsonb IS NOT NULL THEN 'valid_jsonb'
+                ELSE 'invalid_jsonb'
+            END
         ELSE 'NULL'
     END as jsonld_type
 FROM products 
@@ -112,7 +124,22 @@ WHERE table_name = 'llm_discovery_static' AND column_name = 'organization_jsonld
 -- 6. Check for any string vs JSONB conversion issues
 SELECT 
     'String vs JSONB Check' as check_type,
-    COUNT(CASE WHEN organisation_jsonld_object IS NOT NULL AND jsonb_typeof(organisation_jsonld_object) = 'string' THEN 1 END) as string_jsonld,
-    COUNT(CASE WHEN organisation_jsonld_object IS NOT NULL AND jsonb_typeof(organisation_jsonld_object) = 'object' THEN 1 END) as object_jsonld
+    COUNT(CASE WHEN organisation_jsonld_object IS NOT NULL AND organisation_jsonld_object::jsonb IS NULL THEN 1 END) as invalid_jsonld,
+    COUNT(CASE WHEN organisation_jsonld_object IS NOT NULL AND organisation_jsonld_object::jsonb IS NOT NULL THEN 1 END) as valid_jsonld
 FROM client_organisation
-WHERE organisation_jsonld_object IS NOT NULL; 
+WHERE organisation_jsonld_object IS NOT NULL;
+
+-- 7. Show actual content of problematic JSON-LD data
+SELECT 
+    'Problematic JSON-LD Content' as check_type,
+    id,
+    organisation_name,
+    LEFT(organisation_jsonld_object, 100) as jsonld_preview,
+    CASE 
+        WHEN organisation_jsonld_object::jsonb IS NULL THEN 'Invalid JSON'
+        ELSE 'Valid JSON'
+    END as status
+FROM client_organisation 
+WHERE organisation_jsonld_object IS NOT NULL
+  AND organisation_jsonld_object::jsonb IS NULL
+LIMIT 5; 

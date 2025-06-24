@@ -102,8 +102,8 @@ LEFT JOIN llm_discovery_faq_objects f ON s.auth_user_id = f.auth_user_id;
 -- 8. Verify JSON-LD structure quality
 SELECT 
     'JSON-LD Quality Check' as check_type,
-    COUNT(CASE WHEN jsonb_typeof(organization_jsonld) = 'object' THEN 1 END) as valid_org_jsonld,
-    COUNT(CASE WHEN jsonb_typeof(brand_jsonld) = 'object' THEN 1 END) as valid_brand_jsonld,
-    COUNT(CASE WHEN jsonb_typeof(product_jsonld) = 'object' THEN 1 END) as valid_product_jsonld
+    COUNT(CASE WHEN organization_jsonld IS NOT NULL AND jsonb_typeof(organization_jsonld) = 'object' THEN 1 END) as valid_org_jsonld,
+    COUNT(CASE WHEN brand_jsonld IS NOT NULL AND jsonb_typeof(brand_jsonld) = 'object' THEN 1 END) as valid_brand_jsonld,
+    COUNT(CASE WHEN product_jsonld IS NOT NULL AND jsonb_typeof(product_jsonld) = 'object' THEN 1 END) as valid_product_jsonld
 FROM llm_discovery_static
 WHERE organization_jsonld IS NOT NULL OR brand_jsonld IS NOT NULL OR product_jsonld IS NOT NULL; 
