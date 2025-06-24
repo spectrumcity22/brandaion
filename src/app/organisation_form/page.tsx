@@ -50,7 +50,7 @@ export default function OrganisationForm() {
       }
       setSessionUser(user);
 
-      // Get organization details (if they exist)
+      // Check if organization already exists (for existing users)
       const { data: org, error } = await supabase
         .from('client_organisation')
         .select('id, organisation_name')
@@ -58,12 +58,11 @@ export default function OrganisationForm() {
         .maybeSingle();
 
       if (!error && org) {
+        // Existing organization - populate form for editing
         setOrgId(org.id);
         setOrgName(org.organisation_name);
-      } else {
-        // No organization exists yet - this is fine for new users
-        console.log('No existing organization found - will create new one');
       }
+      // If no organization exists, form will be empty for new organization creation
 
       // Load reference data
       await Promise.all([
@@ -98,7 +97,15 @@ export default function OrganisationForm() {
   };
 
   const handleSubmit = async () => {
-    if (!orgName || !orgUrl || !linkedinUrl || !industry || !subcategory || !headquarters) {
+    if (isSubmitting) return;
+
+    // Validate required fields
+    if (!orgId && !orgName?.trim()) {
+      setMessage('❌ Organisation name is required');
+      return;
+    }
+
+    if (!orgUrl || !linkedinUrl || !industry || !subcategory || !headquarters) {
       setMessage('Please fill in all fields.');
       return;
     }
@@ -221,16 +228,27 @@ export default function OrganisationForm() {
         </div>
 
         <div className="glass-card p-8">
-          {orgName ? (
+          {orgId ? (
+            // Existing organization - show current name
             <div className="mb-6 p-4 glass-card text-center">
               <div className="text-2xl mb-2">📛</div>
               <h2 className="text-xl font-semibold mb-1">{orgName}</h2>
               <p className="text-gray-400 text-sm">Organisation Ready for Configuration</p>
             </div>
           ) : (
-            <div className="mb-6 p-4 glass-card text-center">
-              <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-gray-400">🔄 Loading organisation...</p>
+            // New organization - show input field
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                🏢 Organisation Name
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your organisation name"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                className="glass-input w-full p-4"
+                required
+              />
             </div>
           )}
 
@@ -343,10 +361,10 @@ export default function OrganisationForm() {
               {isSubmitting ? (
                 <div className="flex items-center justify-center">
                   <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Updating Organisation...
+                  {orgId ? 'Updating Organisation...' : 'Creating Organisation...'}
                 </div>
               ) : (
-                '✨ Update Organisation'
+                `✨ ${orgId ? 'Update' : 'Create'} Organisation`
               )}
             </button>
             
