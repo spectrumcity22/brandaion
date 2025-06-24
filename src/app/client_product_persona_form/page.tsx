@@ -135,12 +135,14 @@ export default function ClientProductPersonaForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setMessage('Saving...');
+    setMessage('Saving persona...');
+    
     if (!sessionUser) {
       setMessage('Please log in.');
       setIsSubmitting(false);
       return;
     }
+    
     const { error } = await supabase
       .from('client_product_persona')
       .insert({
@@ -148,12 +150,18 @@ export default function ClientProductPersonaForm() {
         organisation_name: organisationName,
         ...form
       });
+    
     if (error) {
       setMessage('❌ Error saving persona: ' + error.message);
+      setIsSubmitting(false);
     } else {
-      setMessage('✅ Persona saved successfully!');
+      setMessage('✅ Persona saved successfully! Redirecting to next step...');
+      
+      // Redirect to the next step after 2 seconds
+      setTimeout(() => {
+        router.push('/client_products');
+      }, 2000);
     }
-    setIsSubmitting(false);
   };
 
   return (
