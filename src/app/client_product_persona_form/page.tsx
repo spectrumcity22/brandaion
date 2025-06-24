@@ -157,9 +157,9 @@ export default function ClientProductPersonaForm() {
     } else {
       setMessage('✅ Persona saved successfully! Redirecting to next step...');
       
-      // Redirect to the next step after 2 seconds
+      // Redirect to schedule page (next step in the flow)
       setTimeout(() => {
-        router.push('/client_products');
+        router.push('/schedule');
       }, 2000);
     }
   };
