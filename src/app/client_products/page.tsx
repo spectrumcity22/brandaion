@@ -13,7 +13,6 @@ interface Product {
   auth_user_id: string;
   user_email: string;
   organisation: string;
-  market_name: string;
   product_name: string;
   description: string;
   keywords: string;
@@ -31,18 +30,12 @@ interface Brand {
   auth_user_id: string;
 }
 
-interface MarketOption {
-  id: string;
-  name: string;
-}
-
 export default function ClientProducts() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [markets, setMarkets] = useState<MarketOption[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState<Partial<Product>>({});
@@ -79,12 +72,6 @@ export default function ClientProducts() {
         .select('*')
         .eq('auth_user_id', user.id);
       setBrands(brandsData || []);
-
-      // Fetch markets for dropdown
-      const { data: marketData } = await supabase
-        .from('markets')
-        .select('id, name');
-      if (marketData) setMarkets(marketData);
 
       setLoading(false);
     } catch (err) {
@@ -218,27 +205,21 @@ export default function ClientProducts() {
 
   const handleNewProduct = () => {
     setEditingProduct(null);
-    
-    // If user has existing products, clone the first one's organizational data
     if (products.length > 0) {
       const firstProduct = products[0];
       setFormData({
         user_email: firstProduct.user_email,
         organisation: firstProduct.organisation,
         brand_id: firstProduct.brand_id,
-        // Clear user-editable fields
         product_name: '',
         description: '',
         keywords: '',
         url: '',
-        category: '',
-        market_name: ''
+        category: ''
       });
     } else {
-      // No existing products, start with empty form
       setFormData({});
     }
-    
     setShowForm(true);
   };
 
@@ -386,21 +367,6 @@ export default function ClientProducts() {
                   </div>
 
                   <div>
-                    <label className="block text-gray-300 mb-2 font-medium">Market</label>
-                    <select 
-                      name="market_name" 
-                      className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                      value={formData.market_name || ''} 
-                      onChange={handleChange}
-                    >
-                      <option value="">Select Market</option>
-                      {markets.map((m) => (
-                        <option key={m.id} value={m.name}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
                     <label className="block text-gray-300 mb-2 font-medium">Product Name</label>
                     <input 
                       name="product_name" 
@@ -537,17 +503,6 @@ export default function ClientProducts() {
                       </div>
                       
                       <div className="space-y-2 text-sm">
-                        {product.market_name && (
-                          <div className="flex items-center text-gray-300">
-                            <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                            {product.market_name}
-                          </div>
-                        )}
-                        {product.category && (
-                          <div className="text-gray-400">
-                            Category: {product.category}
-                          </div>
-                        )}
                         {product.url && (
                           <div className="text-gray-400 truncate">
                             <a href={product.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors">
