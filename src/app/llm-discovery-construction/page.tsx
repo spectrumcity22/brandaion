@@ -129,7 +129,7 @@ export default function LLMDiscoveryConstruction() {
       // Scan batch_faq_pairs
       const { data: faqBatches } = await supabase
         .from('batch_faq_pairs')
-        .select('id, faq_pairs_json')
+        .select('id, faq_pairs_object')
         .eq('auth_user_id', user.id);
 
       updateStep('scan', { progress: 90 });
@@ -140,7 +140,7 @@ export default function LLMDiscoveryConstruction() {
         clients_with_brand_jsonld: brands?.filter(brand => brand.brand_jsonld_object)?.length || 0,
         clients_with_product_jsonld: products?.filter(product => product.schema_json)?.length || 0,
         total_faq_batches: faqBatches?.length || 0,
-        batches_with_jsonld: faqBatches?.filter(batch => batch.faq_pairs_json)?.length || 0
+        batches_with_jsonld: faqBatches?.filter(batch => batch.faq_pairs_object)?.length || 0
       };
 
       setScanResult(result);
@@ -254,12 +254,12 @@ export default function LLMDiscoveryConstruction() {
         .from('batch_faq_pairs')
         .select(`
           id,
-          faq_pairs_json,
-          inserted_at,
+          faq_pairs_object,
+          created_at,
           auth_user_id
         `)
         .eq('auth_user_id', user.id)
-        .not('faq_pairs_json', 'is', null);
+        .not('faq_pairs_object', 'is', null);
 
       if (faqError) throw faqError;
 
@@ -298,7 +298,7 @@ export default function LLMDiscoveryConstruction() {
 
       for (const batch of faqBatches) {
         try {
-          const weekStart = new Date(batch.inserted_at);
+          const weekStart = new Date(batch.created_at);
           weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week
 
           const { error: insertError } = await supabase
@@ -310,7 +310,7 @@ export default function LLMDiscoveryConstruction() {
               brand_id: brands && brands.length > 0 ? brands[0]?.id : null,
               product_id: null, // Will need to be linked properly in future
               week_start_date: weekStart.toISOString().split('T')[0],
-              faq_json_object: batch.faq_pairs_json,
+              faq_json_object: batch.faq_pairs_object,
               organization_jsonld: org?.organisation_jsonld_object,
               brand_jsonld: brands && brands.length > 0 ? brands[0]?.brand_jsonld_object : null,
               product_jsonld: null,
