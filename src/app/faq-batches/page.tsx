@@ -11,14 +11,11 @@ const supabase = createBrowserClient(
 interface FAQBatch {
   id: string;
   unique_batch_id: string;
-  unique_batch_cluster: string;
   batch_date: string;
   organisation: string;
-  brand: string;
-  product: string;
-  audience: string;
-  faq_count_in_batch: number;
+  product_name: string;
   faq_pairs_object: any;
+  batch_status: string;
   created_at: string;
   updated_at: string;
 }
@@ -136,13 +133,13 @@ export default function FAQBatches() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
                       <h3 className="text-lg font-semibold text-white mb-2">
-                        {batch.product} - {batch.brand}
+                        {batch.product_name} - {batch.faq_pairs_object?.brand || 'N/A'}
                       </h3>
                       <p className="text-gray-300 text-sm">
                         <span className="font-medium">Organisation:</span> {batch.organisation}
                       </p>
                       <p className="text-gray-300 text-sm">
-                        <span className="font-medium">Audience:</span> {batch.audience}
+                        <span className="font-medium">Audience:</span> {batch.faq_pairs_object?.audience || 'N/A'}
                       </p>
                     </div>
                     
@@ -151,10 +148,10 @@ export default function FAQBatches() {
                         <span className="font-medium">Batch ID:</span> {batch.unique_batch_id}
                       </p>
                       <p className="text-gray-300 text-sm">
-                        <span className="font-medium">Cluster:</span> {batch.unique_batch_cluster}
+                        <span className="font-medium">Cluster:</span> {batch.faq_pairs_object?.batchNo || 'N/A'}
                       </p>
                       <p className="text-gray-300 text-sm">
-                        <span className="font-medium">FAQ Count:</span> {batch.faq_count_in_batch}
+                        <span className="font-medium">FAQ Count:</span> {batch.faq_pairs_object?.faqCountInBatch || 'N/A'}
                       </p>
                     </div>
                     
@@ -166,8 +163,12 @@ export default function FAQBatches() {
                         <span className="font-medium">Updated:</span> {formatTime(batch.updated_at)}
                       </p>
                       <div className="mt-2">
-                        <span className="inline-block bg-green-600 text-white px-2 py-1 rounded text-xs">
-                          ✓ Processed
+                        <span className={`inline-block px-2 py-1 rounded text-xs ${
+                          batch.batch_status === 'batch_published' 
+                            ? 'bg-green-600 text-white' 
+                            : 'bg-yellow-600 text-white'
+                        }`}>
+                          {batch.batch_status === 'batch_published' ? '✓ Published' : '○ Generated'}
                         </span>
                       </div>
                     </div>

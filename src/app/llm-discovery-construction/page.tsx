@@ -32,44 +32,15 @@ export default function LLMDiscoveryConstruction() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [steps, setSteps] = useState<Record<string, ConstructionStep>>({
+    scan: { id: 'scan', name: 'Scan Existing Data', description: 'Analyze current data structure', status: 'pending', progress: 0 },
+    populate_static: { id: 'populate_static', name: 'Populate Static Objects', description: 'Create organization, brand, and product JSON-LD', status: 'pending', progress: 0 },
+    populate_faq: { id: 'populate_faq', name: 'Populate FAQ Objects', description: 'Create FAQ objects for dispatch-ready batches', status: 'pending', progress: 0 },
+    validate: { id: 'validate', name: 'Validate Objects', description: 'Verify all objects are properly structured', status: 'pending', progress: 0 },
+    preview: { id: 'preview', name: 'Preview Directory Structure', description: 'Show the final directory structure', status: 'pending', progress: 0 }
+  });
   const [currentStep, setCurrentStep] = useState<string | null>(null);
-  const [steps, setSteps] = useState<ConstructionStep[]>([
-    {
-      id: 'scan',
-      name: '🔍 Scan Existing Data',
-      description: 'Analyze existing JSON-LD objects and FAQ batches',
-      status: 'pending',
-      progress: 0
-    },
-    {
-      id: 'populate_static',
-      name: '📋 Populate Static Objects',
-      description: 'Copy organization, brand, and product JSON-LD to discovery tables',
-      status: 'pending',
-      progress: 0
-    },
-    {
-      id: 'populate_faq',
-      name: '❓ Populate FAQ Objects',
-      description: 'Create FAQ discovery objects from batch_faq_pairs',
-      status: 'pending',
-      progress: 0
-    },
-    {
-      id: 'validate',
-      name: '✅ Validate All Objects',
-      description: 'Check all generated objects for proper structure',
-      status: 'pending',
-      progress: 0
-    },
-    {
-      id: 'preview',
-      name: '👁️ Preview Directory Structure',
-      description: 'Generate preview of LLM discovery file structure',
-      status: 'pending',
-      progress: 0
-    }
-  ]);
+  const [forceReprocess, setForceReprocess] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -87,9 +58,10 @@ export default function LLMDiscoveryConstruction() {
   };
 
   const updateStep = (stepId: string, updates: Partial<ConstructionStep>) => {
-    setSteps(prev => prev.map(step => 
-      step.id === stepId ? { ...step, ...updates } : step
-    ));
+    setSteps(prev => ({
+      ...prev,
+      [stepId]: { ...prev[stepId as keyof typeof prev], ...updates }
+    }));
   };
 
   const scanExistingData = async () => {
@@ -264,21 +236,26 @@ export default function LLMDiscoveryConstruction() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get FAQ batches
+      // Get FAQ batches - only those with dispatch date today or before
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      
       const { data: faqBatches, error: faqError } = await supabase
         .from('batch_faq_pairs')
         .select(`
           id,
+          batch_date,
           faq_pairs_object,
           created_at,
           auth_user_id
         `)
         .eq('auth_user_id', user.id)
-        .not('faq_pairs_object', 'is', null);
+        .not('faq_pairs_object', 'is', null)
+        .lte('batch_date', today); // Only batches with dispatch date today or before
 
       if (faqError) throw faqError;
 
-      console.log('FAQ Batches found:', faqBatches?.length || 0);
+      console.log('FAQ Batches found (dispatch date <= today):', faqBatches?.length || 0);
+      console.log('Today\'s date:', today);
       console.log('FAQ Batches data:', faqBatches);
 
       updateStep('populate_faq', { progress: 30 });
@@ -327,11 +304,30 @@ export default function LLMDiscoveryConstruction() {
       // Process each batch
       let processedCount = 0;
       let errorCount = 0;
+      let skippedCount = 0;
       const errors: string[] = [];
 
       for (const batch of faqBatches) {
         try {
-          const weekStart = new Date(batch.created_at);
+          // Check if this batch already exists in llm_discovery_faq_objects
+          const { data: existingFaqObject } = await supabase
+            .from('llm_discovery_faq_objects')
+            .select('id, last_generated')
+            .eq('batch_faq_pairs_id', batch.id)
+            .single();
+
+          if (existingFaqObject) {
+            if (!forceReprocess) {
+              console.log(`Skipping batch ${batch.id} - already exists (last generated: ${existingFaqObject.last_generated})`);
+              skippedCount++;
+              continue; // Skip this batch
+            } else {
+              console.log(`Force re-processing batch ${batch.id} - updating existing record`);
+            }
+          }
+
+          // Use batch_date for week calculation instead of created_at
+          const weekStart = new Date(batch.batch_date);
           weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Start of week
 
           // Use first organization if available, otherwise null
@@ -339,7 +335,7 @@ export default function LLMDiscoveryConstruction() {
 
           const { error: insertError } = await supabase
             .from('llm_discovery_faq_objects')
-            .upsert({
+            .insert({
               batch_faq_pairs_id: batch.id,
               auth_user_id: user.id,
               client_organisation_id: org?.id || null,
@@ -351,12 +347,11 @@ export default function LLMDiscoveryConstruction() {
               brand_jsonld: brands && brands.length > 0 ? safeJsonParse(brands[0]?.brand_jsonld_object) : null,
               product_jsonld: null,
               last_generated: new Date().toISOString()
-            }, {
-              onConflict: 'batch_faq_pairs_id'
             });
 
           if (!insertError) {
             processedCount++;
+            console.log(`Successfully processed batch ${batch.id} for dispatch date ${batch.batch_date}`);
           } else {
             errorCount++;
             errors.push(`Batch ${batch.id}: ${insertError.message}`);
@@ -374,6 +369,7 @@ export default function LLMDiscoveryConstruction() {
         progress: 100,
         result: { 
           batches_processed: processedCount,
+          batches_skipped: skippedCount,
           batches_with_errors: errorCount,
           total_batches: faqBatches.length,
           errors: errors.length > 0 ? errors.slice(0, 3) : undefined // Show first 3 errors
@@ -586,7 +582,7 @@ export default function LLMDiscoveryConstruction() {
         )}
 
         {/* Action Buttons */}
-        <div className="mb-8 flex flex-wrap gap-4">
+        <div className="mb-8 flex flex-wrap gap-4 items-center">
           <button
             onClick={runAllSteps}
             disabled={currentStep !== null}
@@ -602,11 +598,25 @@ export default function LLMDiscoveryConstruction() {
           >
             🔍 Scan Data
           </button>
+
+          {/* Force Reprocess Checkbox */}
+          <div className="flex items-center space-x-2 bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2">
+            <input
+              type="checkbox"
+              id="forceReprocess"
+              checked={forceReprocess}
+              onChange={(e) => setForceReprocess(e.target.checked)}
+              className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+            />
+            <label htmlFor="forceReprocess" className="text-gray-300 text-sm">
+              Force re-process existing batches
+            </label>
+          </div>
         </div>
 
         {/* Construction Steps */}
         <div className="space-y-6">
-          {steps.map((step) => (
+          {Object.values(steps).map((step) => (
             <div key={step.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">

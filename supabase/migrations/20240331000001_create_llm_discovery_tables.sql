@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS llm_discovery_faq_objects (
     product_jsonld JSONB,
     last_generated TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(batch_faq_pairs_id)
 );
 
 -- 3. Create indexes for performance

@@ -138,13 +138,9 @@ serve(async (req) => {
       const { error: updateError } = await supabase
         .from('batch_faq_pairs')
         .update({
-          unique_batch_cluster: firstQuestion.unique_batch_cluster,
           batch_date: firstQuestion.batch_date,
           organisation: firstQuestion.organisation,
-          brand: firstQuestion.persona_name,
-          product: firstQuestion.product_name,
-          audience: firstQuestion.audience_name,
-          faq_count_in_batch: parseInt(firstQuestion.batch_faq_pairs),
+          product_name: firstQuestion.product_name,
           faq_pairs_object: faqPairsObject,
           updated_at: new Date().toISOString()
         })
@@ -161,13 +157,9 @@ serve(async (req) => {
         .from('batch_faq_pairs')
         .insert({
           unique_batch_id: firstQuestion.unique_batch_id,
-          unique_batch_cluster: firstQuestion.unique_batch_cluster,
           batch_date: firstQuestion.batch_date,
           organisation: firstQuestion.organisation,
-          brand: firstQuestion.persona_name,
-          product: firstQuestion.product_name,
-          audience: firstQuestion.audience_name,
-          faq_count_in_batch: parseInt(firstQuestion.batch_faq_pairs),
+          product_name: firstQuestion.product_name,
           faq_pairs_object: faqPairsObject,
           auth_user_id: auth_user_id
         });
