@@ -108,12 +108,27 @@ serve(async (req) => {
           .eq('amount_cents', invoiceData.amount_cents)
           .single();
 
+        // Get user and organisation details
+        const { data: userData } = await supabase
+          .from('auth.users')
+          .select('id')
+          .eq('email', invoiceData.user_email)
+          .single();
+
+        const { data: orgData } = await supabase
+          .from('client_organisation')
+          .select('organisation_name')
+          .eq('auth_user_id', userData?.id)
+          .single();
+
         // Create complete invoice record - only use existing columns
         const { error: invoiceError } = await supabase
           .from('invoices')
           .insert([{
             id: invoiceData.id,
+            auth_user_id: userData?.id,
             user_email: invoiceData.user_email,
+            organisation: orgData?.organisation_name,
             amount_cents: invoiceData.amount_cents,
             stripe_payment_id: invoiceData.stripe_payment_id,
             billing_period_start: invoiceData.billing_period_start,

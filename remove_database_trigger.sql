@@ -27,4 +27,7 @@ SELECT
             AND p.proname = 'process_stripe_webhook'
         ) THEN '❌ Function still exists'
         ELSE '✅ Function removed successfully'
-    END as status; 
+    END as status;
+
+-- Test the function
+SELECT generate_platform_index(); 

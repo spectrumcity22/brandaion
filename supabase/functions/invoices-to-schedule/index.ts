@@ -39,12 +39,12 @@ serve(async (req: Request) => {
 
     console.log('Processing invoice:', invoice_id);
 
-    // Get invoice details with more specific query
+    // Get invoice details
     const { data: invoices, error: invoiceError } = await supabase
       .from('invoices')
       .select('*')
       .eq('id', invoice_id)
-      .eq('sent_to_schedule', false)  // Only get invoices not yet sent to schedule
+      .eq('sent_to_schedule', false)
       .order('inserted_at', { ascending: false })
       .limit(1);
 
@@ -62,10 +62,10 @@ serve(async (req: Request) => {
     const invoice = invoices[0];
     console.log('Selected invoice:', invoice);
 
-    // Get organisation_id from client_organisation
+    // Get organisation details
     const { data: org, error: orgError } = await supabase
       .from('client_organisation')
-      .select('id')
+      .select('id, organisation_name')
       .eq('auth_user_id', invoice.auth_user_id)
       .single();
 
@@ -76,11 +76,22 @@ serve(async (req: Request) => {
       throw new Error(`Organisation not found: ${orgError?.message}`);
     }
 
-    // Calculate batch dates (spread evenly across the billing period)
+    // Get the correct end_user_id for this auth_user_id
+    const { data: endUser, error: endUserError } = await supabase
+      .from('end_users')
+      .select('id')
+      .eq('auth_user_id', invoice.auth_user_id)
+      .single();
+
+    if (endUserError || !endUser) {
+      throw new Error(`End user not found for auth_user_id: ${invoice.auth_user_id}`);
+    }
+
+    // Calculate batch dates (4 batches per billing period)
     const startDate = new Date(invoice.billing_period_start);
     const endDate = new Date(invoice.billing_period_end);
     const periodDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const batchInterval = Math.floor(periodDays / 4); // 4 batches per period
+    const batchInterval = Math.floor(periodDays / 4);
 
     console.log('Batch calculation:', {
       startDate,
@@ -89,27 +100,31 @@ serve(async (req: Request) => {
       batchInterval
     });
 
-    // Create a single schedule record with all batch dates
-    const scheduleRecord = {
-      auth_user_id: invoice.auth_user_id,
-      invoice_id: invoice.id,
-      batch_1_date: new Date(startDate).toISOString(),
-      batch_2_date: new Date(startDate.getTime() + batchInterval * 24 * 60 * 60 * 1000).toISOString(),
-      batch_3_date: new Date(startDate.getTime() + batchInterval * 2 * 24 * 60 * 60 * 1000).toISOString(),
-      batch_4_date: new Date(startDate.getTime() + batchInterval * 3 * 24 * 60 * 60 * 1000).toISOString(),
-      faq_pairs_pm: invoice.faq_pairs_pm,
-      faq_per_batch: invoice.faq_per_batch,
-      status: 'active',
-      billing_period_start: invoice.billing_period_start,
-      billing_period_end: invoice.billing_period_end
-    };
+    const batchClusterId = crypto.randomUUID();
+    const scheduleRecords = [];
+    for(let i = 0; i < 4; i++){
+      const batchDate = new Date(startDate);
+      batchDate.setDate(batchDate.getDate() + batchInterval * i);
+      scheduleRecords.push({
+        auth_user_id: endUser.id,
+        organisation_id: org.id,
+        unique_batch_cluster: batchClusterId,
+        unique_batch_id: crypto.randomUUID(),
+        batch_date: batchDate.toISOString().split('T')[0],
+        batch_faq_pairs: Math.floor(invoice.faq_pairs_pm / 4),
+        total_faq_pairs: invoice.faq_pairs_pm,
+        sent_for_processing: false,
+        organisation: org.organisation_name,
+        user_email: invoice.user_email
+      });
+    }
 
-    console.log('Schedule record to insert:', scheduleRecord);
+    console.log('Schedule records to insert:', scheduleRecords);
 
-    // Insert the schedule record
+    // Insert the schedule records
     const { error: scheduleError } = await supabase
       .from('schedule')
-      .insert(scheduleRecord);
+      .insert(scheduleRecords);
 
     console.log('Schedule insert error:', scheduleError);
 

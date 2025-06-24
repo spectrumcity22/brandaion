@@ -668,6 +668,13 @@ export default function Dashboard() {
             >
               View Schedule
             </button>
+            
+            <button
+              onClick={() => router.push('/llm-discovery-construction')}
+              className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
+            >
+              🚧 LLM Discovery Construction
+            </button>
           </div>
         </div>
 
