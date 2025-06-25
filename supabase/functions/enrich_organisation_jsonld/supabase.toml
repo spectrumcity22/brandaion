@@ -1,0 +1,2 @@
+[functions.enrich_organisation_jsonld]
+verify_jwt = false 

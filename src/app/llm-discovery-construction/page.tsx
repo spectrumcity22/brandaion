@@ -9,6 +9,12 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+interface Client {
+  auth_user_id: string;
+  organisation_name: string;
+  user_email: string;
+}
+
 interface ConstructionStep {
   id: string;
   name: string;
@@ -31,10 +37,13 @@ interface ScanResult {
 export default function LLMDiscoveryConstruction() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [steps, setSteps] = useState<Record<string, ConstructionStep>>({
     scan: { id: 'scan', name: 'Scan Existing Data', description: 'Analyze current data structure', status: 'pending', progress: 0 },
     populate_static: { id: 'populate_static', name: 'Populate Static Objects', description: 'Create organization, brand, and product JSON-LD', status: 'pending', progress: 0 },
+    enrich_org: { id: 'enrich_org', name: 'Enrich Organization JSON-LD', description: 'Add brands, products, and topics to organization JSON-LD', status: 'pending', progress: 0 },
     populate_faq: { id: 'populate_faq', name: 'Populate FAQ Objects', description: 'Create FAQ objects for dispatch-ready batches', status: 'pending', progress: 0 },
     validate: { id: 'validate', name: 'Validate Objects', description: 'Verify all objects are properly structured', status: 'pending', progress: 0 },
     preview: { id: 'preview', name: 'Preview Directory Structure', description: 'Show the final directory structure', status: 'pending', progress: 0 }
@@ -46,10 +55,57 @@ export default function LLMDiscoveryConstruction() {
     loadInitialData();
   }, []);
 
+  useEffect(() => {
+    if (selectedClient) {
+      // Reset scan results when client changes
+      setScanResult(null);
+      // Reset all steps
+      setSteps(prev => {
+        const resetSteps = { ...prev };
+        Object.keys(resetSteps).forEach(key => {
+          resetSteps[key] = { ...resetSteps[key], status: 'pending', progress: 0, result: undefined, error: undefined };
+        });
+        return resetSteps;
+      });
+    }
+  }, [selectedClient]);
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      await scanExistingData();
+      
+      // Get all clients (organizations)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      // For admin purposes, get all clients (in a real app, you'd filter by admin permissions)
+      const { data: clientOrgs, error: clientError } = await supabase
+        .from('client_organisation')
+        .select(`
+          auth_user_id,
+          organisation_name,
+          end_users(user_email)
+        `)
+        .order('organisation_name');
+
+      if (clientError) throw clientError;
+
+      const clientsData: Client[] = clientOrgs?.map(org => ({
+        auth_user_id: org.auth_user_id,
+        organisation_name: org.organisation_name,
+        user_email: org.end_users?.[0]?.user_email || 'Unknown'
+      })) || [];
+
+      setClients(clientsData);
+
+      // Auto-select if only one client, otherwise require selection
+      if (clientsData.length === 1) {
+        setSelectedClient(clientsData[0]);
+      }
+
     } catch (error) {
       console.error('Error loading initial data:', error);
     } finally {
@@ -65,20 +121,19 @@ export default function LLMDiscoveryConstruction() {
   };
 
   const scanExistingData = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
     try {
       updateStep('scan', { status: 'running', progress: 10 });
       
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-
       // Scan client_organisation for JSON-LD
       const { data: orgs } = await supabase
         .from('client_organisation')
         .select('id, organisation_jsonld_object')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       updateStep('scan', { progress: 30 });
 
@@ -86,7 +141,7 @@ export default function LLMDiscoveryConstruction() {
       const { data: brands } = await supabase
         .from('brands')
         .select('id, brand_jsonld_object')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       updateStep('scan', { progress: 50 });
 
@@ -94,7 +149,7 @@ export default function LLMDiscoveryConstruction() {
       const { data: products } = await supabase
         .from('products')
         .select('id, schema_json')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       updateStep('scan', { progress: 70 });
 
@@ -102,7 +157,7 @@ export default function LLMDiscoveryConstruction() {
       const { data: faqBatches } = await supabase
         .from('batch_faq_pairs')
         .select('id, faq_pairs_object')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       updateStep('scan', { progress: 90 });
 
@@ -132,18 +187,20 @@ export default function LLMDiscoveryConstruction() {
   };
 
   const populateStaticObjects = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
     try {
       setCurrentStep('populate_static');
       updateStep('populate_static', { status: 'running', progress: 10 });
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
       // Get organization data
       const { data: org, error: orgError } = await supabase
         .from('client_organisation')
         .select('id, organisation_jsonld_object')
-        .eq('auth_user_id', user.id)
+        .eq('auth_user_id', selectedClient.auth_user_id)
         .single();
 
       if (orgError) throw orgError;
@@ -154,7 +211,7 @@ export default function LLMDiscoveryConstruction() {
       const { data: brands, error: brandsError } = await supabase
         .from('brands')
         .select('id, brand_jsonld_object')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       if (brandsError) throw brandsError;
 
@@ -164,7 +221,7 @@ export default function LLMDiscoveryConstruction() {
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, schema_json')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       if (productsError) throw productsError;
 
@@ -194,7 +251,7 @@ export default function LLMDiscoveryConstruction() {
       const { error: upsertError } = await supabase
         .from('llm_discovery_static')
         .upsert({
-          auth_user_id: user.id,
+          auth_user_id: selectedClient.auth_user_id,
           client_organisation_id: org?.id,
           organization_jsonld: organizationJsonld,
           brand_jsonld: brandJsonld,
@@ -228,13 +285,67 @@ export default function LLMDiscoveryConstruction() {
     }
   };
 
+  const enrichOrganizationJsonld = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
+    try {
+      setCurrentStep('enrich_org');
+      updateStep('enrich_org', { status: 'running', progress: 10 });
+
+      // Call the edge function to enrich organization JSON-LD
+      const response = await fetch('/api/enrich-organisation-jsonld', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          auth_user_id: selectedClient.auth_user_id
+        })
+      });
+
+      updateStep('enrich_org', { progress: 50 });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      updateStep('enrich_org', { 
+        status: 'completed', 
+        progress: 100,
+        result: {
+          success: result.success,
+          message: result.message,
+          organization: result.organization,
+          enrichedData: result.enrichedData
+        }
+      });
+
+    } catch (error) {
+      console.error('Error enriching organization JSON-LD:', error);
+      updateStep('enrich_org', { 
+        status: 'error', 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setCurrentStep(null);
+    }
+  };
+
   const populateFAQObjects = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
     try {
       setCurrentStep('populate_faq');
       updateStep('populate_faq', { status: 'running', progress: 10 });
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
       // Get FAQ batches - only those with dispatch date today or before
       const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
@@ -248,7 +359,7 @@ export default function LLMDiscoveryConstruction() {
           created_at,
           auth_user_id
         `)
-        .eq('auth_user_id', user.id)
+        .eq('auth_user_id', selectedClient.auth_user_id)
         .not('faq_pairs_object', 'is', null)
         .lte('batch_date', today); // Only batches with dispatch date today or before
 
@@ -273,14 +384,14 @@ export default function LLMDiscoveryConstruction() {
       const { data: orgs, error: orgError } = await supabase
         .from('client_organisation')
         .select('id, organisation_jsonld_object')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       if (orgError) throw orgError;
 
       const { data: brands, error: brandsError } = await supabase
         .from('brands')
         .select('id, brand_jsonld_object')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       if (brandsError) throw brandsError;
 
@@ -337,7 +448,7 @@ export default function LLMDiscoveryConstruction() {
             .from('llm_discovery_faq_objects')
             .insert({
               batch_faq_pairs_id: batch.id,
-              auth_user_id: user.id,
+              auth_user_id: selectedClient.auth_user_id,
               client_organisation_id: org?.id || null,
               brand_id: brands && brands.length > 0 ? brands[0]?.id : null,
               product_id: null, // Will need to be linked properly in future
@@ -388,18 +499,20 @@ export default function LLMDiscoveryConstruction() {
   };
 
   const validateObjects = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
     try {
       setCurrentStep('validate');
       updateStep('validate', { status: 'running', progress: 10 });
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
       // Check static objects
       const { data: staticObjects, error: staticError } = await supabase
         .from('llm_discovery_static')
         .select('*')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       if (staticError) throw staticError;
 
@@ -409,7 +522,7 @@ export default function LLMDiscoveryConstruction() {
       const { data: faqObjects, error: faqError } = await supabase
         .from('llm_discovery_faq_objects')
         .select('*')
-        .eq('auth_user_id', user.id);
+        .eq('auth_user_id', selectedClient.auth_user_id);
 
       if (faqError) throw faqError;
 
@@ -441,18 +554,20 @@ export default function LLMDiscoveryConstruction() {
   };
 
   const previewDirectoryStructure = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
     try {
       setCurrentStep('preview');
       updateStep('preview', { status: 'running', progress: 10 });
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
       // Get organization data for preview
       const { data: org } = await supabase
         .from('client_organisation')
         .select('organisation_name')
-        .eq('auth_user_id', user.id)
+        .eq('auth_user_id', selectedClient.auth_user_id)
         .single();
 
       updateStep('preview', { progress: 50 });
@@ -502,10 +617,16 @@ export default function LLMDiscoveryConstruction() {
   };
 
   const runAllSteps = async () => {
-    if (!confirm('This will run all construction steps. Continue?')) return;
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+    
+    if (!confirm('This will run all construction steps for the selected client. Continue?')) return;
     
     await scanExistingData();
     await populateStaticObjects();
+    await enrichOrganizationJsonld();
     await populateFAQObjects();
     await validateObjects();
     await previewDirectoryStructure();
@@ -556,10 +677,53 @@ export default function LLMDiscoveryConstruction() {
           </div>
         </div>
 
+        {/* Client Selection */}
+        <div className="mb-8 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+          <h2 className="text-2xl font-semibold text-white mb-4">👤 Client Selection</h2>
+          
+          {clients.length === 0 ? (
+            <div className="text-gray-400">No clients found. Please ensure you have access to client organizations.</div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="clientSelect" className="block text-gray-300 text-sm font-medium mb-2">
+                  Select Client to Work On:
+                </label>
+                <select
+                  id="clientSelect"
+                  value={selectedClient?.auth_user_id || ''}
+                  onChange={(e) => {
+                    const client = clients.find(c => c.auth_user_id === e.target.value);
+                    setSelectedClient(client || null);
+                  }}
+                  className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">-- Select a client --</option>
+                  {clients.map((client) => (
+                    <option key={client.auth_user_id} value={client.auth_user_id}>
+                      {client.organisation_name} ({client.user_email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedClient && (
+                <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-blue-400 font-semibold">🎯 Working on:</span>
+                    <span className="text-white font-medium">{selectedClient.organisation_name}</span>
+                    <span className="text-gray-400">({selectedClient.user_email})</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Scan Results */}
-        {scanResult && (
+        {scanResult && selectedClient && (
           <div className="mb-8 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-            <h2 className="text-2xl font-semibold text-white mb-4">📊 Data Scan Results</h2>
+            <h2 className="text-2xl font-semibold text-white mb-4">📊 Data Scan Results for {selectedClient.organisation_name}</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-gray-700/50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-blue-400 mb-1">{scanResult.total_clients}</div>
@@ -585,7 +749,7 @@ export default function LLMDiscoveryConstruction() {
         <div className="mb-8 flex flex-wrap gap-4 items-center">
           <button
             onClick={runAllSteps}
-            disabled={currentStep !== null}
+            disabled={currentStep !== null || !selectedClient}
             className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none"
           >
             🚀 Run All Steps
@@ -593,7 +757,7 @@ export default function LLMDiscoveryConstruction() {
           
           <button
             onClick={scanExistingData}
-            disabled={currentStep !== null}
+            disabled={currentStep !== null || !selectedClient}
             className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200"
           >
             🔍 Scan Data
@@ -639,12 +803,13 @@ export default function LLMDiscoveryConstruction() {
                       onClick={() => {
                         switch (step.id) {
                           case 'populate_static': populateStaticObjects(); break;
+                          case 'enrich_org': enrichOrganizationJsonld(); break;
                           case 'populate_faq': populateFAQObjects(); break;
                           case 'validate': validateObjects(); break;
                           case 'preview': previewDirectoryStructure(); break;
                         }
                       }}
-                      disabled={currentStep !== null}
+                      disabled={currentStep !== null || !selectedClient}
                       className="bg-green-500 hover:bg-green-600 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
                     >
                       Run

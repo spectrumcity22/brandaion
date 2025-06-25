@@ -1,0 +1,1 @@
+ALTER TABLE llm_discovery_static ADD COLUMN organisation_jsonld_enriched JSONB; 
