@@ -64,13 +64,18 @@ export default function LLMDiscoveryDashboard() {
   const [regenerationResults, setRegenerationResults] = useState<any>(null);
   const [directoryStructure, setDirectoryStructure] = useState<DirectoryItem[]>([]);
   const [hoveredItem, setHoveredItem] = useState<DirectoryItem | null>(null);
-  const [showDirectoryPanel, setShowDirectoryPanel] = useState(false);
+  const [showDirectoryPanel, setShowDirectoryPanel] = useState(true);
 
   useEffect(() => {
     loadStats();
   }, []);
 
-  const generateDirectoryStructure = (staticObjects: DiscoveryObject[], faqObjects: FAQObject[]) => {
+  const generateDirectoryStructure = (
+    staticObjects: DiscoveryObject[],
+    faqObjects: FAQObject[],
+    brands: any[],
+    products: any[]
+  ) => {
     const structure: DirectoryItem[] = [
       {
         name: 'data',
@@ -103,12 +108,11 @@ export default function LLMDiscoveryDashboard() {
       }
     ];
 
-    // Add organization data
-    if (staticObjects && staticObjects.length > 0) {
-      const org = staticObjects[0]; // Use first organization
+    // For each organization
+    staticObjects.forEach(org => {
       const orgName = org.organization_jsonld?.name || 'organization';
       const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-      
+      const orgBrands = brands.filter(b => b.organisation_id === org.client_organisation_id);
       const orgFolder: DirectoryItem = {
         name: orgSlug,
         type: 'folder',
@@ -151,123 +155,122 @@ export default function LLMDiscoveryDashboard() {
           }
         ]
       };
-
-      // Add brand data if available
-      if (org.brand_jsonld) {
-        const brandName = org.brand_jsonld.name || 'brand-1';
-        const brandSlug = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-        
-        const brandFolder: DirectoryItem = {
-          name: brandSlug,
-          type: 'folder',
-          path: `/data/organizations/${orgSlug}/brands/${brandSlug}`,
-          icon: '🏷️',
-          color: 'text-orange-400',
-          children: [
-            {
-              name: 'brands-llms.txt',
-              type: 'file',
-              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brands-llms.txt`,
-              icon: '📄',
-              color: 'text-green-400',
-              jsonData: {
-                description: 'Brand-specific LLM discovery index',
-                brand: brandName,
-                last_updated: org.last_generated
-              }
-            },
-            {
-              name: 'brand.jsonld',
-              type: 'file',
-              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brand.jsonld`,
-              icon: '🔗',
-              color: 'text-yellow-400',
-              jsonData: org.brand_jsonld
-            },
-            {
-              name: 'products',
-              type: 'folder',
-              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products`,
-              icon: '📦',
-              color: 'text-red-400',
-              children: []
-            }
-          ]
-        };
-
-        // Add product data if available
-        if (org.product_jsonld) {
-          const productName = org.product_jsonld.name || 'product-1';
-          const productSlug = productName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-          
-          const productFolder: DirectoryItem = {
-            name: productSlug,
+      const brandsFolder = orgFolder.children?.find(c => c.name === 'brands' && c.type === 'folder');
+      if (brandsFolder && brandsFolder.children) {
+        orgBrands.forEach(brand => {
+          const brandSlug = brand.brand_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+          const brandProducts = products.filter(p => p.brand_id === brand.id);
+          const brandFolder: DirectoryItem = {
+            name: brandSlug,
             type: 'folder',
-            path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}`,
-            icon: '📦',
-            color: 'text-red-400',
+            path: `/data/organizations/${orgSlug}/brands/${brandSlug}`,
+            icon: '🏷️',
+            color: 'text-orange-400',
             children: [
               {
-                name: 'products-llms.txt',
+                name: 'brands-llms.txt',
                 type: 'file',
-                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/products-llms.txt`,
+                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brands-llms.txt`,
                 icon: '📄',
                 color: 'text-green-400',
                 jsonData: {
-                  description: 'Product-specific LLM discovery index',
-                  product: productName,
-                  last_updated: org.last_generated
+                  description: 'Brand-specific LLM discovery index',
+                  brand: brand.brand_name,
+                  last_updated: brand.updated_at || brand.created_at
                 }
               },
               {
-                name: 'product.jsonld',
+                name: 'brand.jsonld',
                 type: 'file',
-                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/product.jsonld`,
+                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brand.jsonld`,
                 icon: '🔗',
                 color: 'text-yellow-400',
-                jsonData: org.product_jsonld
+                jsonData: brand.brand_jsonld_object
               },
               {
-                name: 'faqs',
+                name: 'products',
                 type: 'folder',
-                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs`,
-                icon: '❓',
-                color: 'text-cyan-400',
+                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products`,
+                icon: '📦',
+                color: 'text-red-400',
                 children: []
               }
             ]
           };
-
-          // Add FAQ data if available
-          if (faqObjects && faqObjects.length > 0) {
-            const faqFile: DirectoryItem = {
-              name: 'faq.jsonld',
-              type: 'file',
-              path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs/faq.jsonld`,
-              icon: '🔗',
-              color: 'text-yellow-400',
-              jsonData: faqObjects[0].faq_json_object || {
-                description: 'FAQ data for this product',
-                faq_count: faqObjects.length,
-                last_updated: faqObjects[0].last_generated
+          const productsFolder = brandFolder.children?.find(c => c.name === 'products' && c.type === 'folder');
+          if (productsFolder && productsFolder.children) {
+            brandProducts.forEach(product => {
+              const productSlug = product.product_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+              const productFaqs = faqObjects.filter(faq => faq.product_id === product.id);
+              const productFolder: DirectoryItem = {
+                name: productSlug,
+                type: 'folder',
+                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}`,
+                icon: '📦',
+                color: 'text-red-400',
+                children: [
+                  {
+                    name: 'products-llms.txt',
+                    type: 'file',
+                    path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/products-llms.txt`,
+                    icon: '📄',
+                    color: 'text-green-400',
+                    jsonData: {
+                      description: 'Product-specific LLM discovery index',
+                      product: product.product_name,
+                      last_updated: product.updated_at || product.inserted_at
+                    }
+                  },
+                  {
+                    name: 'product.jsonld',
+                    type: 'file',
+                    path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/product.jsonld`,
+                    icon: '🔗',
+                    color: 'text-yellow-400',
+                    jsonData: product.schema_json
+                  },
+                  {
+                    name: 'faqs',
+                    type: 'folder',
+                    path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs`,
+                    icon: '❓',
+                    color: 'text-cyan-400',
+                    children: []
+                  }
+                ]
+              };
+              // Add FAQ file if exists
+              if (productFaqs.length > 0) {
+                const faqFile: DirectoryItem = {
+                  name: 'faq.jsonld',
+                  type: 'file',
+                  path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs/faq.jsonld`,
+                  icon: '🔗',
+                  color: 'text-yellow-400',
+                  jsonData: productFaqs[0].faq_json_object || {
+                    description: 'FAQ data for this product',
+                    faq_count: productFaqs.length,
+                    last_updated: productFaqs[0].last_generated
+                  }
+                };
+                const faqsFolder = (productFolder.children ?? []).find(child => child.name === 'faqs' && child.type === 'folder');
+                if (faqsFolder && faqsFolder.children) {
+                  faqsFolder.children.push(faqFile);
+                }
               }
-            };
-            // Find the faqs folder and push the faqFile into its children
-            const faqsFolder = productFolder.children!.find(child => child.name === 'faqs' && child.type === 'folder');
-            if (faqsFolder && faqsFolder.children) {
-              faqsFolder.children.push(faqFile);
-            }
+              if (productsFolder && productsFolder.children) {
+                productsFolder.children.push(productFolder);
+              }
+            });
           }
-
-          brandFolder.children!.push(productFolder);
-        }
-
-        orgFolder.children!.push(brandFolder);
+        });
       }
-
-      structure[0].children![1].children!.push(orgFolder);
-    }
-
+      // Only push orgFolder after all brands are added
+      const orgsArray = structure[0].children[1]?.children ?? [];
+      if (Array.isArray(orgsArray)) {
+        orgsArray.push(orgFolder);
+      }
+    });
     return structure;
   };
 
@@ -313,7 +316,7 @@ export default function LLMDiscoveryDashboard() {
       setStats(stats);
 
       // Generate directory structure
-      const directoryStructure = generateDirectoryStructure(staticObjects || [], faqObjects || []);
+      const directoryStructure = generateDirectoryStructure(staticObjects || [], faqObjects || [], [], []);
       setDirectoryStructure(directoryStructure);
 
     } catch (err) {
@@ -475,6 +478,19 @@ export default function LLMDiscoveryDashboard() {
       </div>
     );
   };
+
+  function getEditableFilesFromDirectory(items: DirectoryItem[]): DirectoryItem[] {
+    let files: DirectoryItem[] = [];
+    for (const item of items) {
+      if (item.type === 'file' && (item.name.endsWith('.jsonld') || item.name.endsWith('-llms.txt'))) {
+        files.push(item);
+      }
+      if (item.children && item.children.length > 0) {
+        files = files.concat(getEditableFilesFromDirectory(item.children));
+      }
+    }
+    return files;
+  }
 
   if (loading) {
     return (
@@ -695,6 +711,24 @@ export default function LLMDiscoveryDashboard() {
               <span className="text-purple-400">Brandaion JSON-LD</span>
               <span className="text-purple-400">→</span>
             </a>
+          </div>
+        </div>
+
+        {/* Editable Files Panel */}
+        <div className="mt-8 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+          <h3 className="text-xl font-semibold text-white mb-4">Editable Files</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {getEditableFilesFromDirectory(directoryStructure).map((file) => (
+              <div key={file.path} className="bg-gray-700/50 border border-gray-600 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-white mb-2">{file.name}</h4>
+                <div className="text-xs text-gray-400">
+                  Last Updated: {formatDate(file.jsonData?.last_updated || '')}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Path: {file.path}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
