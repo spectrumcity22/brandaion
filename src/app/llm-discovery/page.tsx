@@ -834,28 +834,26 @@ export default function LLMDiscoveryDashboard() {
         )}
 
         {/* Directory Structure Panel */}
-        <div className="mb-8 bg-gray-800/50 border border-gray-700 rounded-lg p-6 relative">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-white">📁 Directory Structure Mockup</h3>
+        <div className="bg-gray-900/70 border border-gray-800 rounded-lg p-4 mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-semibold text-white flex items-center">
+              <span className="mr-2">📁</span> Directory Structure
+            </h2>
             <button
-              onClick={() => setShowDirectoryPanel(!showDirectoryPanel)}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-gray-400 hover:text-white text-xs"
+              onClick={() => setShowDirectoryPanel(false)}
             >
-              {showDirectoryPanel ? 'Hide' : 'Show'} Panel
+              Hide Panel
             </button>
           </div>
-          
-          {showDirectoryPanel && (
-            <div className="relative">
-              <div className="bg-gray-900/50 border border-gray-600 rounded-lg p-4 max-h-96 overflow-y-auto">
-                <div className="text-sm text-gray-400 mb-3">
-                  Hover over items to view JSON data
-                </div>
-                {renderAsciiTree(mergedTree)}
-              </div>
-              {renderJSONPreview()}
-            </div>
-          )}
+          <div className="text-gray-400 text-xs mb-2">Click or hover over items to view JSON data</div>
+          <div className="font-mono text-sm bg-black/40 rounded p-4 overflow-x-auto">
+            {directoryStructure.length === 0 ? (
+              <div className="text-red-400">No directory data found for this client.</div>
+            ) : (
+              renderAsciiTree(directoryStructure)
+            )}
+          </div>
         </div>
 
         {/* Recent Updates */}
