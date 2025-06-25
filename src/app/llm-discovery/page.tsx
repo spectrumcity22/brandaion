@@ -126,6 +126,7 @@ export default function LLMDiscoveryDashboard() {
   const [editingFile, setEditingFile] = useState<DirectoryItem | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('all');
+  const [clientStats, setClientStats] = useState<Record<string, any>>({});
 
   useEffect(() => {
     loadStats();
@@ -407,6 +408,9 @@ export default function LLMDiscoveryDashboard() {
       const directoryStructure = generateDirectoryStructure(staticObjects || [], faqObjects || [], brands || [], products || []);
       setDirectoryStructure(directoryStructure);
 
+      // Calculate client stats
+      await calculateClientStats();
+
     } catch (err) {
       console.error('Error loading stats:', err);
       setError('Failed to load discovery stats');
@@ -652,6 +656,58 @@ export default function LLMDiscoveryDashboard() {
   // In the main component, after loading data and building directoryStructure:
   const mergedTree = mergeWithSkeleton(schemaSkeleton, directoryStructure[0] || {});
 
+  // Function to calculate stats for each client
+  const calculateClientStats = async () => {
+    try {
+      const stats: Record<string, any> = {};
+      
+      for (const client of clients) {
+        // Get static objects for this client
+        const { data: staticObjects } = await supabase
+          .from('llm_discovery_static')
+          .select('*')
+          .eq('auth_user_id', client.auth_user_id);
+
+        // Get FAQ objects for this client
+        const { data: faqObjects } = await supabase
+          .from('llm_discovery_faq_objects')
+          .select('*')
+          .eq('auth_user_id', client.auth_user_id);
+
+        // Get brands for this client
+        const { data: brands } = await supabase
+          .from('brands')
+          .select('*')
+          .eq('auth_user_id', client.auth_user_id);
+
+        // Get products for this client
+        const { data: products } = await supabase
+          .from('products')
+          .select('*')
+          .eq('auth_user_id', client.auth_user_id);
+
+        stats[client.auth_user_id] = {
+          static_objects: staticObjects?.length || 0,
+          faq_objects: faqObjects?.length || 0,
+          brands: brands?.length || 0,
+          products: products?.length || 0,
+          has_org_jsonld: staticObjects?.some(obj => obj.organization_jsonld) || false,
+          has_brand_jsonld: staticObjects?.some(obj => obj.brand_jsonld) || false,
+          has_product_jsonld: staticObjects?.some(obj => obj.product_jsonld) || false,
+        };
+      }
+      
+      setClientStats(stats);
+    } catch (error) {
+      console.error('Error calculating client stats:', error);
+    }
+  };
+
+  // Function to handle client selection from table
+  const handleClientSelect = (clientId: string) => {
+    setSelectedClientId(clientId);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
@@ -696,6 +752,14 @@ export default function LLMDiscoveryDashboard() {
                   </option>
                 ))}
               </select>
+              {selectedClientId !== 'all' && (
+                <button
+                  onClick={() => setSelectedClientId('all')}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors text-sm"
+                >
+                  View All Clients
+                </button>
+              )}
             </div>
             <div className="text-sm text-gray-400">
               {selectedClientId === 'all' 
@@ -804,33 +868,52 @@ export default function LLMDiscoveryDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {clients.map((client) => (
-                    <tr key={client.id} className="hover:bg-gray-700/30">
-                      <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-white">{client.organisation_name}</div>
-                        <div className="text-xs text-gray-400">{client.auth_user_id.slice(0, 8)}...</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-300">-</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-300">-</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-300">-</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-300">-</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
-                          Active
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {clients.map((client) => {
+                    const stats = clientStats[client.auth_user_id] || {};
+                    const isActive = stats.static_objects > 0 || stats.faq_objects > 0;
+                    const hasCompleteData = stats.has_org_jsonld && stats.has_brand_jsonld && stats.has_product_jsonld;
+                    
+                    return (
+                      <tr 
+                        key={client.id} 
+                        className="hover:bg-gray-700/30 cursor-pointer transition-colors"
+                        onClick={() => handleClientSelect(client.auth_user_id)}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-white">{client.organisation_name}</div>
+                          <div className="text-xs text-gray-400">{client.auth_user_id.slice(0, 8)}...</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-300">{stats.static_objects || 0}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-300">{stats.faq_objects || 0}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-300">{stats.brands || 0}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm text-gray-300">{stats.products || 0}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            hasCompleteData 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : isActive 
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {hasCompleteData ? 'Complete' : isActive ? 'Partial' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+            <div className="mt-4 text-sm text-gray-400">
+              💡 Click on any client row to filter and view their specific data
             </div>
           </div>
         )}
