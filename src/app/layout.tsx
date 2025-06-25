@@ -85,7 +85,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       <Link href="/client_brands_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Brand Management</Link>
                       <Link href="/client_products" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Product Management</Link>
                       <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Persona Management</Link>
-                      <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Configure AI</Link>
                     </div>
                   )}
                 </div>
@@ -117,6 +116,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </button>
                   {openDropdown === 'batches' && (
                     <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Configure AI</Link>
                       <Link href="/review-questions" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Questions</Link>
                       <Link href="/review-answers" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Answers</Link>
                       <Link href="/faq-pairs" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Pairs</Link>
