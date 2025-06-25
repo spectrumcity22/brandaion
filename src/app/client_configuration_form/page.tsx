@@ -129,7 +129,7 @@ export default function ClientConfigurationForm() {
         throw new Error(`Failed to save configuration: ${configError.message}`);
       }
 
-      setProcessingStatus('Merging with pending rows...');
+      setProcessingStatus('Configuration saved. Merging with schedule data...');
 
       // Get the session for the webhook call
       const { data: { session } } = await supabase.auth.getSession();
@@ -137,10 +137,7 @@ export default function ClientConfigurationForm() {
         throw new Error('No session found');
       }
 
-      // Call merge_schedule_and_configuration which will:
-      // 1. Find rows in construct_faq_pairs where status is 'pending'
-      // 2. Update those rows with the new configuration data
-      // 3. Keep status as 'pending'
+      // Call merge_schedule_and_configuration
       const mergeResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "POST",
         headers: {
@@ -153,14 +150,23 @@ export default function ClientConfigurationForm() {
       });
 
       const mergeData = await mergeResponse.json();
+      
       if (!mergeResponse.ok) {
         throw new Error(`Merge failed: ${mergeData.error || 'Unknown error'}`);
       }
 
-      setProcessingStatus('Merge complete. Waiting 5 seconds before generating questions...');
-      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay after merge
+      // Check if any schedule rows were processed
+      if (mergeData.processed_count === 0) {
+        setProcessingStatus('No schedule rows found to process. Please ensure you have completed the payment and schedule creation.');
+        setMessage("⚠️ No schedule rows found. Please check your payment status and try again.");
+        return;
+      }
+
+      setProcessingStatus(`Merge complete! Processed ${mergeData.processed_count} schedule rows. Starting question generation...`);
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay after merge
 
       // Call open_ai_request_questions for pending rows
+      setProcessingStatus('Generating AI questions...');
       const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
         method: "POST",
         headers: {
@@ -177,11 +183,17 @@ export default function ClientConfigurationForm() {
         throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
       }
 
-      setMessage("✅ Configuration saved and questions generation started!");
-      router.push('/review-questions');
+      setMessage(`✅ Configuration saved and ${mergeData.processed_count} FAQ batches queued for generation!`);
+      setProcessingStatus('Redirecting to review questions...');
+      
+      setTimeout(() => {
+        router.push('/review-questions');
+      }, 2000);
+      
     } catch (error) {
       console.error('Error:', error);
       setMessage("❌ Error: " + (error instanceof Error ? error.message : 'Unknown error'));
+      setProcessingStatus('');
     } finally {
       setIsProcessing(false);
     }

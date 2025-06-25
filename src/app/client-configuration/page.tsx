@@ -96,7 +96,7 @@ const ClientConfiguration: React.FC = () => {
 
       if (error) throw error;
 
-      // Call the provided webhook after successful save
+      // Call the merge function after successful save
       const webhookResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/merge_schedule_and_configuration", {
         method: "POST",
         headers: {
@@ -105,12 +105,17 @@ const ClientConfiguration: React.FC = () => {
         body: JSON.stringify({ auth_user_id: user.id }),
       });
 
+      const webhookData = await webhookResponse.json();
+
       if (!webhookResponse.ok) {
-        const webhookError = await webhookResponse.json();
-        console.error("Webhook error:", webhookError);
-        toast.error("Failed to trigger merge function");
+        console.error("Webhook error:", webhookData);
+        toast.error(`Failed to trigger merge function: ${webhookData.error || 'Unknown error'}`);
       } else {
-        toast.success("Configuration saved and merge triggered!");
+        if (webhookData.processed_count === 0) {
+          toast.error("Configuration saved but no schedule rows found to process. Please check your payment status.");
+        } else {
+          toast.success(`Configuration saved and ${webhookData.processed_count} schedule rows processed successfully!`);
+        }
       }
     } catch (error) {
       console.error("Error saving configuration:", error);
