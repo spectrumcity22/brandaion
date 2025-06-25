@@ -141,26 +141,20 @@ export default function LLMDiscoveryDashboard() {
     selectedClientId: string
   ): DirectoryItem[] => {
     const structure: DirectoryItem[] = [];
-
-    // Determine which clients to show
     const clientsToShow = selectedClientId === 'all' ? clients : clients.filter(c => c.auth_user_id === selectedClientId);
-
     for (const client of clientsToShow) {
       const clientStaticObjects = staticObjects.filter(obj => obj.client_organisation_id === client.id);
       const clientFaqObjects = faqObjects.filter(obj => obj.client_organisation_id === client.id);
       const clientBrands = brands.filter(brand => brand.organisation_id === client.id);
       const clientProducts = products.filter(product => product.organisation_id === client.id);
-
-      // Organization folder
       const orgFolder: DirectoryItem = {
         name: client.organisation_name || 'Unnamed Organization',
         type: 'folder',
         path: `/${client.organisation_name || 'unnamed'}`,
         icon: '📁',
-        color: clientStaticObjects.length > 0 ? 'text-green-500' : 'text-red-500',
+        color: 'text-white',
         children: []
       };
-
       // Organization JSON-LD file
       const orgJsonld = clientStaticObjects.find(obj => obj.organization_jsonld);
       orgFolder.children!.push({
@@ -171,29 +165,34 @@ export default function LLMDiscoveryDashboard() {
         icon: '📄',
         color: orgJsonld ? 'text-green-500' : 'text-red-500'
       });
-
       // Brands folder
       const brandsFolder: DirectoryItem = {
         name: 'brands',
         type: 'folder',
         path: `/${client.organisation_name || 'unnamed'}/brands`,
         icon: '📁',
-        color: clientBrands.length > 0 ? 'text-green-500' : 'text-red-500',
+        color: 'text-white',
         children: []
       };
-
-      // Add brand files
       for (const brand of clientBrands) {
         const brandJsonld = clientStaticObjects.find(obj => obj.brand_jsonld);
-        brandsFolder.children!.push({
+        const brandFolder: DirectoryItem = {
+          name: `${brand.brand_name || 'unnamed'}.jsonld`,
+          type: 'folder',
+          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}`,
+          icon: '��',
+          color: 'text-white',
+          children: []
+        };
+        // Brand JSON-LD file
+        brandFolder.children!.push({
           name: `${brand.brand_name || 'unnamed'}.jsonld`,
           type: 'file',
-          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}.jsonld`,
+          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/${brand.brand_name || 'unnamed'}.jsonld`,
           jsonData: brandJsonld?.brand_jsonld || null,
           icon: '📄',
           color: brandJsonld ? 'text-green-500' : 'text-red-500'
         });
-
         // Products subfolder for this brand
         const brandProducts = clientProducts.filter(product => product.brand_id === brand.id);
         if (brandProducts.length > 0) {
@@ -202,55 +201,39 @@ export default function LLMDiscoveryDashboard() {
             type: 'folder',
             path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products`,
             icon: '📁',
-            color: 'text-green-500',
+            color: 'text-white',
             children: []
           };
-
           for (const product of brandProducts) {
-            const productJsonld = clientStaticObjects.find(obj => obj.product_jsonld);
+            // Product JSON-LD file
             productsFolder.children!.push({
               name: `${product.product_name || 'unnamed'}.jsonld`,
               type: 'file',
               path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}.jsonld`,
-              jsonData: productJsonld?.product_jsonld || null,
+              jsonData: product.schema_json ? JSON.parse(product.schema_json) : null,
               icon: '📄',
-              color: productJsonld ? 'text-green-500' : 'text-red-500'
+              color: product.schema_json ? 'text-green-500' : 'text-red-500'
             });
+            // FAQ files for this product
+            const productFaqs = clientFaqObjects.filter(faq => faq.product_id === product.id);
+            for (const faq of productFaqs) {
+              productsFolder.children!.push({
+                name: `faq-${faq.week_start_date}.jsonld`,
+                type: 'file',
+                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/faq-${faq.week_start_date}.jsonld`,
+                jsonData: faq.faq_json_object || null,
+                icon: '📄',
+                color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
+              });
+            }
           }
-
-          brandsFolder.children!.push(productsFolder);
+          brandFolder.children!.push(productsFolder);
         }
+        brandsFolder.children!.push(brandFolder);
       }
-
       orgFolder.children!.push(brandsFolder);
-
-      // FAQs folder
-      const faqsFolder: DirectoryItem = {
-        name: 'faqs',
-        type: 'folder',
-        path: `/${client.organisation_name || 'unnamed'}/faqs`,
-        icon: '📁',
-        color: clientFaqObjects.length > 0 ? 'text-green-500' : 'text-red-500',
-        children: []
-      };
-
-      // Add FAQ files
-      for (const faq of clientFaqObjects) {
-        faqsFolder.children!.push({
-          name: `faq-${faq.week_start_date}.jsonld`,
-          type: 'file',
-          path: `/${client.organisation_name || 'unnamed'}/faqs/faq-${faq.week_start_date}.jsonld`,
-          jsonData: faq.faq_json_object || null,
-          icon: '📄',
-          color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
-        });
-      }
-
-      orgFolder.children!.push(faqsFolder);
-
       structure.push(orgFolder);
     }
-
     return structure;
   };
 
@@ -519,12 +502,16 @@ export default function LLMDiscoveryDashboard() {
       const last = idx === nodes.length - 1;
       const branch = level === 0 ? '' : (last ? '└── ' : '├── ');
       const nextPrefix = level === 0 ? '' : prefix + (last ? '    ' : '│   ');
+      // Only color code files
       let colorClass = '';
-      // Use getFileStatus for color coding
-      const status = getFileStatus(node);
-      if (status === 'red') colorClass = 'text-red-400 font-bold';
-      else if (status === 'amber') colorClass = 'text-yellow-400 font-semibold';
-      else if (status === 'green') colorClass = 'text-green-400 font-semibold';
+      if (node.type === 'file') {
+        const status = getFileStatus(node);
+        if (status === 'red') colorClass = 'text-red-400 font-bold';
+        else if (status === 'amber') colorClass = 'text-yellow-400 font-semibold';
+        else if (status === 'green') colorClass = 'text-green-400 font-semibold';
+      } else {
+        colorClass = 'text-white'; // Folders are white
+      }
       return (
         <div key={node.path || node.name + level + idx}>
           <div
@@ -535,18 +522,10 @@ export default function LLMDiscoveryDashboard() {
             onClick={() => node.type === 'file' ? setEditingFile(node) : undefined}
           >
             <span className="whitespace-pre">{prefix}{branch}</span>
-            {node.type === 'file' ? (
-              <span
-                className={colorClass + ' underline cursor-pointer'}
-                title={status === 'red' ? 'Missing or invalid' : status === 'amber' ? 'Needs attention' : 'Fit for purpose'}
-              >
-                {node.name}
-              </span>
-            ) : (
-              <span className={colorClass}>{node.name}</span>
-            )}
+            <span className={node.type === 'file' ? colorClass + ' underline cursor-pointer' : colorClass}>
+              {node.name}
+            </span>
           </div>
-          {/* Place FAQ files under their related product nodes */}
           {node.children && node.children.length > 0 && renderAsciiTree(node.children, nextPrefix, last, level + 1)}
         </div>
       );
