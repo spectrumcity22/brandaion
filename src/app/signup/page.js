@@ -80,6 +80,13 @@ export default function Signup() {
           Sign Up
         </button>
         <div className="text-sm text-red-400 mt-4 text-center">{message}</div>
+        <div className="mt-6 text-center">
+          <span className="text-gray-400">Already have an account?</span>
+          <a href="/login" className="ml-2 text-blue-400 hover:underline">Log in</a>
+        </div>
+        <div className="mt-2 text-center">
+          <a href="/test-user" className="text-green-400 hover:underline">Test as Guest</a>
+        </div>
       </div>
     </div>
   );

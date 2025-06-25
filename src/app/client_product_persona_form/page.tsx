@@ -156,11 +156,20 @@ export default function ClientProductPersonaForm() {
       setIsSubmitting(false);
     } else {
       setMessage('✅ Persona saved successfully! Redirecting to next step...');
-      
-      // Redirect to configure AI page (next step in the flow)
-      setTimeout(() => {
-        router.push('/client_configuration_form');
-      }, 2000);
+      // After persona creation, check for invoice
+      (async () => {
+        const { data: invoice, error: invoiceError } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('auth_user_id', sessionUser.id)
+          .eq('status', 'paid')
+          .maybeSingle();
+        if (!invoice) {
+          router.push('/select_package');
+        } else {
+          router.push('/schedule');
+        }
+      })();
     }
   };
 
