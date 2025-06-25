@@ -23,6 +23,10 @@ export default function ClientConfigurationForm() {
   const [isMerging, setIsMerging] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [mergeComplete, setMergeComplete] = useState(false);
+  const [hasSchedule, setHasSchedule] = useState(false);
+  const [hasInvoice, setHasInvoice] = useState(false);
+  const [hasConfig, setHasConfig] = useState(false);
+  const [status, setStatus] = useState('');
   const router = useRouter();
 
   useEffect(() => {
@@ -46,6 +50,37 @@ export default function ClientConfigurationForm() {
         .select("id, persona_name, persona_jsonld")
         .eq("auth_user_id", user.id);
       setPersonas(personasData || []);
+      
+      // Fetch schedule
+      const { data: scheduleData } = await supabase
+        .from('schedule')
+        .select('id')
+        .eq('auth_user_id', user.id);
+      setHasSchedule(!!(scheduleData && scheduleData.length > 0));
+      
+      // Fetch invoice
+      const { data: invoiceData } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .eq('status', 'paid');
+      setHasInvoice(!!(invoiceData && invoiceData.length > 0));
+      
+      // Fetch configuration
+      const { data: configData } = await supabase
+        .from('client_configuration')
+        .select('id')
+        .eq('auth_user_id', user.id);
+      setHasConfig(!!(configData && configData.length > 0));
+      
+      // Set status
+      if (!invoiceData || invoiceData.length === 0) {
+        setStatus('No Package');
+      } else if (configData && configData.length > 0) {
+        setStatus('Created');
+      } else {
+        setStatus('Pending');
+      }
     })();
   }, []);
 
@@ -235,7 +270,7 @@ export default function ClientConfigurationForm() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">Configuration Status</p>
-                <p className="text-3xl font-bold text-white">{isFormComplete ? 'Ready' : 'Pending'}</p>
+                <p className="text-3xl font-bold text-white">{status}</p>
               </div>
               <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -386,7 +421,7 @@ export default function ClientConfigurationForm() {
               <button 
                 type="submit" 
                 className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" 
-                disabled={isProcessing || !isFormComplete}
+                disabled={isProcessing || !isFormComplete || !hasSchedule}
               >
                 {isProcessing ? (
                   <div className="flex items-center">
