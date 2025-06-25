@@ -447,87 +447,139 @@ export default function LLMDiscoveryDashboard() {
     return colors[type] || 'bg-gray-500/20 text-gray-400';
   };
 
-  const renderDirectoryTree = (items: DirectoryItem[], level: number = 0) => {
-    return items.map((item, index) => {
-      const status = item.type === 'file' ? getFileStatus(item) : undefined;
+  // 1. Define the schema skeleton for the directory structure
+  const schemaSkeleton = {
+    name: 'data',
+    type: 'folder',
+    children: [
+      { name: 'platform-llms.txt', type: 'file' },
+      {
+        name: 'organizations',
+        type: 'folder',
+        children: [
+          {
+            name: '[org-slug]',
+            type: 'folder',
+            children: [
+              { name: 'organization-llms.txt', type: 'file' },
+              { name: 'organization.jsonld', type: 'file' },
+              {
+                name: 'brands',
+                type: 'folder',
+                children: [
+                  {
+                    name: '[brand-slug]',
+                    type: 'folder',
+                    children: [
+                      { name: 'brands-llms.txt', type: 'file' },
+                      { name: 'brand.jsonld', type: 'file' },
+                      {
+                        name: 'products',
+                        type: 'folder',
+                        children: [
+                          {
+                            name: '[product-slug]',
+                            type: 'folder',
+                            children: [
+                              { name: 'products-llms.txt', type: 'file' },
+                              { name: 'product.jsonld', type: 'file' },
+                              {
+                                name: 'faqs',
+                                type: 'folder',
+                                children: [
+                                  { name: 'faq.jsonld', type: 'file' }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+
+  // 2. Merge real data with the skeleton, marking missing nodes as red
+  function mergeWithSkeleton(skeleton: any, data: any, level = 0): any {
+    // If skeleton is a file, try to find it in data.children
+    if (skeleton.type === 'file') {
+      const found = data?.children?.find((child: any) => child.name === skeleton.name && child.type === 'file');
+      return found
+        ? { ...found, status: getFileStatus(found) }
+        : { ...skeleton, status: 'red', path: data?.path ? `${data.path}/${skeleton.name}` : skeleton.name };
+    }
+    // If skeleton is a folder, try to find it in data.children
+    let folderData = data?.children?.find((child: any) => child.name === skeleton.name && child.type === 'folder');
+    // For slug folders, match any folder if not found
+    if (!folderData && skeleton.name.startsWith('[') && skeleton.name.endsWith(']')) {
+      // If there are any folders at this level, merge them all
+      const allFolders = (data?.children || []).filter((child: any) => child.type === 'folder' && child.name !== skeleton.name);
+      if (allFolders.length > 0) {
+        return allFolders.map((f: any) => mergeWithSkeleton({ ...skeleton, name: f.name }, f, level + 1));
+      } else {
+        // No folders, show placeholder
+        return [{ ...skeleton, status: 'red', path: data?.path ? `${data.path}/${skeleton.name}` : skeleton.name, children: (skeleton.children || []).map((c: any) => mergeWithSkeleton(c, {}, level + 1)) }];
+      }
+    }
+    // If folderData found, merge its children
+    if (folderData) {
+      return {
+        ...folderData,
+        status: 'green',
+        children: (skeleton.children || []).flatMap((c: any) => mergeWithSkeleton(c, folderData, level + 1)),
+      };
+    } else {
+      // Folder missing, show placeholder with all children as missing
+      return {
+        ...skeleton,
+        status: 'red',
+        path: data?.path ? `${data.path}/${skeleton.name}` : skeleton.name,
+        children: (skeleton.children || []).map((c: any) => mergeWithSkeleton(c, {}, level + 1)),
+      };
+    }
+  }
+
+  // 3. Robust ASCII tree renderer
+  function renderAsciiTree(nodes: any, prefix = '', isLast = true, level = 0): any {
+    if (!Array.isArray(nodes)) nodes = [nodes];
+    return nodes.map((node: any, idx: any) => {
+      const last = idx === nodes.length - 1;
+      const branch = level === 0 ? '' : (last ? '└── ' : '├── ');
+      const nextPrefix = level === 0 ? '' : prefix + (last ? '    ' : '│   ');
       let colorClass = '';
-      if (status === 'red') colorClass = 'text-red-400 font-bold';
-      else if (status === 'amber') colorClass = 'text-yellow-400 font-semibold';
-      else if (status === 'green') colorClass = 'text-green-400 font-semibold';
+      if (node.status === 'red') colorClass = 'text-red-400 font-bold';
+      else if (node.status === 'amber') colorClass = 'text-yellow-400 font-semibold';
+      else if (node.status === 'green') colorClass = 'text-green-400 font-semibold';
       return (
-        <div key={item.path} className="relative">
+        <div key={node.path || node.name + level + idx}>
           <div
-            className={`font-mono text-xs flex items-center py-0.5 px-2 rounded cursor-pointer transition-colors ${
-              hoveredItem?.path === item.path 
-                ? 'bg-gray-700/50' 
-                : 'hover:bg-gray-700/30'
-            }`}
+            className={`font-mono text-xs flex items-center py-0.5 px-2 rounded transition-colors ${colorClass}`}
             style={{ paddingLeft: `${level * 20 + 8}px` }}
-            onMouseEnter={() => setHoveredItem(item)}
-            onMouseLeave={() => setHoveredItem(null)}
           >
-            <span className="whitespace-pre">{'│   '.repeat(level)}{item.type === 'folder' ? '├── ' : '    '}</span>
-            {item.type === 'file' ? (
+            <span className="whitespace-pre">{prefix}{branch}</span>
+            {node.type === 'file' ? (
               <span
                 className={colorClass + ' underline cursor-pointer'}
-                title={status === 'red' ? 'Missing or invalid' : status === 'amber' ? 'Needs attention' : 'Fit for purpose'}
-                onClick={() => setEditingFile(item)}
+                title={node.status === 'red' ? 'Missing or invalid' : node.status === 'amber' ? 'Needs attention' : 'Fit for purpose'}
+                onClick={() => setEditingFile(node)}
               >
-                {item.name}
+                {node.name}
               </span>
             ) : (
-              <span className="text-gray-200">{item.name}</span>
-            )}
-            {/* Inline comment for top-level items */}
-            {item.type === 'folder' && level === 1 && item.name === '[org-slug]' && (
-              <span className="ml-2 text-gray-500"># Individual organization folders</span>
-            )}
-            {item.type === 'file' && item.name === 'organization-llms.txt' && (
-              <span className="ml-2 text-gray-500"># Organization index</span>
-            )}
-            {item.type === 'file' && item.name === 'organization.jsonld' && (
-              <span className="ml-2 text-gray-500"># Organization JSON-LD</span>
-            )}
-            {item.type === 'folder' && item.name === 'brands' && (
-              <span className="ml-2 text-gray-500"># Organization&apos;s brands</span>
-            )}
-            {item.type === 'folder' && level === 3 && item.name === '[brand-slug]' && (
-              <span className="ml-2 text-gray-500"># Brand folders</span>
-            )}
-            {item.type === 'file' && item.name === 'brands-llms.txt' && (
-              <span className="ml-2 text-gray-500"># Brand index</span>
-            )}
-            {item.type === 'file' && item.name === 'brand.jsonld' && (
-              <span className="ml-2 text-gray-500"># Brand JSON-LD</span>
-            )}
-            {item.type === 'folder' && item.name === 'products' && (
-              <span className="ml-2 text-gray-500"># Brand&apos;s products</span>
-            )}
-            {item.type === 'folder' && level === 5 && item.name === '[product-slug]' && (
-              <span className="ml-2 text-gray-500"># Product folders</span>
-            )}
-            {item.type === 'file' && item.name === 'products-llms.txt' && (
-              <span className="ml-2 text-gray-500"># Product index</span>
-            )}
-            {item.type === 'file' && item.name === 'product.jsonld' && (
-              <span className="ml-2 text-gray-500"># Product JSON-LD</span>
-            )}
-            {item.type === 'folder' && item.name === 'faqs' && (
-              <span className="ml-2 text-gray-500"># Product&apos;s FAQs</span>
-            )}
-            {item.type === 'file' && item.name === 'faq.jsonld' && (
-              <span className="ml-2 text-gray-500"># FAQ JSON-LD</span>
+              <span className={colorClass}>{node.name}</span>
             )}
           </div>
-          {item.children && item.children.length > 0 && (
-            <div>
-              {renderDirectoryTree(item.children, level + 1)}
-            </div>
-          )}
+          {node.children && node.children.length > 0 && renderAsciiTree(node.children, nextPrefix, last, level + 1)}
         </div>
       );
     });
-  };
+  }
 
   const renderJSONPreview = () => {
     if (!hoveredItem || !hoveredItem.jsonData) return null;
@@ -562,6 +614,9 @@ export default function LLMDiscoveryDashboard() {
     }
     return files;
   }
+
+  // In the main component, after loading data and building directoryStructure:
+  const mergedTree = mergeWithSkeleton(schemaSkeleton, directoryStructure[0] || {});
 
   if (loading) {
     return (
@@ -677,7 +732,7 @@ export default function LLMDiscoveryDashboard() {
                 <div className="text-sm text-gray-400 mb-3">
                   Hover over items to view JSON data
                 </div>
-                {renderDirectoryTree(directoryStructure)}
+                {renderAsciiTree(mergedTree)}
               </div>
               {renderJSONPreview()}
             </div>
