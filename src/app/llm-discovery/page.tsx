@@ -412,7 +412,7 @@ export default function LLMDiscoveryDashboard() {
             <span className="ml-2 text-gray-500"># Organization JSON-LD</span>
           )}
           {item.type === 'folder' && item.name === 'brands' && (
-            <span className="ml-2 text-gray-500"># Organization's brands</span>
+            <span className="ml-2 text-gray-500"># Organization&apos;s brands</span>
           )}
           {item.type === 'folder' && level === 3 && item.name === '[brand-slug]' && (
             <span className="ml-2 text-gray-500"># Brand folders</span>
@@ -424,7 +424,7 @@ export default function LLMDiscoveryDashboard() {
             <span className="ml-2 text-gray-500"># Brand JSON-LD</span>
           )}
           {item.type === 'folder' && item.name === 'products' && (
-            <span className="ml-2 text-gray-500"># Brand's products</span>
+            <span className="ml-2 text-gray-500"># Brand&apos;s products</span>
           )}
           {item.type === 'folder' && level === 5 && item.name === '[product-slug]' && (
             <span className="ml-2 text-gray-500"># Product folders</span>
@@ -436,7 +436,7 @@ export default function LLMDiscoveryDashboard() {
             <span className="ml-2 text-gray-500"># Product JSON-LD</span>
           )}
           {item.type === 'folder' && item.name === 'faqs' && (
-            <span className="ml-2 text-gray-500"># Product's FAQs</span>
+            <span className="ml-2 text-gray-500"># Product&apos;s FAQs</span>
           )}
           {item.type === 'file' && item.name === 'faq.jsonld' && (
             <span className="ml-2 text-gray-500"># FAQ JSON-LD</span>
