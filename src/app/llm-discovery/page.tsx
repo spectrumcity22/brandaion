@@ -390,7 +390,7 @@ export default function LLMDiscoveryDashboard() {
     return items.map((item, index) => (
       <div key={item.path} className="relative">
         <div
-          className={`flex items-center py-1 px-2 rounded cursor-pointer transition-colors ${
+          className={`font-mono text-xs text-gray-200 flex items-center py-0.5 px-2 rounded cursor-pointer transition-colors ${
             hoveredItem?.path === item.path 
               ? 'bg-gray-700/50' 
               : 'hover:bg-gray-700/30'
@@ -399,15 +399,51 @@ export default function LLMDiscoveryDashboard() {
           onMouseEnter={() => setHoveredItem(item)}
           onMouseLeave={() => setHoveredItem(null)}
         >
-          <span className={`mr-2 ${item.color}`}>{item.icon}</span>
-          <span className="text-gray-300 font-mono text-sm">{item.name}</span>
-          {item.type === 'folder' && (
-            <span className="ml-2 text-gray-500 text-xs">/</span>
+          <span className="whitespace-pre">{'│   '.repeat(level)}{item.type === 'folder' ? '├── ' : '    '}</span>
+          <span>{item.name}</span>
+          {/* Inline comment for top-level items */}
+          {item.type === 'folder' && level === 1 && item.name === '[org-slug]' && (
+            <span className="ml-2 text-gray-500"># Individual organization folders</span>
+          )}
+          {item.type === 'file' && item.name === 'organization-llms.txt' && (
+            <span className="ml-2 text-gray-500"># Organization index</span>
+          )}
+          {item.type === 'file' && item.name === 'organization.jsonld' && (
+            <span className="ml-2 text-gray-500"># Organization JSON-LD</span>
+          )}
+          {item.type === 'folder' && item.name === 'brands' && (
+            <span className="ml-2 text-gray-500"># Organization's brands</span>
+          )}
+          {item.type === 'folder' && level === 3 && item.name === '[brand-slug]' && (
+            <span className="ml-2 text-gray-500"># Brand folders</span>
+          )}
+          {item.type === 'file' && item.name === 'brands-llms.txt' && (
+            <span className="ml-2 text-gray-500"># Brand index</span>
+          )}
+          {item.type === 'file' && item.name === 'brand.jsonld' && (
+            <span className="ml-2 text-gray-500"># Brand JSON-LD</span>
+          )}
+          {item.type === 'folder' && item.name === 'products' && (
+            <span className="ml-2 text-gray-500"># Brand's products</span>
+          )}
+          {item.type === 'folder' && level === 5 && item.name === '[product-slug]' && (
+            <span className="ml-2 text-gray-500"># Product folders</span>
+          )}
+          {item.type === 'file' && item.name === 'products-llms.txt' && (
+            <span className="ml-2 text-gray-500"># Product index</span>
+          )}
+          {item.type === 'file' && item.name === 'product.jsonld' && (
+            <span className="ml-2 text-gray-500"># Product JSON-LD</span>
+          )}
+          {item.type === 'folder' && item.name === 'faqs' && (
+            <span className="ml-2 text-gray-500"># Product's FAQs</span>
+          )}
+          {item.type === 'file' && item.name === 'faq.jsonld' && (
+            <span className="ml-2 text-gray-500"># FAQ JSON-LD</span>
           )}
         </div>
-        
         {item.children && item.children.length > 0 && (
-          <div className="ml-4">
+          <div>
             {renderDirectoryTree(item.children, level + 1)}
           </div>
         )}
