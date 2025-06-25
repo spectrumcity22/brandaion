@@ -54,6 +54,56 @@ interface DirectoryItem {
   color: string;
 }
 
+// Modal for editing file content
+function EditFileModal({ file, onClose, onSave }: { file: DirectoryItem | null, onClose: () => void, onSave: (content: any) => void }) {
+  const [content, setContent] = useState(file?.jsonData ? JSON.stringify(file.jsonData, null, 2) : '');
+  useEffect(() => {
+    setContent(file?.jsonData ? JSON.stringify(file.jsonData, null, 2) : '');
+  }, [file]);
+  if (!file) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+      <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl w-full max-w-2xl p-6 relative">
+        <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white">✕</button>
+        <h3 className="text-lg font-semibold text-white mb-2">Edit {file.name}</h3>
+        <div className="mb-4 text-xs text-gray-400">Path: {file.path}</div>
+        <textarea
+          className="w-full h-64 p-2 bg-gray-800 text-gray-200 font-mono rounded border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          value={content}
+          onChange={e => setContent(e.target.value)}
+        />
+        <div className="flex justify-end mt-4 gap-2">
+          <button onClick={onClose} className="px-4 py-2 rounded bg-gray-700 text-gray-300 hover:bg-gray-600">Cancel</button>
+          <button onClick={() => onSave(content)} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper to determine file status
+function getFileStatus(file: DirectoryItem): 'red' | 'amber' | 'green' {
+  if (!file.jsonData) return 'red';
+  if (file.name.endsWith('.jsonld')) {
+    // Example: check for required fields
+    try {
+      const data = typeof file.jsonData === 'string' ? JSON.parse(file.jsonData) : file.jsonData;
+      if (!data || Object.keys(data).length === 0) return 'red';
+      if (data['@type'] && data['@type'].toLowerCase().includes('organization') && !data['industry']) return 'amber';
+      if (data['@type'] && data['@type'].toLowerCase().includes('product') && !data['name']) return 'amber';
+      // Add more checks as needed
+    } catch {
+      return 'amber';
+    }
+  }
+  // If last_updated is too old, mark as amber
+  if (file.jsonData?.last_updated) {
+    const last = new Date(file.jsonData.last_updated);
+    if (Date.now() - last.getTime() > 1000 * 60 * 60 * 24 * 30) return 'amber'; // >30 days old
+  }
+  return 'green';
+}
+
 export default function LLMDiscoveryDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<DiscoveryStats | null>(null);
@@ -65,6 +115,7 @@ export default function LLMDiscoveryDashboard() {
   const [directoryStructure, setDirectoryStructure] = useState<DirectoryItem[]>([]);
   const [hoveredItem, setHoveredItem] = useState<DirectoryItem | null>(null);
   const [showDirectoryPanel, setShowDirectoryPanel] = useState(true);
+  const [editingFile, setEditingFile] = useState<DirectoryItem | null>(null);
 
   useEffect(() => {
     loadStats();
@@ -397,68 +448,85 @@ export default function LLMDiscoveryDashboard() {
   };
 
   const renderDirectoryTree = (items: DirectoryItem[], level: number = 0) => {
-    return items.map((item, index) => (
-      <div key={item.path} className="relative">
-        <div
-          className={`font-mono text-xs text-gray-200 flex items-center py-0.5 px-2 rounded cursor-pointer transition-colors ${
-            hoveredItem?.path === item.path 
-              ? 'bg-gray-700/50' 
-              : 'hover:bg-gray-700/30'
-          }`}
-          style={{ paddingLeft: `${level * 20 + 8}px` }}
-          onMouseEnter={() => setHoveredItem(item)}
-          onMouseLeave={() => setHoveredItem(null)}
-        >
-          <span className="whitespace-pre">{'│   '.repeat(level)}{item.type === 'folder' ? '├── ' : '    '}</span>
-          <span>{item.name}</span>
-          {/* Inline comment for top-level items */}
-          {item.type === 'folder' && level === 1 && item.name === '[org-slug]' && (
-            <span className="ml-2 text-gray-500"># Individual organization folders</span>
-          )}
-          {item.type === 'file' && item.name === 'organization-llms.txt' && (
-            <span className="ml-2 text-gray-500"># Organization index</span>
-          )}
-          {item.type === 'file' && item.name === 'organization.jsonld' && (
-            <span className="ml-2 text-gray-500"># Organization JSON-LD</span>
-          )}
-          {item.type === 'folder' && item.name === 'brands' && (
-            <span className="ml-2 text-gray-500"># Organization&apos;s brands</span>
-          )}
-          {item.type === 'folder' && level === 3 && item.name === '[brand-slug]' && (
-            <span className="ml-2 text-gray-500"># Brand folders</span>
-          )}
-          {item.type === 'file' && item.name === 'brands-llms.txt' && (
-            <span className="ml-2 text-gray-500"># Brand index</span>
-          )}
-          {item.type === 'file' && item.name === 'brand.jsonld' && (
-            <span className="ml-2 text-gray-500"># Brand JSON-LD</span>
-          )}
-          {item.type === 'folder' && item.name === 'products' && (
-            <span className="ml-2 text-gray-500"># Brand&apos;s products</span>
-          )}
-          {item.type === 'folder' && level === 5 && item.name === '[product-slug]' && (
-            <span className="ml-2 text-gray-500"># Product folders</span>
-          )}
-          {item.type === 'file' && item.name === 'products-llms.txt' && (
-            <span className="ml-2 text-gray-500"># Product index</span>
-          )}
-          {item.type === 'file' && item.name === 'product.jsonld' && (
-            <span className="ml-2 text-gray-500"># Product JSON-LD</span>
-          )}
-          {item.type === 'folder' && item.name === 'faqs' && (
-            <span className="ml-2 text-gray-500"># Product&apos;s FAQs</span>
-          )}
-          {item.type === 'file' && item.name === 'faq.jsonld' && (
-            <span className="ml-2 text-gray-500"># FAQ JSON-LD</span>
+    return items.map((item, index) => {
+      const status = item.type === 'file' ? getFileStatus(item) : undefined;
+      let colorClass = '';
+      if (status === 'red') colorClass = 'text-red-400 font-bold';
+      else if (status === 'amber') colorClass = 'text-yellow-400 font-semibold';
+      else if (status === 'green') colorClass = 'text-green-400 font-semibold';
+      return (
+        <div key={item.path} className="relative">
+          <div
+            className={`font-mono text-xs flex items-center py-0.5 px-2 rounded cursor-pointer transition-colors ${
+              hoveredItem?.path === item.path 
+                ? 'bg-gray-700/50' 
+                : 'hover:bg-gray-700/30'
+            }`}
+            style={{ paddingLeft: `${level * 20 + 8}px` }}
+            onMouseEnter={() => setHoveredItem(item)}
+            onMouseLeave={() => setHoveredItem(null)}
+          >
+            <span className="whitespace-pre">{'│   '.repeat(level)}{item.type === 'folder' ? '├── ' : '    '}</span>
+            {item.type === 'file' ? (
+              <span
+                className={colorClass + ' underline cursor-pointer'}
+                title={status === 'red' ? 'Missing or invalid' : status === 'amber' ? 'Needs attention' : 'Fit for purpose'}
+                onClick={() => setEditingFile(item)}
+              >
+                {item.name}
+              </span>
+            ) : (
+              <span className="text-gray-200">{item.name}</span>
+            )}
+            {/* Inline comment for top-level items */}
+            {item.type === 'folder' && level === 1 && item.name === '[org-slug]' && (
+              <span className="ml-2 text-gray-500"># Individual organization folders</span>
+            )}
+            {item.type === 'file' && item.name === 'organization-llms.txt' && (
+              <span className="ml-2 text-gray-500"># Organization index</span>
+            )}
+            {item.type === 'file' && item.name === 'organization.jsonld' && (
+              <span className="ml-2 text-gray-500"># Organization JSON-LD</span>
+            )}
+            {item.type === 'folder' && item.name === 'brands' && (
+              <span className="ml-2 text-gray-500"># Organization&apos;s brands</span>
+            )}
+            {item.type === 'folder' && level === 3 && item.name === '[brand-slug]' && (
+              <span className="ml-2 text-gray-500"># Brand folders</span>
+            )}
+            {item.type === 'file' && item.name === 'brands-llms.txt' && (
+              <span className="ml-2 text-gray-500"># Brand index</span>
+            )}
+            {item.type === 'file' && item.name === 'brand.jsonld' && (
+              <span className="ml-2 text-gray-500"># Brand JSON-LD</span>
+            )}
+            {item.type === 'folder' && item.name === 'products' && (
+              <span className="ml-2 text-gray-500"># Brand&apos;s products</span>
+            )}
+            {item.type === 'folder' && level === 5 && item.name === '[product-slug]' && (
+              <span className="ml-2 text-gray-500"># Product folders</span>
+            )}
+            {item.type === 'file' && item.name === 'products-llms.txt' && (
+              <span className="ml-2 text-gray-500"># Product index</span>
+            )}
+            {item.type === 'file' && item.name === 'product.jsonld' && (
+              <span className="ml-2 text-gray-500"># Product JSON-LD</span>
+            )}
+            {item.type === 'folder' && item.name === 'faqs' && (
+              <span className="ml-2 text-gray-500"># Product&apos;s FAQs</span>
+            )}
+            {item.type === 'file' && item.name === 'faq.jsonld' && (
+              <span className="ml-2 text-gray-500"># FAQ JSON-LD</span>
+            )}
+          </div>
+          {item.children && item.children.length > 0 && (
+            <div>
+              {renderDirectoryTree(item.children, level + 1)}
+            </div>
           )}
         </div>
-        {item.children && item.children.length > 0 && (
-          <div>
-            {renderDirectoryTree(item.children, level + 1)}
-          </div>
-        )}
-      </div>
-    ));
+      );
+    });
   };
 
   const renderJSONPreview = () => {
@@ -734,6 +802,11 @@ export default function LLMDiscoveryDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Edit File Modal */}
+        {editingFile && (
+          <EditFileModal file={editingFile} onClose={() => setEditingFile(null)} onSave={() => setEditingFile(null)} />
+        )}
       </div>
     </div>
   );
