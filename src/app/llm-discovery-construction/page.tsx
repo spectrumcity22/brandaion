@@ -848,6 +848,7 @@ export default function LLMDiscoveryConstruction() {
                     <button
                       onClick={() => {
                         switch (step.id) {
+                          case 'scan': scanExistingData(); break;
                           case 'populate_static': populateStaticObjects(); break;
                           case 'enrich_org': enrichOrganizationJsonld(); break;
                           case 'populate_faq': populateFAQObjects(); break;
