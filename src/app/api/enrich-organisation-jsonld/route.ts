@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,24 +13,39 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    console.log('Calling edge function with:', { auth_user_id, client_organisation_id });
+
     // Call the Supabase edge function
     const response = await fetch(`${supabaseUrl}/functions/v1/enrich_organisation_jsonld`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'apikey': supabaseServiceKey
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': supabaseAnonKey
       },
       body: JSON.stringify({ auth_user_id, client_organisation_id })
     });
 
-    const result = await response.json();
+    console.log('Edge function response status:', response.status);
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Edge function error response:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      
       return NextResponse.json({ 
-        error: result.error || 'Failed to enrich organization JSON-LD' 
+        error: errorData.error || `HTTP ${response.status}: ${errorText}` 
       }, { status: response.status });
     }
+
+    const result = await response.json();
+    console.log('Edge function success result:', result);
 
     return NextResponse.json(result);
 

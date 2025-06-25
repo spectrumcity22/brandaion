@@ -318,25 +318,48 @@ export default function LLMDiscoveryConstruction() {
       setCurrentStep('enrich_org');
       updateStep('enrich_org', { status: 'running', progress: 10 });
 
-      // Call the edge function to enrich organization JSON-LD
-      const response = await fetch('/api/enrich-organisation-jsonld', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          auth_user_id: selectedClient.auth_user_id
-        })
-      });
+      // Try calling the API route first
+      let response;
+      try {
+        response = await fetch('/api/enrich-organisation-jsonld', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            auth_user_id: selectedClient.auth_user_id
+          })
+        });
+      } catch (apiError) {
+        console.log('API route failed, trying direct edge function call');
+        
+        // Fallback: call edge function directly
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        
+        response = await fetch(`${supabaseUrl}/functions/v1/enrich_organisation_jsonld`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey!
+          },
+          body: JSON.stringify({
+            auth_user_id: selectedClient.auth_user_id
+          })
+        });
+      }
 
       updateStep('enrich_org', { progress: 50 });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('Function call failed:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('Enrichment result:', result);
 
       updateStep('enrich_org', { 
         status: 'completed', 
