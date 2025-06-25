@@ -512,7 +512,7 @@ export default function LLMDiscoveryDashboard() {
     }
   }
 
-  // 3. Robust ASCII tree renderer
+  // 3. Robust ASCII tree renderer with hover/click and color coding
   function renderAsciiTree(nodes: any, prefix = '', isLast = true, level = 0): any {
     if (!Array.isArray(nodes)) nodes = [nodes];
     return nodes.map((node: any, idx: any) => {
@@ -520,21 +520,25 @@ export default function LLMDiscoveryDashboard() {
       const branch = level === 0 ? '' : (last ? '└── ' : '├── ');
       const nextPrefix = level === 0 ? '' : prefix + (last ? '    ' : '│   ');
       let colorClass = '';
-      if (node.status === 'red') colorClass = 'text-red-400 font-bold';
-      else if (node.status === 'amber') colorClass = 'text-yellow-400 font-semibold';
-      else if (node.status === 'green') colorClass = 'text-green-400 font-semibold';
+      // Use getFileStatus for color coding
+      const status = getFileStatus(node);
+      if (status === 'red') colorClass = 'text-red-400 font-bold';
+      else if (status === 'amber') colorClass = 'text-yellow-400 font-semibold';
+      else if (status === 'green') colorClass = 'text-green-400 font-semibold';
       return (
         <div key={node.path || node.name + level + idx}>
           <div
             className={`font-mono text-xs flex items-center py-0.5 px-2 rounded transition-colors ${colorClass}`}
             style={{ paddingLeft: `${level * 20 + 8}px` }}
+            onMouseEnter={() => setHoveredItem(node)}
+            onMouseLeave={() => setHoveredItem(null)}
+            onClick={() => node.type === 'file' ? setEditingFile(node) : undefined}
           >
             <span className="whitespace-pre">{prefix}{branch}</span>
             {node.type === 'file' ? (
               <span
                 className={colorClass + ' underline cursor-pointer'}
-                title={node.status === 'red' ? 'Missing or invalid' : node.status === 'amber' ? 'Needs attention' : 'Fit for purpose'}
-                onClick={() => setEditingFile(node)}
+                title={status === 'red' ? 'Missing or invalid' : status === 'amber' ? 'Needs attention' : 'Fit for purpose'}
               >
                 {node.name}
               </span>
@@ -542,17 +546,18 @@ export default function LLMDiscoveryDashboard() {
               <span className={colorClass}>{node.name}</span>
             )}
           </div>
+          {/* Place FAQ files under their related product nodes */}
           {node.children && node.children.length > 0 && renderAsciiTree(node.children, nextPrefix, last, level + 1)}
         </div>
       );
     });
   }
 
+  // JSON preview side panel
   const renderJSONPreview = () => {
     if (!hoveredItem || !hoveredItem.jsonData) return null;
-
     return (
-      <div className="absolute right-0 top-0 w-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
+      <div className="fixed right-8 top-32 w-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 p-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-white font-semibold text-sm">{hoveredItem.name}</h4>
           <span className="text-gray-400 text-xs">{hoveredItem.type}</span>
@@ -847,12 +852,13 @@ export default function LLMDiscoveryDashboard() {
             </button>
           </div>
           <div className="text-gray-400 text-xs mb-2">Click or hover over items to view JSON data</div>
-          <div className="font-mono text-sm bg-black/40 rounded p-4 overflow-x-auto">
+          <div className="font-mono text-sm bg-black/40 rounded p-4 overflow-x-auto relative">
             {directoryStructure.length === 0 ? (
               <div className="text-red-400">No directory data found for this client.</div>
             ) : (
               renderAsciiTree(directoryStructure)
             )}
+            {renderJSONPreview()}
           </div>
         </div>
 
