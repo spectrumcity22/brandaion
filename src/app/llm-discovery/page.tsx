@@ -252,7 +252,11 @@ export default function LLMDiscoveryDashboard() {
                 last_updated: faqObjects[0].last_generated
               }
             };
-            productFolder.children!.push(faqFile);
+            // Find the faqs folder and push the faqFile into its children
+            const faqsFolder = productFolder.children!.find(child => child.name === 'faqs' && child.type === 'folder');
+            if (faqsFolder && faqsFolder.children) {
+              faqsFolder.children.push(faqFile);
+            }
           }
 
           brandFolder.children!.push(productFolder);
