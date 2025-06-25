@@ -27,6 +27,7 @@ export default function ClientConfigurationForm() {
   const [hasInvoice, setHasInvoice] = useState(false);
   const [hasConfig, setHasConfig] = useState(false);
   const [status, setStatus] = useState('');
+  const [organisation, setOrganisation] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -43,6 +44,14 @@ export default function ClientConfigurationForm() {
         .select("id, brand_name, organisation_name, brand_jsonld_object")
         .eq("auth_user_id", user.id);
       setBrands(brandsData || []);
+      
+      // Fetch organization data for this user
+      const { data: orgData } = await supabase
+        .from("client_organisation")
+        .select("id, organisation_name, organisation_jsonld_object")
+        .eq("auth_user_id", user.id)
+        .single();
+      setOrganisation(orgData);
       
       // Load all personas for the user immediately
       const { data: personasData } = await supabase
@@ -122,7 +131,8 @@ export default function ClientConfigurationForm() {
           market_name: markets.find(m => m.id === form.market_id)?.name,
           brand_jsonld_object: brands.find(b => b.id === form.brand_id)?.brand_jsonld_object,
           schema_json: products.find(p => p.id === form.product_id)?.schema_json || null,
-          persona_jsonld: personas.find(p => p.id === form.persona_id)?.persona_jsonld
+          persona_jsonld: personas.find(p => p.id === form.persona_id)?.persona_jsonld,
+          organisation_jsonld_object: organisation?.organisation_jsonld_object || null
         }, { onConflict: "auth_user_id" });
 
       if (configError) {

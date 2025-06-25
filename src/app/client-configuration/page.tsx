@@ -92,6 +92,7 @@ const ClientConfiguration: React.FC = () => {
           schema_json: selectedProduct ? products.find(p => p.id === selectedProduct)?.schema_json : null,
           persona_jsonld: selectedPersona ? personas.find(p => p.id === selectedPersona)?.persona_jsonld : null,
           audience_json: selectedAudience ? audiences.find(a => a.id === selectedAudience)?.json_audience : null,
+          organisation_jsonld_object: null // This will be populated by the merge function from client_organisation
         });
 
       if (error) throw error;
