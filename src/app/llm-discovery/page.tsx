@@ -133,209 +133,124 @@ export default function LLMDiscoveryDashboard() {
   }, [selectedClientId]);
 
   const generateDirectoryStructure = (
+    clients: Client[],
     staticObjects: DiscoveryObject[],
     faqObjects: FAQObject[],
     brands: any[],
-    products: any[]
-  ) => {
-    const structure: DirectoryItem[] = [
-      {
-        name: 'data',
-        type: 'folder',
-        path: '/data',
-        icon: '📁',
-        color: 'text-blue-400',
-        children: [
-          {
-            name: 'platform-llms.txt',
-            type: 'file',
-            path: '/data/platform-llms.txt',
-            icon: '📄',
-            color: 'text-green-400',
-            jsonData: {
-              description: 'Platform-level LLM discovery index',
-              content: 'Contains all available LLM providers and their capabilities',
-              last_updated: new Date().toISOString()
-            }
-          },
-          {
-            name: 'organizations',
-            type: 'folder',
-            path: '/data/organizations',
-            icon: '🏢',
-            color: 'text-purple-400',
-            children: []
-          }
-        ]
-      }
-    ];
+    products: any[],
+    selectedClientId: string
+  ): DirectoryItem[] => {
+    const structure: DirectoryItem[] = [];
 
-    // For each organization
-    staticObjects.forEach(org => {
-      const orgName = org.organization_jsonld?.name || 'organization';
-      const orgSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-      const orgBrands = brands.filter(b => b.organisation_id === org.client_organisation_id);
+    // Determine which clients to show
+    const clientsToShow = selectedClientId === 'all' ? clients : clients.filter(c => c.auth_user_id === selectedClientId);
+
+    for (const client of clientsToShow) {
+      const clientStaticObjects = staticObjects.filter(obj => obj.client_organisation_id === client.id);
+      const clientFaqObjects = faqObjects.filter(obj => obj.client_organisation_id === client.id);
+      const clientBrands = brands.filter(brand => brand.organisation_id === client.id);
+      const clientProducts = products.filter(product => product.organisation_id === client.id);
+
+      // Organization folder
       const orgFolder: DirectoryItem = {
-        name: orgSlug,
+        name: client.organisation_name || 'Unnamed Organization',
         type: 'folder',
-        path: `/data/organizations/${orgSlug}`,
-        icon: '🏢',
-        color: 'text-purple-400',
-        children: [
-          {
-            name: 'organization-llms.txt',
-            type: 'file',
-            path: `/data/organizations/${orgSlug}/organization-llms.txt`,
-            icon: '📄',
-            color: 'text-green-400',
-            jsonData: {
-              description: 'Organization-specific LLM discovery index',
-              organization: orgName,
-              last_updated: org.last_generated
-            }
-          },
-          {
-            name: 'organization.jsonld',
-            type: 'file',
-            path: `/data/organizations/${orgSlug}/organization.jsonld`,
-            icon: '🔗',
-            color: 'text-yellow-400',
-            jsonData: org.organization_jsonld || {
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": orgName,
-              "description": "Organization JSON-LD data"
-            }
-          },
-          {
-            name: 'brands',
-            type: 'folder',
-            path: `/data/organizations/${orgSlug}/brands`,
-            icon: '🏷️',
-            color: 'text-orange-400',
-            children: []
-          }
-        ]
+        path: `/${client.organisation_name || 'unnamed'}`,
+        icon: '📁',
+        color: clientStaticObjects.length > 0 ? 'text-green-500' : 'text-red-500',
+        children: []
       };
-      const brandsFolder = orgFolder.children?.find(c => c.name === 'brands' && c.type === 'folder');
-      if (brandsFolder && brandsFolder.children) {
-        orgBrands.forEach(brand => {
-          const brandSlug = brand.brand_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-          const brandProducts = products.filter(p => p.brand_id === brand.id);
-          const brandFolder: DirectoryItem = {
-            name: brandSlug,
+
+      // Organization JSON-LD file
+      const orgJsonld = clientStaticObjects.find(obj => obj.organization_jsonld);
+      orgFolder.children!.push({
+        name: 'organization.jsonld',
+        type: 'file',
+        path: `/${client.organisation_name || 'unnamed'}/organization.jsonld`,
+        jsonData: orgJsonld?.organization_jsonld || null,
+        icon: '📄',
+        color: orgJsonld ? 'text-green-500' : 'text-red-500'
+      });
+
+      // Brands folder
+      const brandsFolder: DirectoryItem = {
+        name: 'brands',
+        type: 'folder',
+        path: `/${client.organisation_name || 'unnamed'}/brands`,
+        icon: '📁',
+        color: clientBrands.length > 0 ? 'text-green-500' : 'text-red-500',
+        children: []
+      };
+
+      // Add brand files
+      for (const brand of clientBrands) {
+        const brandJsonld = clientStaticObjects.find(obj => obj.brand_jsonld);
+        brandsFolder.children!.push({
+          name: `${brand.brand_name || 'unnamed'}.jsonld`,
+          type: 'file',
+          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}.jsonld`,
+          jsonData: brandJsonld?.brand_jsonld || null,
+          icon: '📄',
+          color: brandJsonld ? 'text-green-500' : 'text-red-500'
+        });
+
+        // Products subfolder for this brand
+        const brandProducts = clientProducts.filter(product => product.brand_id === brand.id);
+        if (brandProducts.length > 0) {
+          const productsFolder: DirectoryItem = {
+            name: 'products',
             type: 'folder',
-            path: `/data/organizations/${orgSlug}/brands/${brandSlug}`,
-            icon: '🏷️',
-            color: 'text-orange-400',
-            children: [
-              {
-                name: 'brands-llms.txt',
-                type: 'file',
-                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brands-llms.txt`,
-                icon: '📄',
-                color: 'text-green-400',
-                jsonData: {
-                  description: 'Brand-specific LLM discovery index',
-                  brand: brand.brand_name,
-                  last_updated: brand.updated_at || brand.created_at
-                }
-              },
-              {
-                name: 'brand.jsonld',
-                type: 'file',
-                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/brand.jsonld`,
-                icon: '🔗',
-                color: 'text-yellow-400',
-                jsonData: brand.brand_jsonld_object
-              },
-              {
-                name: 'products',
-                type: 'folder',
-                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products`,
-                icon: '📦',
-                color: 'text-red-400',
-                children: []
-              }
-            ]
+            path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products`,
+            icon: '📁',
+            color: 'text-green-500',
+            children: []
           };
-          const productsFolder = brandFolder.children?.find(c => c.name === 'products' && c.type === 'folder');
-          if (productsFolder && productsFolder.children) {
-            brandProducts.forEach(product => {
-              const productSlug = product.product_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-              const productFaqs = faqObjects.filter(faq => faq.product_id === product.id);
-              const productFolder: DirectoryItem = {
-                name: productSlug,
-                type: 'folder',
-                path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}`,
-                icon: '📦',
-                color: 'text-red-400',
-                children: [
-                  {
-                    name: 'products-llms.txt',
-                    type: 'file',
-                    path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/products-llms.txt`,
-                    icon: '📄',
-                    color: 'text-green-400',
-                    jsonData: {
-                      description: 'Product-specific LLM discovery index',
-                      product: product.product_name,
-                      last_updated: product.updated_at || product.inserted_at
-                    }
-                  },
-                  {
-                    name: 'product.jsonld',
-                    type: 'file',
-                    path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/product.jsonld`,
-                    icon: '🔗',
-                    color: 'text-yellow-400',
-                    jsonData: product.schema_json
-                  },
-                  {
-                    name: 'faqs',
-                    type: 'folder',
-                    path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs`,
-                    icon: '❓',
-                    color: 'text-cyan-400',
-                    children: []
-                  }
-                ]
-              };
-              // Add FAQ file if exists
-              if (productFaqs.length > 0) {
-                const faqFile: DirectoryItem = {
-                  name: 'faq.jsonld',
-                  type: 'file',
-                  path: `/data/organizations/${orgSlug}/brands/${brandSlug}/products/${productSlug}/faqs/faq.jsonld`,
-                  icon: '🔗',
-                  color: 'text-yellow-400',
-                  jsonData: productFaqs[0].faq_json_object || {
-                    description: 'FAQ data for this product',
-                    faq_count: productFaqs.length,
-                    last_updated: productFaqs[0].last_generated
-                  }
-                };
-                const faqsFolder = (productFolder.children ?? []).find(child => child.name === 'faqs' && child.type === 'folder');
-                if (faqsFolder && faqsFolder.children) {
-                  faqsFolder.children.push(faqFile);
-                }
-              }
-              if (productsFolder && productsFolder.children) {
-                productsFolder.children.push(productFolder);
-              }
+
+          for (const product of brandProducts) {
+            const productJsonld = clientStaticObjects.find(obj => obj.product_jsonld);
+            productsFolder.children!.push({
+              name: `${product.product_name || 'unnamed'}.jsonld`,
+              type: 'file',
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}.jsonld`,
+              jsonData: productJsonld?.product_jsonld || null,
+              icon: '📄',
+              color: productJsonld ? 'text-green-500' : 'text-red-500'
             });
           }
+
+          brandsFolder.children!.push(productsFolder);
+        }
+      }
+
+      orgFolder.children!.push(brandsFolder);
+
+      // FAQs folder
+      const faqsFolder: DirectoryItem = {
+        name: 'faqs',
+        type: 'folder',
+        path: `/${client.organisation_name || 'unnamed'}/faqs`,
+        icon: '📁',
+        color: clientFaqObjects.length > 0 ? 'text-green-500' : 'text-red-500',
+        children: []
+      };
+
+      // Add FAQ files
+      for (const faq of clientFaqObjects) {
+        faqsFolder.children!.push({
+          name: `faq-${faq.week_start_date}.jsonld`,
+          type: 'file',
+          path: `/${client.organisation_name || 'unnamed'}/faqs/faq-${faq.week_start_date}.jsonld`,
+          jsonData: faq.faq_json_object || null,
+          icon: '📄',
+          color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
         });
       }
-      // Only push orgFolder after all brands are added
-      if (
-        Array.isArray(structure[0].children) &&
-        structure[0].children[1] &&
-        Array.isArray(structure[0].children[1].children)
-      ) {
-        structure[0].children[1].children.push(orgFolder);
-      }
-    });
+
+      orgFolder.children!.push(faqsFolder);
+
+      structure.push(orgFolder);
+    }
+
     return structure;
   };
 
@@ -364,56 +279,70 @@ export default function LLMDiscoveryDashboard() {
       let productsFilter = supabase.from('products').select('*');
 
       if (selectedClientId !== 'all') {
-        staticFilter = staticFilter.eq('auth_user_id', selectedClientId);
-        faqFilter = faqFilter.eq('auth_user_id', selectedClientId);
-        brandsFilter = brandsFilter.eq('auth_user_id', selectedClientId);
-        productsFilter = productsFilter.eq('auth_user_id', selectedClientId);
+        // Filter by specific client's organization
+        const selectedClient = allClients?.find(c => c.auth_user_id === selectedClientId);
+        if (selectedClient) {
+          staticFilter = staticFilter.eq('client_organisation_id', selectedClient.id);
+          faqFilter = faqFilter.eq('client_organisation_id', selectedClient.id);
+          brandsFilter = brandsFilter.eq('organisation_id', selectedClient.id);
+          productsFilter = productsFilter.eq('organisation_id', selectedClient.id);
+        }
       }
 
       // Get static objects
-      const { data: staticObjects, error: staticError } = await staticFilter
-        .order('last_generated', { ascending: false });
-
+      const { data: staticObjects, error: staticError } = await staticFilter.order('last_generated', { ascending: false });
       if (staticError) throw staticError;
 
       // Get FAQ objects
-      const { data: faqObjects, error: faqError } = await faqFilter
-        .order('last_generated', { ascending: false });
-
+      const { data: faqObjects, error: faqError } = await faqFilter.order('last_generated', { ascending: false });
       if (faqError) throw faqError;
 
       // Get brands
-      const { data: brands, error: brandsError } = await brandsFilter;
+      const { data: brands, error: brandsError } = await brandsFilter.order('brand_name', { ascending: true });
       if (brandsError) throw brandsError;
 
       // Get products
-      const { data: products, error: productsError } = await productsFilter;
+      const { data: products, error: productsError } = await productsFilter.order('product_name', { ascending: true });
       if (productsError) throw productsError;
 
       // Calculate stats
-      const stats: DiscoveryStats = {
-        total_static_objects: staticObjects?.length || 0,
-        total_faq_objects: faqObjects?.length || 0,
-        organizations_with_jsonld: staticObjects?.filter(obj => obj.organization_jsonld)?.length || 0,
-        brands_with_jsonld: staticObjects?.filter(obj => obj.brand_jsonld)?.length || 0,
-        products_with_jsonld: staticObjects?.filter(obj => obj.product_jsonld)?.length || 0,
-        recent_updates: [...(staticObjects || []), ...(faqObjects || [])]
-          .sort((a, b) => new Date(b.last_generated).getTime() - new Date(a.last_generated).getTime())
-          .slice(0, 10)
-      };
+      const totalStaticObjects = staticObjects?.length || 0;
+      const totalFaqObjects = faqObjects?.length || 0;
+      const organizationsWithJsonld = staticObjects?.filter(obj => obj.organization_jsonld)?.length || 0;
+      const brandsWithJsonld = staticObjects?.filter(obj => obj.brand_jsonld)?.length || 0;
+      const productsWithJsonld = staticObjects?.filter(obj => obj.product_jsonld)?.length || 0;
 
-      setStats(stats);
+      // Get recent updates (last 10)
+      const recentUpdates = [...(staticObjects || []), ...(faqObjects || [])]
+        .sort((a, b) => new Date(b.last_generated || b.created_at).getTime() - new Date(a.last_generated || a.created_at).getTime())
+        .slice(0, 10);
 
-      // Generate directory structure with brands and products
-      const directoryStructure = generateDirectoryStructure(staticObjects || [], faqObjects || [], brands || [], products || []);
+      setStats({
+        total_static_objects: totalStaticObjects,
+        total_faq_objects: totalFaqObjects,
+        organizations_with_jsonld: organizationsWithJsonld,
+        brands_with_jsonld: brandsWithJsonld,
+        products_with_jsonld: productsWithJsonld,
+        recent_updates: recentUpdates
+      });
+
+      // Generate directory structure
+      const directoryStructure = generateDirectoryStructure(
+        allClients || [],
+        staticObjects || [],
+        faqObjects || [],
+        brands || [],
+        products || [],
+        selectedClientId
+      );
       setDirectoryStructure(directoryStructure);
 
-      // Calculate client stats
-      await calculateClientStats();
+      // Calculate client stats for overview table
+      await calculateClientStats(allClients || [], staticObjects || [], faqObjects || [], brands || [], products || []);
 
-    } catch (err) {
-      console.error('Error loading stats:', err);
-      setError('Failed to load discovery stats');
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      setError('Failed to load discovery data');
     } finally {
       setLoading(false);
     }
@@ -657,43 +586,38 @@ export default function LLMDiscoveryDashboard() {
   const mergedTree = mergeWithSkeleton(schemaSkeleton, directoryStructure[0] || {});
 
   // Function to calculate stats for each client
-  const calculateClientStats = async () => {
+  const calculateClientStats = async (clients: Client[], staticObjects: DiscoveryObject[], faqObjects: FAQObject[], brands: any[], products: any[]) => {
     try {
       const stats: Record<string, any> = {};
       
       for (const client of clients) {
         // Get static objects for this client
-        const { data: staticObjects } = await supabase
-          .from('llm_discovery_static')
-          .select('*')
-          .eq('auth_user_id', client.auth_user_id);
+        const clientStaticObjects = staticObjects.filter(obj => obj.client_organisation_id === client.id);
+        const clientFaqObjects = faqObjects.filter(obj => obj.client_organisation_id === client.id);
+        const clientBrands = brands.filter(brand => brand.organisation_id === client.id);
+        const clientProducts = products.filter(product => product.organisation_id === client.id);
 
-        // Get FAQ objects for this client
-        const { data: faqObjects } = await supabase
-          .from('llm_discovery_faq_objects')
-          .select('*')
-          .eq('auth_user_id', client.auth_user_id);
-
-        // Get brands for this client
-        const { data: brands } = await supabase
-          .from('brands')
-          .select('*')
-          .eq('auth_user_id', client.auth_user_id);
-
-        // Get products for this client
-        const { data: products } = await supabase
-          .from('products')
-          .select('*')
-          .eq('auth_user_id', client.auth_user_id);
+        // Calculate status
+        let status = 'Inactive';
+        let statusColor = 'text-red-500';
+        
+        if (clientStaticObjects.length > 0 || clientFaqObjects.length > 0) {
+          if (clientStaticObjects.length > 0 && clientBrands.length > 0 && clientProducts.length > 0) {
+            status = 'Complete';
+            statusColor = 'text-green-500';
+          } else {
+            status = 'Partial';
+            statusColor = 'text-yellow-500';
+          }
+        }
 
         stats[client.auth_user_id] = {
-          static_objects: staticObjects?.length || 0,
-          faq_objects: faqObjects?.length || 0,
-          brands: brands?.length || 0,
-          products: products?.length || 0,
-          has_org_jsonld: staticObjects?.some(obj => obj.organization_jsonld) || false,
-          has_brand_jsonld: staticObjects?.some(obj => obj.brand_jsonld) || false,
-          has_product_jsonld: staticObjects?.some(obj => obj.product_jsonld) || false,
+          staticObjects: clientStaticObjects.length,
+          faqObjects: clientFaqObjects.length,
+          brands: clientBrands.length,
+          products: clientProducts.length,
+          status,
+          statusColor
         };
       }
       
@@ -870,24 +794,21 @@ export default function LLMDiscoveryDashboard() {
                 <tbody className="divide-y divide-gray-700">
                   {clients.map((client) => {
                     const stats = clientStats[client.auth_user_id] || {};
-                    const isActive = stats.static_objects > 0 || stats.faq_objects > 0;
-                    const hasCompleteData = stats.has_org_jsonld && stats.has_brand_jsonld && stats.has_product_jsonld;
                     
                     return (
                       <tr 
-                        key={client.id} 
-                        className="hover:bg-gray-700/30 cursor-pointer transition-colors"
-                        onClick={() => handleClientSelect(client.auth_user_id)}
+                        key={client.id}
+                        className="border-b border-gray-700 hover:bg-gray-700/30 cursor-pointer transition-colors"
+                        onClick={() => setSelectedClientId(client.auth_user_id)}
                       >
                         <td className="px-4 py-3">
                           <div className="text-sm font-medium text-white">{client.organisation_name}</div>
-                          <div className="text-xs text-gray-400">{client.auth_user_id.slice(0, 8)}...</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm text-gray-300">{stats.static_objects || 0}</div>
+                          <div className="text-sm text-gray-300">{stats.staticObjects || 0}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm text-gray-300">{stats.faq_objects || 0}</div>
+                          <div className="text-sm text-gray-300">{stats.faqObjects || 0}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm text-gray-300">{stats.brands || 0}</div>
@@ -896,15 +817,9 @@ export default function LLMDiscoveryDashboard() {
                           <div className="text-sm text-gray-300">{stats.products || 0}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            hasCompleteData 
-                              ? 'bg-green-500/20 text-green-400' 
-                              : isActive 
-                                ? 'bg-yellow-500/20 text-yellow-400'
-                                : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            {hasCompleteData ? 'Complete' : isActive ? 'Partial' : 'Inactive'}
-                          </span>
+                          <div className={`text-sm font-medium ${stats.statusColor || 'text-gray-400'}`}>
+                            {stats.status || 'Unknown'}
+                          </div>
                         </td>
                       </tr>
                     );

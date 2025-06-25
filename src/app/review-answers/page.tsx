@@ -65,9 +65,18 @@ export default function ReviewAnswers() {
 
   const fetchAnswers = async () => {
     try {
+      // Get current user first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!user || authError) {
+        setError('Authentication required');
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('review_questions')
         .select('id, topic, question, ai_response_answers, answer_status, unique_batch_id, unique_batch_cluster, organisation, product_name, audience_name, batch_faq_pairs')
+        .eq('auth_user_id', user.id) // Filter by current user
         .eq('answer_status', 'completed')
         .not('ai_response_answers', 'is', null)
         .order('created_at', { ascending: false });
