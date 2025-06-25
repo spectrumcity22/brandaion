@@ -44,6 +44,14 @@ interface DiscoveryStats {
   recent_updates: (DiscoveryObject | FAQObject)[];
 }
 
+interface Client {
+  id: string;
+  auth_user_id: string;
+  organisation_name: string;
+  email?: string;
+  created_at: string;
+}
+
 interface DirectoryItem {
   name: string;
   type: 'file' | 'folder';
@@ -116,10 +124,12 @@ export default function LLMDiscoveryDashboard() {
   const [hoveredItem, setHoveredItem] = useState<DirectoryItem | null>(null);
   const [showDirectoryPanel, setShowDirectoryPanel] = useState(true);
   const [editingFile, setEditingFile] = useState<DirectoryItem | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('all');
 
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [selectedClientId]);
 
   const generateDirectoryStructure = (
     staticObjects: DiscoveryObject[],
@@ -337,23 +347,47 @@ export default function LLMDiscoveryDashboard() {
         return;
       }
 
+      // Get all clients for admin view
+      const { data: allClients, error: clientsError } = await supabase
+        .from('client_organisation')
+        .select('id, auth_user_id, organisation_name, created_at')
+        .order('organisation_name', { ascending: true });
+
+      if (clientsError) throw clientsError;
+      setClients(allClients || []);
+
+      // Build filter conditions based on selected client
+      let staticFilter = supabase.from('llm_discovery_static').select('*');
+      let faqFilter = supabase.from('llm_discovery_faq_objects').select('*');
+      let brandsFilter = supabase.from('brands').select('*');
+      let productsFilter = supabase.from('products').select('*');
+
+      if (selectedClientId !== 'all') {
+        staticFilter = staticFilter.eq('auth_user_id', selectedClientId);
+        faqFilter = faqFilter.eq('auth_user_id', selectedClientId);
+        brandsFilter = brandsFilter.eq('auth_user_id', selectedClientId);
+        productsFilter = productsFilter.eq('auth_user_id', selectedClientId);
+      }
+
       // Get static objects
-      const { data: staticObjects, error: staticError } = await supabase
-        .from('llm_discovery_static')
-        .select('*')
-        .eq('auth_user_id', user.id)
+      const { data: staticObjects, error: staticError } = await staticFilter
         .order('last_generated', { ascending: false });
 
       if (staticError) throw staticError;
 
       // Get FAQ objects
-      const { data: faqObjects, error: faqError } = await supabase
-        .from('llm_discovery_faq_objects')
-        .select('*')
-        .eq('auth_user_id', user.id)
+      const { data: faqObjects, error: faqError } = await faqFilter
         .order('last_generated', { ascending: false });
 
       if (faqError) throw faqError;
+
+      // Get brands
+      const { data: brands, error: brandsError } = await brandsFilter;
+      if (brandsError) throw brandsError;
+
+      // Get products
+      const { data: products, error: productsError } = await productsFilter;
+      if (productsError) throw productsError;
 
       // Calculate stats
       const stats: DiscoveryStats = {
@@ -369,8 +403,8 @@ export default function LLMDiscoveryDashboard() {
 
       setStats(stats);
 
-      // Generate directory structure
-      const directoryStructure = generateDirectoryStructure(staticObjects || [], faqObjects || [], [], []);
+      // Generate directory structure with brands and products
+      const directoryStructure = generateDirectoryStructure(staticObjects || [], faqObjects || [], brands || [], products || []);
       setDirectoryStructure(directoryStructure);
 
     } catch (err) {
@@ -645,6 +679,33 @@ export default function LLMDiscoveryDashboard() {
           </div>
         </div>
 
+        {/* Client Filter */}
+        <div className="mb-6 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <label className="text-white font-medium">Filter by Client:</label>
+              <select
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+                className="bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Clients</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.auth_user_id}>
+                    {client.organisation_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="text-sm text-gray-400">
+              {selectedClientId === 'all' 
+                ? `Showing data for all ${clients.length} clients`
+                : `Showing data for ${clients.find(c => c.auth_user_id === selectedClientId)?.organisation_name || 'selected client'}`
+              }
+            </div>
+          </div>
+        </div>
+
         {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-lg">
@@ -710,6 +771,66 @@ export default function LLMDiscoveryDashboard() {
             <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
               <div className="text-3xl font-bold text-orange-400 mb-2">{stats.products_with_jsonld}</div>
               <div className="text-gray-400">With Product JSON-LD</div>
+            </div>
+          </div>
+        )}
+
+        {/* Client Overview */}
+        {selectedClientId === 'all' && (
+          <div className="mb-8 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-white mb-4">📊 Client Overview</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-700/50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Static Objects
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      FAQ Objects
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Brands
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Products
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {clients.map((client) => (
+                    <tr key={client.id} className="hover:bg-gray-700/30">
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-white">{client.organisation_name}</div>
+                        <div className="text-xs text-gray-400">{client.auth_user_id.slice(0, 8)}...</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-300">-</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-300">-</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-300">-</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm text-gray-300">-</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                          Active
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
