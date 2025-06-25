@@ -42,24 +42,11 @@ export default function Schedule() {
         return;
       }
 
-      // Get the end_user_id for this user
-      const { data: endUser, error: endUserError } = await supabase
-        .from('end_users')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (endUserError || !endUser) {
-        setError('No end user found for this account.');
-        setLoading(false);
-        return;
-      }
-
-      // Fetch all schedule rows for this end user, ordered by batch_date
+      // Fetch all schedule rows for this user, ordered by batch_date
       const { data, error: scheduleError } = await supabase
         .from('schedule')
         .select('*')
-        .eq('auth_user_id', endUser.id)
+        .eq('auth_user_id', user.id)
         .order('batch_date', { ascending: true });
 
       if (scheduleError) {

@@ -56,7 +56,8 @@ serve(async (req) => {
       brand_jsonld_object: config.brand_jsonld_object,
       product_jsonld_object: config.schema_json,
       persona_jsonld: config.persona_jsonld,
-      generation_status: 'pending'
+      ai_request_for_questions: config.brand_jsonld_object,
+      question_status: 'pending'
     }));
     const { error: insertError } = await supabase
       .from("construct_faq_pairs")
