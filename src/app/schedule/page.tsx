@@ -162,16 +162,15 @@ export default function Schedule() {
         },
         body: JSON.stringify({
           organisation_id: org.id,
-          product_name: s.organisation, // or s.product_name if available
-          id: s.unique_batch_cluster, // or another unique id
-          market: s.organisation, // or s.market if available
+          product_name: s.organisation, // Use organization name as product name
           description: '', // fill as needed
           keywords: '', // fill as needed
           url: '', // fill as needed
-          brand_name: s.organisation,
           category: '', // fill as needed
           organisation: s.organisation,
           schema_json: {}, // fill as needed
+          auth_user_id: userId,
+          user_email: s.user_email
         }),
       });
       if (!response.ok) {
