@@ -75,29 +75,52 @@ export default function LLMDiscoveryConstruction() {
       setLoading(true);
       
       // Get all clients (organizations)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-
-      // For admin purposes, get all clients (in a real app, you'd filter by admin permissions)
       const { data: clientOrgs, error: clientError } = await supabase
         .from('client_organisation')
         .select(`
           auth_user_id,
-          organisation_name,
-          end_users(user_email)
+          organisation_name
         `)
         .order('organisation_name');
 
       if (clientError) throw clientError;
 
-      const clientsData: Client[] = clientOrgs?.map(org => ({
-        auth_user_id: org.auth_user_id,
-        organisation_name: org.organisation_name,
-        user_email: org.end_users?.[0]?.user_email || 'Unknown'
-      })) || [];
+      // Get user emails for each organization
+      const clientsData: Client[] = [];
+      for (const org of clientOrgs || []) {
+        const { data: endUser } = await supabase
+          .from('end_users')
+          .select('user_email')
+          .eq('auth_user_id', org.auth_user_id)
+          .single();
+
+        clientsData.push({
+          auth_user_id: org.auth_user_id,
+          organisation_name: org.organisation_name,
+          user_email: endUser?.user_email || 'Unknown'
+        });
+      }
+
+      console.log('Found organizations:', clientOrgs?.length || 0);
+      console.log('Processed clients:', clientsData.length);
+
+      // If no organizations found, try to get the current user as a fallback
+      if (clientsData.length === 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: endUser } = await supabase
+            .from('end_users')
+            .select('user_email')
+            .eq('auth_user_id', user.id)
+            .single();
+
+          clientsData.push({
+            auth_user_id: user.id,
+            organisation_name: 'Current User',
+            user_email: endUser?.user_email || user.email || 'Unknown'
+          });
+        }
+      }
 
       setClients(clientsData);
 
