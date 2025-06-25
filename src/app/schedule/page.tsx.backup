@@ -31,8 +31,6 @@ export default function Schedule() {
   const [error, setError] = useState('');
   const [productMessage, setProductMessage] = useState('');
   const [creatingProduct, setCreatingProduct] = useState(false);
-  const [productExists, setProductExists] = useState(false);
-  const [productCheckComplete, setProductCheckComplete] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -72,61 +70,6 @@ export default function Schedule() {
       setLoading(false);
     })();
   }, [router]);
-
-  // Check if product exists and handle auto-creation
-  useEffect(() => {
-    if (!schedule || schedule.length === 0 || loading) return;
-
-    const checkAndCreateProduct = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const userId = session.user.id;
-        
-        // Get the user's organisation_id
-        const { data: org, error: orgError } = await supabase
-          .from('client_organisation')
-          .select('id')
-          .eq('auth_user_id', userId)
-          .single();
-
-        if (orgError || !org) return;
-
-        // Check if product already exists for this organization
-        const { data: existingProduct, error: productError } = await supabase
-          .from('products')
-          .select('id')
-          .eq('organisation_id', org.id)
-          .single();
-
-        if (productError && productError.code !== 'PGRST116') {
-          // PGRST116 is "not found" error, which is expected if no product exists
-          console.error('Error checking product:', productError);
-          return;
-        }
-
-        if (existingProduct) {
-          // Product exists, show success state immediately
-          setProductExists(true);
-          setProductMessage('✅ Product already exists!');
-        } else {
-          // Product doesn't exist, auto-create after 2 seconds
-          setProductMessage('⏳ Auto-creating product in 2 seconds...');
-          
-          setTimeout(async () => {
-            await handleCreateProduct();
-          }, 2000);
-        }
-      } catch (err) {
-        console.error('Error in checkAndCreateProduct:', err);
-      } finally {
-        setProductCheckComplete(true);
-      }
-    };
-
-    checkAndCreateProduct();
-  }, [schedule, loading]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '—';
@@ -178,7 +121,6 @@ export default function Schedule() {
         const errorData = await response.json();
         setProductMessage('❌ Failed to create product: ' + errorData.error);
       } else {
-        setProductExists(true);
         setProductMessage('✅ Product created successfully!');
       }
     } catch (err: any) {
@@ -314,8 +256,6 @@ export default function Schedule() {
               <div className={`mb-6 p-4 rounded-lg text-center ${
                 productMessage.includes('❌') 
                   ? 'bg-red-500/10 text-red-400 border border-red-500/20' 
-                  : productMessage.includes('⏳')
-                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                   : 'bg-green-500/10 text-green-400 border border-green-500/20'
               }`}>
                 {productMessage}
@@ -323,22 +263,20 @@ export default function Schedule() {
             )}
 
             <div className="flex flex-col sm:flex-row gap-4">
-              {!productExists && (
-                <button
-                  onClick={handleCreateProduct}
-                  disabled={creatingProduct}
-                  className={`premium-button flex-1 ${creatingProduct ? 'premium-loading' : ''}`}
-                >
-                  {creatingProduct ? (
-                    <div className="flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Creating Product...
-                    </div>
-                  ) : (
-                    '📦 Create Product'
-                  )}
-                </button>
-              )}
+              <button
+                onClick={handleCreateProduct}
+                disabled={creatingProduct}
+                className={`premium-button flex-1 ${creatingProduct ? 'premium-loading' : ''}`}
+              >
+                {creatingProduct ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Creating Product...
+                  </div>
+                ) : (
+                  '📦 Create Product'
+                )}
+              </button>
               
               <button
                 onClick={() => router.push('/dashboard')}
@@ -348,7 +286,7 @@ export default function Schedule() {
               </button>
             </div>
             
-            {productExists && (
+            {productMessage.includes('✅') && (
               <div className="mt-6 text-center">
                 <button
                   onClick={() => router.push('/client_product_persona_form')}
