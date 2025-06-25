@@ -79,6 +79,9 @@ function InvoiceConfirmationContent() {
       const data = await response.json();
       console.log('Schedule created successfully:', data);
       setMessage('✅ Schedule created successfully!');
+      setTimeout(() => {
+        router.push('/client_configuration_form');
+      }, 1500);
     } catch (error) {
       console.error('Error creating schedule:', error);
       setMessage('❌ Failed to create schedule. Please try again.');

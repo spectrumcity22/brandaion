@@ -44,10 +44,19 @@ export default function GlobalLayout({ children }: { children: React.ReactNode }
           ) : (
             <>
               <Link href="/dashboard" className="hover:text-green-400">Dashboard</Link>
+              <div className="relative group">
+                <button className="hover:text-blue-400 focus:outline-none">Configuration ▾</button>
+                <div className="absolute left-0 mt-2 w-48 bg-black border border-gray-700 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                  <Link href="/client_brands_form" className="block px-4 py-2 hover:bg-gray-800">Brand Management</Link>
+                  <Link href="/client_products" className="block px-4 py-2 hover:bg-gray-800">Product Management</Link>
+                  <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-800">Persona Management</Link>
+                </div>
+              </div>
+              <Link href="/invoice_confirmation" className="hover:text-yellow-400">Invoice Payment</Link>
+              <Link href="/client_configuration_form" className="hover:text-green-400 font-bold">Configure AI</Link>
               <Link href="/review-questions" className="hover:text-green-400">Review Questions</Link>
               <Link href="/end_user_form" className="hover:text-green-400">End User Form</Link>
               <Link href="/organisation_form" className="hover:text-green-400">Client Organisation</Link>
-              <Link href="/invoice_confirmation" className="hover:text-green-400">Invoice</Link>
               <button onClick={handleLogout} className="hover:text-red-400">Log Out</button>
             </>
           )}
