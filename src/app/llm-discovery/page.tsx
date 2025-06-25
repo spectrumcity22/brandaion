@@ -266,9 +266,12 @@ export default function LLMDiscoveryDashboard() {
         });
       }
       // Only push orgFolder after all brands are added
-      const orgsArray = structure[0].children[1]?.children ?? [];
-      if (Array.isArray(orgsArray)) {
-        orgsArray.push(orgFolder);
+      if (
+        Array.isArray(structure[0].children) &&
+        structure[0].children[1] &&
+        Array.isArray(structure[0].children[1].children)
+      ) {
+        structure[0].children[1].children.push(orgFolder);
       }
     });
     return structure;
