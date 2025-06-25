@@ -58,14 +58,6 @@ export default function ClientConfigurationForm() {
         .eq('auth_user_id', user.id);
       setHasSchedule(!!(scheduleData && scheduleData.length > 0));
       
-      // Fetch invoice
-      const { data: invoiceData } = await supabase
-        .from('invoices')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .eq('status', 'paid');
-      setHasInvoice(!!(invoiceData && invoiceData.length > 0));
-      
       // Fetch configuration
       const { data: configData } = await supabase
         .from('client_configuration')
@@ -74,8 +66,8 @@ export default function ClientConfigurationForm() {
       setHasConfig(!!(configData && configData.length > 0));
       
       // Set status
-      if (!invoiceData || invoiceData.length === 0) {
-        setStatus('No Package');
+      if (!scheduleData || scheduleData.length === 0) {
+        setStatus('No Schedule');
       } else if (configData && configData.length > 0) {
         setStatus('Created');
       } else {
