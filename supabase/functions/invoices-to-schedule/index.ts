@@ -106,7 +106,7 @@ serve(async (req: Request) => {
       const batchDate = new Date(startDate);
       batchDate.setDate(batchDate.getDate() + batchInterval * i);
       scheduleRecords.push({
-        auth_user_id: endUser.id,
+        auth_user_id: invoice.auth_user_id,
         organisation_id: org.id,
         unique_batch_cluster: batchClusterId,
         unique_batch_id: crypto.randomUUID(),

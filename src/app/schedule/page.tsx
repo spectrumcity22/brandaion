@@ -42,7 +42,21 @@ export default function Schedule() {
         return;
       }
 
+      // Get the end_user_id for this user first
+      const { data: endUser, error: endUserError } = await supabase
+        .from('end_users')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (endUserError || !endUser) {
+        setError('No end user found for this account.');
+        setLoading(false);
+        return;
+      }
+
       // Fetch all schedule rows for this user, ordered by batch_date
+      // Use the actual auth_user_id directly since we're fixing the foreign key constraint
       const { data, error: scheduleError } = await supabase
         .from('schedule')
         .select('*')
