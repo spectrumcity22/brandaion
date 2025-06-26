@@ -320,14 +320,6 @@ export default function ReviewQuestions() {
     );
   }
 
-  if (questions.length === 0) {
-    return (
-      <div className="max-w-4xl mx-auto mt-8">
-        <div className="text-center text-lg text-foreground">No questions pending review</div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-6xl mx-auto mt-8">
       <h1 className="text-3xl font-bold mb-6 text-foreground">Review Questions</h1>
