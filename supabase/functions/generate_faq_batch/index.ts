@@ -50,11 +50,22 @@ serve(async (req) => {
       });
     }
 
-    // 2. Validate batch completion
-    const expectedCount = questions[0].batch_faq_pairs;
-    if (questions.length !== parseInt(expectedCount)) {
+    // 2. Check if ALL questions in this batch are approved
+    const { data: allBatchQuestions, error: allQuestionsError } = await supabase
+      .from('review_questions')
+      .select('id, answer_status')
+      .eq('unique_batch_id', unique_batch_id)
+      .eq('auth_user_id', auth_user_id);
+
+    if (allQuestionsError) {
+      throw new Error(`Error fetching all batch questions: ${allQuestionsError.message}`);
+    }
+
+    const unapprovedQuestions = allBatchQuestions?.filter(q => q.answer_status !== 'approved') || [];
+    
+    if (unapprovedQuestions.length > 0) {
       return new Response(JSON.stringify({ 
-        error: `Batch incomplete. Expected ${expectedCount} questions, found ${questions.length}` 
+        error: `Batch incomplete. ${unapprovedQuestions.length} questions still need to be approved. Please approve all questions in this batch before processing.` 
       }), {
         headers: corsHeaders,
         status: 400

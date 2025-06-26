@@ -635,7 +635,9 @@ export default function ReviewQuestions() {
                             {isApproved ? (
                               <div className="flex items-center gap-2">
                                 <span className="text-green-400 font-bold">✓ Approved</span>
-                                {!question.ai_response_answers && (
+                                {question.answer_status === 'completed' ? (
+                                  <span className="text-blue-400 font-bold">✓ Answered</span>
+                                ) : question.answer_status === 'pending' ? (
                                   <span className="flex items-center gap-2 text-blue-400 animate-pulse">
                                     <svg className="animate-spin h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -643,6 +645,8 @@ export default function ReviewQuestions() {
                                     </svg>
                                     Generating...
                                   </span>
+                                ) : (
+                                  <span className="text-yellow-400 font-bold">Waiting</span>
                                 )}
                               </div>
                             ) : (
