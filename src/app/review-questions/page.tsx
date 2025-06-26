@@ -53,6 +53,7 @@ export default function ReviewQuestions() {
   const [user, setUser] = useState<any>(null);
   const [pendingBatches, setPendingBatches] = useState<any[]>([]);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [batchApproving, setBatchApproving] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchQuestions();
@@ -463,12 +464,15 @@ export default function ReviewQuestions() {
                     variant="contained"
                     color="primary"
                     onClick={async () => {
+                      setBatchApproving(prev => ({ ...prev, [batch.batchId]: true }));
                       // Approve all questions in this batch
                       const idsToApprove = batch.questions
                         .filter(q => q.question_status !== 'question_approved')
                         .map(q => q.id);
-                      if (idsToApprove.length === 0) return;
-
+                      if (idsToApprove.length === 0) {
+                        setBatchApproving(prev => ({ ...prev, [batch.batchId]: false }));
+                        return;
+                      }
                       // Update in DB
                       const { error: updateError } = await supabase
                         .from('review_questions')
@@ -476,13 +480,14 @@ export default function ReviewQuestions() {
                         .in('id', idsToApprove);
                       if (updateError) {
                         setError('Failed to approve batch questions');
+                        setBatchApproving(prev => ({ ...prev, [batch.batchId]: false }));
                         return;
                       }
-
                       // Call edge function for each
                       const { data: { session } } = await supabase.auth.getSession();
                       if (!session) {
                         setError('No active session');
+                        setBatchApproving(prev => ({ ...prev, [batch.batchId]: false }));
                         return;
                       }
                       for (const id of idsToApprove) {
@@ -497,15 +502,26 @@ export default function ReviewQuestions() {
                         if (!response.ok) {
                           const errorText = await response.text();
                           setError(`Failed to trigger answer generation for question ${id}: ${errorText}`);
+                          setBatchApproving(prev => ({ ...prev, [batch.batchId]: false }));
                           return;
                         }
                       }
                       // Refresh questions
-                      fetchQuestions();
+                      await fetchQuestions();
+                      setBatchApproving(prev => ({ ...prev, [batch.batchId]: false }));
                     }}
-                    className="ml-4 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+                    className="ml-4 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 shadow-lg px-6 py-2 rounded-lg text-lg font-bold flex items-center gap-2"
+                    disabled={batchApproving[batch.batchId]}
                   >
-                    Approve All in Batch
+                    {batchApproving[batch.batchId] ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        Approving...
+                      </span>
+                    ) : 'Approve All in Batch'}
                   </Button>
                 </div>
                 
@@ -618,10 +634,19 @@ export default function ReviewQuestions() {
                           <td className="text-foreground py-1 px-4 align-top w-1/6">
                             {isApproved ? (
                               <div className="flex items-center gap-2">
-                                <span className="text-green-400">✓ Approved</span>
+                                <span className="text-green-400 font-bold">✓ Approved</span>
+                                {!question.ai_response_answers && (
+                                  <span className="flex items-center gap-2 text-blue-400 animate-pulse">
+                                    <svg className="animate-spin h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    Generating...
+                                  </span>
+                                )}
                               </div>
                             ) : (
-                              <span className="text-yellow-400">Pending</span>
+                              <span className="text-yellow-400 font-bold">Pending</span>
                             )}
                           </td>
                         </tr>
