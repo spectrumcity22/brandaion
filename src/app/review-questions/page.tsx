@@ -635,7 +635,7 @@ export default function ReviewQuestions() {
                             {isApproved ? (
                               <div className="flex items-center gap-2">
                                 <span className="text-green-400 font-bold">✓ Approved</span>
-                                {question.answer_status === 'completed' ? (
+                                {question.ai_response_answers && question.ai_response_answers.trim() !== '' ? (
                                   <span className="text-blue-400 font-bold">✓ Answered</span>
                                 ) : question.answer_status === 'pending' ? (
                                   <span className="flex items-center gap-2 text-blue-400 animate-pulse">

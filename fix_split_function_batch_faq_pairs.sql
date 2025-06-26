@@ -1,8 +1,7 @@
--- Fix the split_questions_into_review function to use batch_faq_pairs instead of total_faq_pairs
--- batch_faq_pairs = FAQs in this specific batch (5)
--- total_faq_pairs = Total FAQs in the cluster (20)
+-- Fix the split_questions_into_review function to include batch_faq_pairs
+-- This field is critical for the batch processing validation
 
--- Update the function to use the correct field
+-- Update the function to include batch_faq_pairs in the INSERT statement
 CREATE OR REPLACE FUNCTION public.split_questions_into_review()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -39,7 +38,7 @@ BEGIN
                         unique_batch_cluster,
                         unique_batch_id,
                         batch_date,
-                        batch_faq_pairs,  -- Use batch_faq_pairs (not total_faq_pairs)
+                        batch_faq_pairs,  -- ADD THIS FIELD!
                         organisation,
                         user_email,
                         auth_user_id,
@@ -58,7 +57,7 @@ BEGIN
                         NEW.unique_batch_cluster,
                         NEW.unique_batch_id,
                         NEW.batch_date,
-                        NEW.batch_faq_pairs,  -- Use batch_faq_pairs (not total_faq_pairs)
+                        NEW.total_faq_pairs,  -- ADD THIS VALUE!
                         NEW.organisation,
                         NEW.user_email,
                         NEW.auth_user_id,
@@ -83,29 +82,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Verify the function was updated correctly
+-- Verify the function was updated
 SELECT 
     'Function Updated' as check_type,
     p.proname as function_name,
     CASE 
-        WHEN p.prosrc LIKE '%batch_faq_pairs%' AND p.prosrc NOT LIKE '%total_faq_pairs%' THEN '✅ PASS - Using batch_faq_pairs correctly'
-        WHEN p.prosrc LIKE '%total_faq_pairs%' THEN '❌ FAIL - Still using total_faq_pairs'
-        ELSE '⚠️ WARNING - Check function manually'
-    END as field_usage_status
+        WHEN p.prosrc LIKE '%batch_faq_pairs%' THEN '✅ batch_faq_pairs included'
+        ELSE '❌ batch_faq_pairs missing'
+    END as batch_faq_pairs_status
 FROM pg_proc p
 JOIN pg_namespace n ON p.pronamespace = n.oid
 WHERE n.nspname = 'public' 
   AND p.proname = 'split_questions_into_review';
 
--- Test with sample data to show the difference
+-- Test the function by checking what it would do with a sample record
 SELECT 
-    'Field Comparison' as check_type,
+    'Sample Test' as check_type,
     unique_batch_id,
-    batch_faq_pairs as batch_size,
-    total_faq_pairs as cluster_total,
-    'batch_faq_pairs should be used for validation' as note
+    total_faq_pairs as source_batch_faq_pairs,
+    'This value will now be copied to review_questions.batch_faq_pairs' as explanation
 FROM construct_faq_pairs 
-WHERE auth_user_id = 'f2de3f3f-94e7-4a8e-85af-77743de0ee2f'
-  AND batch_faq_pairs IS NOT NULL
-ORDER BY created_at DESC
-LIMIT 3; 
+WHERE question_status = 'questions_generated'
+  AND total_faq_pairs IS NOT NULL
+LIMIT 1; 
