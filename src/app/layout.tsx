@@ -16,8 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const schedulingRef = useRef<HTMLDivElement>(null);
-  const batchesRef = useRef<HTMLDivElement>(null);
+  const packageRef = useRef<HTMLDivElement>(null);
+  const configRef = useRef<HTMLDivElement>(null);
+  const faqRef = useRef<HTMLDivElement>(null);
   const monitoringRef = useRef<HTMLDivElement>(null);
   const adminRef = useRef<HTMLDivElement>(null);
 
@@ -33,8 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     function handleClickOutside(event: MouseEvent) {
       if (
         profileRef.current && !profileRef.current.contains(event.target as Node) &&
-        schedulingRef.current && !schedulingRef.current.contains(event.target as Node) &&
-        batchesRef.current && !batchesRef.current.contains(event.target as Node) &&
+        packageRef.current && !packageRef.current.contains(event.target as Node) &&
+        configRef.current && !configRef.current.contains(event.target as Node) &&
+        faqRef.current && !faqRef.current.contains(event.target as Node) &&
         monitoringRef.current && !monitoringRef.current.contains(event.target as Node) &&
         adminRef.current && !adminRef.current.contains(event.target as Node)
       ) {
@@ -60,7 +62,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Link href="/" className="text-xl font-bold hover:text-green-400">
             BrandAION
           </Link>
-          <div className="flex space-x-6 text-sm font-medium">
+          
+          <div className="flex items-center space-x-6 text-sm font-medium">
             {!loggedIn ? (
               <>
                 <Link href="/signup" className="hover:text-green-400">Sign Up</Link>
@@ -70,35 +73,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <>
                 <Link href="/dashboard" className="hover:text-green-400">Dashboard</Link>
                 
-                {/* Profile Dropdown */}
-                <div ref={profileRef} className="relative">
+                {/* Package Dropdown */}
+                <div ref={packageRef} className="relative">
                   <button
                     className="hover:text-green-400"
-                    onClick={() => setOpenDropdown(openDropdown === 'profile' ? null : 'profile')}
+                    onClick={() => setOpenDropdown(openDropdown === 'package' ? null : 'package')}
                   >
-                    Profile ▾
+                    Package ▾
                   </button>
-                  {openDropdown === 'profile' && (
+                  {openDropdown === 'package' && (
                     <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
-                      <Link href="/end_user_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>User Profile</Link>
-                      <Link href="/organisation_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Organisation</Link>
-                      <Link href="/client_brands_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Brand Management</Link>
-                      <Link href="/client_products" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Product Management</Link>
-                      <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Persona Management</Link>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Scheduling Dropdown */}
-                <div ref={schedulingRef} className="relative">
-                  <button
-                    className="hover:text-green-400"
-                    onClick={() => setOpenDropdown(openDropdown === 'scheduling' ? null : 'scheduling')}
-                  >
-                    Scheduling ▾
-                  </button>
-                  {openDropdown === 'scheduling' && (
-                    <div className="absolute left-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
                       <Link href="/packages" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Select Package</Link>
                       <Link href="/invoice_confirmation" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Invoices</Link>
                       <Link href="/schedule" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Schedule</Link>
@@ -106,15 +90,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   )}
                 </div>
                 
-                {/* Batches Dropdown */}
-                <div ref={batchesRef} className="relative">
+                {/* Configuration Dropdown */}
+                <div ref={configRef} className="relative">
                   <button
                     className="hover:text-green-400"
-                    onClick={() => setOpenDropdown(openDropdown === 'batches' ? null : 'batches')}
+                    onClick={() => setOpenDropdown(openDropdown === 'config' ? null : 'config')}
                   >
-                    Batches ▾
+                    Configuration ▾
                   </button>
-                  {openDropdown === 'batches' && (
+                  {openDropdown === 'config' && (
+                    <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/client_brands_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Brand Management</Link>
+                      <Link href="/client_products" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Product Management</Link>
+                      <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Persona Management</Link>
+                    </div>
+                  )}
+                </div>
+                
+                {/* FAQs Dropdown */}
+                <div ref={faqRef} className="relative">
+                  <button
+                    className="hover:text-green-400"
+                    onClick={() => setOpenDropdown(openDropdown === 'faq' ? null : 'faq')}
+                  >
+                    FAQs ▾
+                  </button>
+                  {openDropdown === 'faq' && (
                     <div className="absolute left-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
                       <Link href="/client_configuration_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Configure AI</Link>
                       <Link href="/review-questions" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Review Questions</Link>
@@ -152,12 +153,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <div className="absolute left-0 mt-2 w-56 bg-white text-black rounded shadow-lg z-50">
                       <Link href="/faq-batches" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>FAQ Batches</Link>
                       <Link href="/llm-discovery-construction" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>LLM Discovery Construction</Link>
-                      <Link href="/llm-discovery" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>LLM Discovery System</Link>
+                      <Link href="/llm-discovery" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>LLM Discovery Directory</Link>
                     </div>
                   )}
                 </div>
                 
-                <button onClick={handleLogout} className="hover:text-red-400">Log Out</button>
+                {/* Profile Icon in Top Right */}
+                <div ref={profileRef} className="relative">
+                  <button
+                    className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 transition-colors"
+                    onClick={() => setOpenDropdown(openDropdown === 'profile' ? null : 'profile')}
+                  >
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  {openDropdown === 'profile' && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded shadow-lg z-50">
+                      <Link href="/end_user_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>User Profile</Link>
+                      <Link href="/organisation_form" className="block px-4 py-2 hover:bg-gray-200" onClick={() => setOpenDropdown(null)}>Organisation</Link>
+                      <div className="border-t border-gray-200 my-1"></div>
+                      <button 
+                        onClick={() => {
+                          handleLogout();
+                          setOpenDropdown(null);
+                        }} 
+                        className="w-full text-left px-4 py-2 hover:bg-gray-200 text-red-600"
+                      >
+                        Log Out
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
