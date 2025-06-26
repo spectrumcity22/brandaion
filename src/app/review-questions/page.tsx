@@ -252,10 +252,8 @@ export default function ReviewQuestions() {
         throw new Error(`Failed to trigger answer generation: ${errorText}`);
       }
 
-      // 3. Update local state
-      setQuestions(prev => prev.map(q => 
-        q.id === id ? { ...q, question_status: 'question_approved' } : q
-      ));
+      // 3. Refresh the questions list to get updated data (including ai_response_answers)
+      await fetchQuestions();
 
       // 4. Clear selection
       setSelectedQuestions(prev => {
@@ -648,30 +646,19 @@ export default function ReviewQuestions() {
                             {isApproved ? (
                               <div className="flex items-center gap-2">
                                 <span className="text-green-400 font-bold">✓ Approved</span>
-                                {(() => {
-                                  // Debug logging
-                                  console.log(`Question ${question.id}:`, {
-                                    ai_response_answers: question.ai_response_answers,
-                                    answer_status: question.answer_status,
-                                    hasAnswer: question.ai_response_answers && question.ai_response_answers.trim() !== ''
-                                  });
-                                  
-                                  if (question.ai_response_answers && question.ai_response_answers.trim() !== '') {
-                                    return <span className="text-blue-400 font-bold">✓ Answered</span>;
-                                  } else if (question.answer_status === 'pending') {
-                                    return (
-                                      <span className="flex items-center gap-2 text-blue-400 animate-pulse">
-                                        <svg className="animate-spin h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                        </svg>
-                                        Generating...
-                                      </span>
-                                    );
-                                  } else {
-                                    return <span className="text-yellow-400 font-bold">Waiting</span>;
-                                  }
-                                })()}
+                                {question.ai_response_answers && question.ai_response_answers.trim() !== '' ? (
+                                  <span className="text-blue-400 font-bold">✓ Answered</span>
+                                ) : question.answer_status === 'pending' ? (
+                                  <span className="flex items-center gap-2 text-blue-400 animate-pulse">
+                                    <svg className="animate-spin h-4 w-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    Generating...
+                                  </span>
+                                ) : (
+                                  <span className="text-yellow-400 font-bold">Waiting</span>
+                                )}
                               </div>
                             ) : (
                               <span className="text-yellow-400 font-bold">Pending</span>
