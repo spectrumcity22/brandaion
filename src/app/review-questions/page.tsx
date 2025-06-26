@@ -221,6 +221,7 @@ export default function ReviewQuestions() {
 
   const handleApproveQuestion = async (id: number) => {
     try {
+      // 1. Mark as approved in the database
       const { error: updateError } = await supabase
         .from('review_questions')
         .update({ question_status: 'question_approved' })
@@ -228,12 +229,30 @@ export default function ReviewQuestions() {
 
       if (updateError) throw updateError;
 
-      // Update local state
+      // 2. Call the edge function to generate the answer
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No active session");
+
+      const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ question_id: id, auth_user_id: session.user.id }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to trigger answer generation: ${errorText}`);
+      }
+
+      // 3. Update local state
       setQuestions(prev => prev.map(q => 
         q.id === id ? { ...q, question_status: 'question_approved' } : q
       ));
 
-      // Clear selection
+      // 4. Clear selection
       setSelectedQuestions(prev => {
         const newState = { ...prev };
         delete newState[id];
@@ -258,6 +277,25 @@ export default function ReviewQuestions() {
         .in('id', selectedIds);
 
       if (updateError) throw updateError;
+
+      // Call the edge function for each approved question
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No active session");
+
+      for (const id of selectedIds) {
+        const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ question_id: id, auth_user_id: session.user.id }),
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to trigger answer generation for question ${id}: ${errorText}`);
+        }
+      }
 
       // Refresh the questions list
       fetchQuestions();
@@ -402,11 +440,62 @@ export default function ReviewQuestions() {
           <>
             {groupedQuestions.map((batch, batchIndex) => (
               <div key={batch.batchId} className="mb-8">
-                <div className="bg-gray-800 p-4 rounded-t-lg">
-                  <h3 className="text-lg font-semibold text-white">
-                    Batch ID: {batch.batchId}
-                  </h3>
-                  <p className="text-gray-300">Cluster: {batch.batchCluster}</p>
+                <div className="bg-gray-800 p-4 rounded-t-lg flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      Batch ID: {batch.batchId}
+                    </h3>
+                    <p className="text-gray-300">Cluster: {batch.batchCluster}</p>
+                  </div>
+                  {/* Bulk Approve Button for this batch */}
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={async () => {
+                      // Approve all questions in this batch
+                      const idsToApprove = batch.questions
+                        .filter(q => q.question_status !== 'question_approved')
+                        .map(q => q.id);
+                      if (idsToApprove.length === 0) return;
+
+                      // Update in DB
+                      const { error: updateError } = await supabase
+                        .from('review_questions')
+                        .update({ question_status: 'question_approved' })
+                        .in('id', idsToApprove);
+                      if (updateError) {
+                        setError('Failed to approve batch questions');
+                        return;
+                      }
+
+                      // Call edge function for each
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session) {
+                        setError('No active session');
+                        return;
+                      }
+                      for (const id of idsToApprove) {
+                        const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/ai_request_answers", {
+                          method: "POST",
+                          headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${session.access_token}`,
+                          },
+                          body: JSON.stringify({ question_id: id, auth_user_id: session.user.id }),
+                        });
+                        if (!response.ok) {
+                          const errorText = await response.text();
+                          setError(`Failed to trigger answer generation for question ${id}: ${errorText}`);
+                          return;
+                        }
+                      }
+                      // Refresh questions
+                      fetchQuestions();
+                    }}
+                    className="ml-4 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600"
+                  >
+                    Approve All in Batch
+                  </Button>
                 </div>
                 
                 <table className="w-full text-left border-separate border-spacing-y-2 bg-gray-900 rounded-b-lg">
