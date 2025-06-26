@@ -49,6 +49,7 @@ export default function ReviewQuestions() {
   const [selectedQuestions, setSelectedQuestions] = useState<Record<number, boolean>>({});
   const [editingQuestions, setEditingQuestions] = useState<Record<number, string>>({});
   const [askingQuestions, setAskingQuestions] = useState<Record<number, boolean>>({});
+  const [approvingQuestions, setApprovingQuestions] = useState<Record<number, boolean>>({});
   const [user, setUser] = useState<any>(null);
   const [pendingBatches, setPendingBatches] = useState<any[]>([]);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
@@ -221,6 +222,9 @@ export default function ReviewQuestions() {
 
   const handleApproveQuestion = async (id: number) => {
     try {
+      // Set loading state for this specific question
+      setApprovingQuestions(prev => ({ ...prev, [id]: true }));
+
       // 1. Mark as approved in the database
       const { error: updateError } = await supabase
         .from('review_questions')
@@ -261,6 +265,13 @@ export default function ReviewQuestions() {
     } catch (error) {
       console.error('Error approving question:', error);
       setError('Failed to approve question');
+    } finally {
+      // Clear loading state
+      setApprovingQuestions(prev => {
+        const newState = { ...prev };
+        delete newState[id];
+        return newState;
+      });
     }
   };
 
@@ -584,37 +595,23 @@ export default function ReviewQuestions() {
                                 </button>
                                 <button
                                   onClick={() => handleApproveQuestion(question.id)}
-                                  className="bg-green-600 text-white px-3 py-1 rounded text-sm"
+                                  disabled={approvingQuestions[question.id]}
+                                  className={`px-3 py-1 rounded text-sm ${
+                                    approvingQuestions[question.id]
+                                      ? 'bg-blue-600 text-white cursor-not-allowed'
+                                      : 'bg-green-600 text-white hover:bg-green-700'
+                                  }`}
                                 >
-                                  Approve
+                                  {approvingQuestions[question.id] ? (
+                                    <span className="flex items-center gap-2">
+                                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                      </svg>
+                                      Answering...
+                                    </span>
+                                  ) : 'Approve'}
                                 </button>
-                              </div>
-                            )}
-                            {isApproved && (
-                              <div className="flex gap-2">
-                                {!question.ai_response_answers && question.answer_status !== 'completed' ? (
-                                  <button
-                                    onClick={() => handleAskQuestion(question.id)}
-                                    disabled={askingQuestions[question.id] || question.answer_status === 'generating'}
-                                    className={`px-3 py-1 rounded text-sm ${
-                                      askingQuestions[question.id] 
-                                        ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                                        : 'bg-purple-600 text-white hover:bg-purple-700'
-                                    }`}
-                                  >
-                                    {askingQuestions[question.id] ? (
-                                      <span className="flex items-center gap-2">
-                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                        </svg>
-                                        Thinking...
-                                      </span>
-                                    ) : 'Ask Question'}
-                                  </button>
-                                ) : (
-                                  <span className="text-green-400 text-sm">✓ Answered</span>
-                                )}
                               </div>
                             )}
                           </td>
