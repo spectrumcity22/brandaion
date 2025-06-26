@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -104,9 +104,9 @@ export default function Dashboard() {
         const pendingAnswers = pendingAnswersResult.data?.length || 0;
         const completedBatches = faqPairsResult.data?.length || 0;
 
-        // Calculate account completion percentage - updated logic
+        // Calculate account completion percentage - updated for 10-step workflow
         let completionSteps = 0;
-        let totalSteps = 6; // Updated to 6 steps
+        let totalSteps = 10; // Updated to 10 steps for complete FAQ pairs workflow
         
         // Check if profile is complete (has first_name, last_name, org_name)
         const profileComplete = endUser && endUser.first_name && endUser.last_name && endUser.org_name;
@@ -121,6 +121,9 @@ export default function Dashboard() {
         const organisationConfigured = organisation && organisation.organisation_url && organisation.industry && organisation.headquarters;
         if (organisationConfigured) completionSteps++;
         
+        // Check if package is selected
+        if (invoice) completionSteps++;
+        
         // Check if brands exist
         const { data: brands } = await supabase
           .from('brands')
@@ -128,19 +131,19 @@ export default function Dashboard() {
           .eq('auth_user_id', user.id);
         if (brands && brands.length > 0) completionSteps++;
         
-        // Check if persona exists
-        const { data: personas } = await supabase
-          .from('client_product_persona')
-          .select('id')
-          .eq('auth_user_id', user.id);
-        if (personas && personas.length > 0) completionSteps++;
-        
         // Check if products exist
         const { data: products } = await supabase
           .from('products')
           .select('id')
           .eq('auth_user_id', user.id);
         if (products && products.length > 0) completionSteps++;
+        
+        // Check if persona exists
+        const { data: personas } = await supabase
+          .from('client_product_persona')
+          .select('id')
+          .eq('auth_user_id', user.id);
+        if (personas && personas.length > 0) completionSteps++;
         
         // Check if AI is configured - updated to check for complete configuration
         const { data: aiConfig } = await supabase
@@ -157,6 +160,15 @@ export default function Dashboard() {
           aiConfig.audience_id;
         
         if (aiConfigComplete) completionSteps++;
+        
+        // Check if questions are reviewed (no pending questions)
+        if (pendingQuestions === 0) completionSteps++;
+        
+        // Check if answers are reviewed (no pending answers)
+        if (pendingAnswers === 0) completionSteps++;
+        
+        // Check if FAQ pairs are generated
+        if (totalFaqPairs > 0) completionSteps++;
         
         const accountCompletion = Math.round((completionSteps / totalSteps) * 100);
 
@@ -234,14 +246,14 @@ export default function Dashboard() {
           <p className="text-gray-400">Here&apos;s what&apos;s happening with your BrandAION account</p>
         </div>
 
-        {/* Expandable Account Setup Panel */}
+        {/* Complete FAQ Pairs Workflow Panel */}
         <div className="mb-8">
           <div className="bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-xl p-6">
             {/* Summary Row */}
             <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpanded((prev) => !prev)}>
               <div className="flex items-center space-x-3">
-                <span className="text-xl font-semibold text-white">Account Setup</span>
-                <span className={`text-sm font-bold ${data.accountCompletion === 100 ? 'text-green-400' : 'text-yellow-400'}`}>{data.accountCompletion === 100 ? 'Complete' : 'Incomplete'}</span>
+                <span className="text-xl font-semibold text-white">Complete FAQ Pairs Workflow</span>
+                <span className={`text-sm font-bold ${data.accountCompletion === 100 ? 'text-green-400' : 'text-yellow-400'}`}>{data.accountCompletion === 100 ? 'Complete' : 'In Progress'}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <span className="text-2xl font-bold text-green-400">{data.accountCompletion}%</span>
@@ -262,14 +274,17 @@ export default function Dashboard() {
               ></div>
             </div>
             <p className="text-gray-300 text-sm mt-2">
-              {data.accountCompletion === 100 ? 'Account fully configured!' : 'Complete your setup to unlock full features'}
+              {data.accountCompletion === 100 ? 'All steps completed! You can now generate FAQ pairs.' : 'Complete all steps to unlock FAQ pair generation'}
             </p>
             {/* Expanded Steps */}
             {expanded && (
               <div className="space-y-3 mt-6">
-                {/* Setup Profile */}
+                {/* Step 1: Setup Profile */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">1</span>
+                    </div>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       data.profileComplete 
                         ? 'bg-green-500/20' 
@@ -303,9 +318,13 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                {/* Setup Organisation */}
+
+                {/* Step 2: Setup Organisation */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">2</span>
+                    </div>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       data.organisationConfigured 
                         ? 'bg-green-500/20' 
@@ -339,9 +358,53 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                {/* Create a Brand */}
+
+                {/* Step 3: Select Package */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">3</span>
+                    </div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      data.invoice 
+                        ? 'bg-green-500/20' 
+                        : 'bg-orange-500/20'
+                    }`}>
+                      {data.invoice ? (
+                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-gray-300">Select Package</span>
+                  </div>
+                  {data.invoice ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-green-400 text-sm">Completed</span>
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => router.push('/packages')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Go
+                    </button>
+                  )}
+                </div>
+
+                {/* Step 4: Brand Management */}
+                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">4</span>
+                    </div>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       data.brands.length > 0 
                         ? 'bg-green-500/20' 
@@ -357,7 +420,7 @@ export default function Dashboard() {
                         </svg>
                       )}
                     </div>
-                    <span className="text-gray-300">Create a Brand</span>
+                    <span className="text-gray-300">Brand Management</span>
                   </div>
                   {data.brands.length > 0 ? (
                     <div className="flex items-center space-x-2">
@@ -375,9 +438,13 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                {/* Create a Product */}
+
+                {/* Step 5: Product Management */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">5</span>
+                    </div>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       data.products.length > 0 
                         ? 'bg-green-500/20' 
@@ -393,7 +460,7 @@ export default function Dashboard() {
                         </svg>
                       )}
                     </div>
-                    <span className="text-gray-300">Create a Product</span>
+                    <span className="text-gray-300">Product Management</span>
                   </div>
                   {data.products.length > 0 ? (
                     <div className="flex items-center space-x-2">
@@ -411,9 +478,13 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                {/* Create a Persona */}
+
+                {/* Step 6: Persona Management */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">6</span>
+                    </div>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       data.personas.length > 0 
                         ? 'bg-green-500/20' 
@@ -429,7 +500,7 @@ export default function Dashboard() {
                         </svg>
                       )}
                     </div>
-                    <span className="text-gray-300">Create a Persona</span>
+                    <span className="text-gray-300">Persona Management</span>
                   </div>
                   {data.personas.length > 0 ? (
                     <div className="flex items-center space-x-2">
@@ -447,9 +518,13 @@ export default function Dashboard() {
                     </button>
                   )}
                 </div>
-                {/* Configure AI */}
+
+                {/* Step 7: Configure AI */}
                 <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                   <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">7</span>
+                    </div>
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       data.aiConfigComplete 
                         ? 'bg-green-500/20' 
@@ -477,6 +552,126 @@ export default function Dashboard() {
                   ) : (
                     <button
                       onClick={() => router.push('/client_configuration_form')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Go
+                    </button>
+                  )}
+                </div>
+
+                {/* Step 8: Review Questions */}
+                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">8</span>
+                    </div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      data.pendingQuestions === 0 
+                        ? 'bg-green-500/20' 
+                        : 'bg-yellow-500/20'
+                    }`}>
+                      {data.pendingQuestions === 0 ? (
+                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-gray-300">Review Questions {data.pendingQuestions > 0 && `(${data.pendingQuestions} pending)`}</span>
+                  </div>
+                  {data.pendingQuestions === 0 ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-green-400 text-sm">Completed</span>
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => router.push('/review-questions')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Go
+                    </button>
+                  )}
+                </div>
+
+                {/* Step 9: Review Answers */}
+                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">9</span>
+                    </div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      data.pendingAnswers === 0 
+                        ? 'bg-green-500/20' 
+                        : 'bg-blue-500/20'
+                    }`}>
+                      {data.pendingAnswers === 0 ? (
+                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-gray-300">Review Answers {data.pendingAnswers > 0 && `(${data.pendingAnswers} pending)`}</span>
+                  </div>
+                  {data.pendingAnswers === 0 ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-green-400 text-sm">Completed</span>
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => router.push('/review-answers')}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
+                    >
+                      Go
+                    </button>
+                  )}
+                </div>
+
+                {/* Step 10: FAQ Pairs */}
+                <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <span className="text-blue-400 text-xs font-bold">10</span>
+                    </div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      data.totalFaqPairs > 0 
+                        ? 'bg-green-500/20' 
+                        : 'bg-purple-500/20'
+                    }`}>
+                      {data.totalFaqPairs > 0 ? (
+                        <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-gray-300">FAQ Pairs {data.totalFaqPairs > 0 && `(${data.totalFaqPairs} generated)`}</span>
+                  </div>
+                  {data.totalFaqPairs > 0 ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-green-400 text-sm">Completed</span>
+                      <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => router.push('/faq-pairs')}
                       className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
                     >
                       Go
