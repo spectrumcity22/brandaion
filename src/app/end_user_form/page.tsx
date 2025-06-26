@@ -10,22 +10,47 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+interface UserProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  org_name?: string;
+}
+
 export default function EndUserForm() {
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<User | null>(null);
+  const [existingProfile, setExistingProfile] = useState<UserProfile | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/login');
-      } else {
-        setSessionUser(user);
+        return;
       }
+      setSessionUser(user);
+
+      // Check if profile already exists
+      const { data: profile } = await supabase
+        .from('end_users')
+        .select('id, first_name, last_name, email, org_name')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      if (profile) {
+        setExistingProfile(profile);
+        setFirstName(profile.first_name);
+        setLastName(profile.last_name);
+      }
+      setIsLoading(false);
     })();
   }, [router]);
 
@@ -74,11 +99,21 @@ export default function EndUserForm() {
       }
 
       setMessage('✅ Profile saved!');
+      setExistingProfile({
+        id: existingUser?.id || 'new',
+        first_name: firstName,
+        last_name: lastName,
+        email: sessionUser.email || '',
+        org_name: existingProfile?.org_name
+      });
+      setIsEditing(false);
       
-      // Auto-redirect to organisation form after 2 seconds
-      setTimeout(() => {
-        router.push('/organisation_form');
-      }, 2000);
+      // Auto-redirect to organisation form after 2 seconds if no org exists
+      if (!existingProfile?.org_name) {
+        setTimeout(() => {
+          router.push('/organisation_form');
+        }, 2000);
+      }
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {
@@ -86,6 +121,102 @@ export default function EndUserForm() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen p-4 lg:p-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="glass-card p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400 mx-auto"></div>
+            <p className="text-gray-400 mt-4">Loading profile...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show existing profile with edit button
+  if (existingProfile && !isEditing) {
+    return (
+      <div className="min-h-screen p-4 lg:p-8">
+        <div className="max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="glass-card p-8 text-center mb-8">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
+              👤
+            </div>
+            <h1 className="text-3xl font-bold mb-2 shimmer-text">Your Profile</h1>
+            <p className="text-gray-400">Your profile is already set up</p>
+          </div>
+
+          <div className="glass-card p-8">
+            <div className="mb-6 p-4 glass-card text-center">
+              <div className="text-2xl mb-2">✅</div>
+              <h2 className="text-lg font-semibold mb-1">Logged in as</h2>
+              <p className="text-brand font-medium">{sessionUser?.email}</p>
+            </div>
+
+            <div className="space-y-4 mb-8">
+              <div className="flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                <div>
+                  <p className="text-gray-400 text-sm">First Name</p>
+                  <p className="text-white font-medium">{existingProfile.first_name}</p>
+                </div>
+                <div className="text-green-400">✓</div>
+              </div>
+
+              <div className="flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                <div>
+                  <p className="text-gray-400 text-sm">Last Name</p>
+                  <p className="text-white font-medium">{existingProfile.last_name}</p>
+                </div>
+                <div className="text-green-400">✓</div>
+              </div>
+
+              {existingProfile.org_name && (
+                <div className="flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                  <div>
+                    <p className="text-gray-400 text-sm">Organisation</p>
+                    <p className="text-white font-medium">{existingProfile.org_name}</p>
+                  </div>
+                  <div className="text-green-400">✓</div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="premium-button flex-1"
+              >
+                ✏️ Edit Profile
+              </button>
+              
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="glass-input p-4 hover:bg-white/10 transition-colors"
+              >
+                🏠 Back to Dashboard
+              </button>
+            </div>
+
+            {!existingProfile.org_name && (
+              <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
+                <p className="text-blue-400 mb-3">Next step: Set up your organisation</p>
+                <button
+                  onClick={() => router.push('/organisation_form')}
+                  className="premium-button"
+                >
+                  🏢 Continue to Organisation Setup
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show edit form or new profile form
   return (
     <div className="min-h-screen p-4 lg:p-8">
       <div className="max-w-2xl mx-auto">
@@ -94,8 +225,12 @@ export default function EndUserForm() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
             👤
           </div>
-          <h1 className="text-3xl font-bold mb-2 shimmer-text">Complete Your BrandAION Profile</h1>
-          <p className="text-gray-400">Set up your account to get started with AI-powered FAQ generation</p>
+          <h1 className="text-3xl font-bold mb-2 shimmer-text">
+            {existingProfile ? 'Edit Your Profile' : 'Complete Your BrandAION Profile'}
+          </h1>
+          <p className="text-gray-400">
+            {existingProfile ? 'Update your profile information' : 'Set up your account to get started with AI-powered FAQ generation'}
+          </p>
         </div>
 
         <div className="glass-card p-8">
@@ -159,9 +294,18 @@ export default function EndUserForm() {
                   Submitting...
                 </div>
               ) : (
-                '✨ Complete Profile'
+                existingProfile ? '✨ Update Profile' : '✨ Complete Profile'
               )}
             </button>
+            
+            {existingProfile && (
+              <button
+                onClick={() => setIsEditing(false)}
+                className="glass-input p-4 hover:bg-white/10 transition-colors"
+              >
+                ❌ Cancel
+              </button>
+            )}
             
             <button
               onClick={() => router.push('/dashboard')}
@@ -173,7 +317,7 @@ export default function EndUserForm() {
         </div>
 
         {/* Success Action */}
-        {message.includes('✅') && (
+        {message.includes('✅') && !existingProfile?.org_name && (
           <div className="glass-card p-8 mt-8 text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center text-2xl">
               🎉

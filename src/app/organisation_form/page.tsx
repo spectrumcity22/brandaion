@@ -25,9 +25,21 @@ interface Market {
   name: string;
 }
 
+interface Organisation {
+  id: string;
+  organisation_name: string;
+  organisation_url: string;
+  linkedin_url: string;
+  industry: string;
+  subcategory: string;
+  headquarters: string;
+}
+
 export default function OrganisationForm() {
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<User | null>(null);
+  const [existingOrg, setExistingOrg] = useState<Organisation | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [orgName, setOrgName] = useState('');
   const [orgId, setOrgId] = useState('');
   const [orgUrl, setOrgUrl] = useState('');
@@ -40,6 +52,7 @@ export default function OrganisationForm() {
   const [headquarters, setHeadquarters] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -53,22 +66,34 @@ export default function OrganisationForm() {
       // Check if organization already exists (for existing users)
       const { data: org, error } = await supabase
         .from('client_organisation')
-        .select('id, organisation_name')
+        .select('id, organisation_name, organisation_url, linkedin_url, industry, subcategory, headquarters')
         .eq('auth_user_id', user.id)
         .maybeSingle();
 
       if (!error && org) {
         // Existing organization - populate form for editing
+        setExistingOrg(org);
         setOrgId(org.id);
         setOrgName(org.organisation_name);
+        setOrgUrl(org.organisation_url);
+        setLinkedinUrl(org.linkedin_url);
+        setIndustry(org.industry);
+        setSubcategory(org.subcategory);
+        setHeadquarters(org.headquarters);
       }
-      // If no organization exists, form will be empty for new organization creation
 
       // Load reference data
       await Promise.all([
         loadIndustries(),
         loadMarkets()
       ]);
+
+      // Load subcategories if industry is already set
+      if (org?.industry) {
+        await loadSubcategories(org.industry);
+      }
+
+      setIsLoading(false);
     })();
   }, [router]);
 
@@ -177,6 +202,18 @@ export default function OrganisationForm() {
 
       setMessage('✅ Organisation and profile linked successfully!');
 
+      // Update existing org state
+      setExistingOrg({
+        id: organizationId,
+        organisation_name: orgName,
+        organisation_url: orgUrl,
+        linkedin_url: linkedinUrl,
+        industry: industry,
+        subcategory: subcategory,
+        headquarters: headquarters
+      });
+      setIsEditing(false);
+
       // Step 4: Call the edge function to create a brand row with JWT
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -215,6 +252,114 @@ export default function OrganisationForm() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen p-4 lg:p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="glass-card p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400 mx-auto"></div>
+            <p className="text-gray-400 mt-4">Loading organisation...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show existing organisation with edit button
+  if (existingOrg && !isEditing) {
+    return (
+      <div className="min-h-screen p-4 lg:p-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="glass-card p-8 text-center mb-8">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
+              🏢
+            </div>
+            <h1 className="text-3xl font-bold mb-2 shimmer-text">Your Organisation</h1>
+            <p className="text-gray-400">Your organisation is already configured</p>
+          </div>
+
+          <div className="glass-card p-8">
+            <div className="mb-6 p-4 glass-card text-center">
+              <div className="text-2xl mb-2">📛</div>
+              <h2 className="text-xl font-semibold mb-1">{existingOrg.organisation_name}</h2>
+              <p className="text-gray-400 text-sm">Organisation Ready for Configuration</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 mb-8">
+              <div className="flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                <div>
+                  <p className="text-gray-400 text-sm">Website</p>
+                  <p className="text-white font-medium truncate">{existingOrg.organisation_url}</p>
+                </div>
+                <div className="text-green-400">✓</div>
+              </div>
+
+              <div className="flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                <div>
+                  <p className="text-gray-400 text-sm">LinkedIn</p>
+                  <p className="text-white font-medium truncate">{existingOrg.linkedin_url}</p>
+                </div>
+                <div className="text-green-400">✓</div>
+              </div>
+
+              <div className="flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                <div>
+                  <p className="text-gray-400 text-sm">Industry</p>
+                  <p className="text-white font-medium">{existingOrg.industry}</p>
+                </div>
+                <div className="text-green-400">✓</div>
+              </div>
+
+              <div className="flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                <div>
+                  <p className="text-gray-400 text-sm">Subcategory</p>
+                  <p className="text-white font-medium">{existingOrg.subcategory}</p>
+                </div>
+                <div className="text-green-400">✓</div>
+              </div>
+
+              <div className="md:col-span-2 flex justify-between items-center p-4 bg-gray-800/30 rounded-lg">
+                <div>
+                  <p className="text-gray-400 text-sm">Headquarters</p>
+                  <p className="text-white font-medium">{existingOrg.headquarters}</p>
+                </div>
+                <div className="text-green-400">✓</div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="premium-button flex-1"
+              >
+                ✏️ Edit Organisation
+              </button>
+              
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="glass-input p-4 hover:bg-white/10 transition-colors"
+              >
+                🏠 Back to Dashboard
+              </button>
+            </div>
+
+            <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
+              <p className="text-blue-400 mb-3">Next step: Set up your brand management</p>
+              <button
+                onClick={() => router.push('/client_brands_form')}
+                className="premium-button"
+              >
+                🏷️ Continue to Brand Management
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show edit form or new organisation form
   return (
     <div className="min-h-screen p-4 lg:p-8">
       <div className="max-w-4xl mx-auto">
@@ -223,8 +368,12 @@ export default function OrganisationForm() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-full premium-gradient flex items-center justify-center text-2xl glow-animation">
             🏢
           </div>
-          <h1 className="text-3xl font-bold mb-2 shimmer-text">Define Your Organisation</h1>
-          <p className="text-gray-400">Complete your organisation profile to unlock premium features</p>
+          <h1 className="text-3xl font-bold mb-2 shimmer-text">
+            {existingOrg ? 'Edit Your Organisation' : 'Define Your Organisation'}
+          </h1>
+          <p className="text-gray-400">
+            {existingOrg ? 'Update your organisation information' : 'Complete your organisation profile to unlock premium features'}
+          </p>
         </div>
 
         <div className="glass-card p-8">
@@ -367,6 +516,15 @@ export default function OrganisationForm() {
                 `✨ ${orgId ? 'Update' : 'Create'} Organisation`
               )}
             </button>
+            
+            {existingOrg && (
+              <button
+                onClick={() => setIsEditing(false)}
+                className="glass-input p-4 hover:bg-white/10 transition-colors"
+              >
+                ❌ Cancel
+              </button>
+            )}
             
             <button
               onClick={() => router.push('/dashboard')}
