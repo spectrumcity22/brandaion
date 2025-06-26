@@ -46,12 +46,41 @@ export default function ClientConfigurationForm() {
       setBrands(brandsData || []);
       
       // Fetch organization data for this user
-      const { data: orgData } = await supabase
+      const { data: orgData, error: orgError } = await supabase
         .from("client_organisation")
         .select("id, organisation_name, organisation_jsonld_object")
         .eq("auth_user_id", user.id)
         .single();
-      setOrganisation(orgData);
+      
+      if (orgError) {
+        console.warn('No organization found for user:', user.id, orgError);
+        setOrganisation(null);
+        
+        // Try to create a basic organization record if none exists
+        const { data: newOrg, error: createError } = await supabase
+          .from("client_organisation")
+          .insert({
+            auth_user_id: user.id,
+            organisation_name: "Default Organization",
+            organisation_url: "",
+            linkedin_url: "",
+            industry: "",
+            subcategory: "",
+            headquarters: ""
+          })
+          .select("id, organisation_name, organisation_jsonld_object")
+          .single();
+        
+        if (createError) {
+          console.error('Failed to create organization:', createError);
+        } else {
+          console.log('Created default organization:', newOrg);
+          setOrganisation(newOrg);
+        }
+      } else {
+        console.log('Found organization data:', orgData);
+        setOrganisation(orgData);
+      }
       
       // Load all personas for the user immediately
       const { data: personasData } = await supabase
@@ -116,24 +145,31 @@ export default function ClientConfigurationForm() {
 
     try {
       // First save to client_configuration
+      const configData = {
+        auth_user_id: user.id,
+        brand_id: form.brand_id,
+        product_id: form.product_id || null,
+        persona_id: form.persona_id,
+        market_id: form.market_id,
+        audience_id: form.audience_id,
+        product_name: products.find(p => p.id === form.product_id)?.product_name || null,
+        persona_name: personas.find(p => p.id === form.persona_id)?.persona_name,
+        audience_name: audiences.find(a => a.id === form.audience_id)?.target_audience,
+        market_name: markets.find(m => m.id === form.market_id)?.name,
+        brand_jsonld_object: brands.find(b => b.id === form.brand_id)?.brand_jsonld_object,
+        schema_json: products.find(p => p.id === form.product_id)?.schema_json || null,
+        persona_jsonld: personas.find(p => p.id === form.persona_id)?.persona_jsonld,
+        organisation_jsonld_object: organisation?.organisation_jsonld_object || null
+      };
+      
+      console.log('Saving configuration with data:', {
+        ...configData,
+        organisation_jsonld_object: configData.organisation_jsonld_object ? 'Present' : 'NULL'
+      });
+      
       const { error: configError } = await supabase
         .from('client_configuration')
-        .upsert({
-          auth_user_id: user.id,
-          brand_id: form.brand_id,
-          product_id: form.product_id || null,
-          persona_id: form.persona_id,
-          market_id: form.market_id,
-          audience_id: form.audience_id,
-          product_name: products.find(p => p.id === form.product_id)?.product_name || null,
-          persona_name: personas.find(p => p.id === form.persona_id)?.persona_name,
-          audience_name: audiences.find(a => a.id === form.audience_id)?.target_audience,
-          market_name: markets.find(m => m.id === form.market_id)?.name,
-          brand_jsonld_object: brands.find(b => b.id === form.brand_id)?.brand_jsonld_object,
-          schema_json: products.find(p => p.id === form.product_id)?.schema_json || null,
-          persona_jsonld: personas.find(p => p.id === form.persona_id)?.persona_jsonld,
-          organisation_jsonld_object: organisation?.organisation_jsonld_object || null
-        }, { onConflict: "auth_user_id" });
+        .upsert(configData, { onConflict: "auth_user_id" });
 
       if (configError) {
         throw new Error(`Failed to save configuration: ${configError.message}`);
