@@ -50,9 +50,12 @@ export default function ReviewQuestions() {
   const [editingQuestions, setEditingQuestions] = useState<Record<number, string>>({});
   const [askingQuestions, setAskingQuestions] = useState<Record<number, boolean>>({});
   const [user, setUser] = useState<any>(null);
+  const [pendingBatches, setPendingBatches] = useState<any[]>([]);
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
+    fetchPendingBatches();
     // Get user on component load (following client_configuration_form pattern)
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -84,6 +87,64 @@ export default function ReviewQuestions() {
       setError('Failed to load questions');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPendingBatches = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (!user || authError) return;
+
+      const { data, error } = await supabase
+        .from('construct_faq_pairs')
+        .select('unique_batch_id, unique_batch_cluster, batch_date, organisation')
+        .eq('auth_user_id', user.id)
+        .eq('question_status', 'pending')
+        .is('ai_response_questions', null)
+        .order('batch_date', { ascending: false });
+
+      if (error) throw error;
+      setPendingBatches(data || []);
+    } catch (error) {
+      console.error('Error fetching pending batches:', error);
+    }
+  };
+
+  const handleGenerateQuestions = async () => {
+    setGeneratingQuestions(true);
+    setError(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No active session");
+
+      // Generate questions for each pending batch
+      for (const batch of pendingBatches) {
+        const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+            "x-client-info": "supabase-js/2.39.3",
+            "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          },
+          body: JSON.stringify({ batchId: batch.unique_batch_id }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error(`Failed to generate questions for batch ${batch.unique_batch_id}:`, errorData);
+        }
+      }
+
+      // Refresh data after generation
+      await fetchQuestions();
+      await fetchPendingBatches();
+    } catch (error) {
+      console.error('Error generating questions:', error);
+      setError('Failed to generate questions. Please try again.');
+    } finally {
+      setGeneratingQuestions(false);
     }
   };
 
@@ -270,162 +331,212 @@ export default function ReviewQuestions() {
   return (
     <div className="max-w-6xl mx-auto mt-8">
       <h1 className="text-3xl font-bold mb-6 text-foreground">Review Questions</h1>
-      <div className="mb-4">
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={handleApproveSelected}
-          disabled={Object.values(selectedQuestions).every(v => !v)}
-        >
-          Approve Selected
-        </Button>
-      </div>
       
-      {groupedQuestions.map((batch, batchIndex) => (
-        <div key={batch.batchId} className="mb-8">
-          <div className="bg-gray-800 p-4 rounded-t-lg">
-            <h2 className="text-xl font-semibold text-white">
-              Batch ID: {batch.batchId}
-            </h2>
-            <p className="text-gray-300">Cluster: {batch.batchCluster}</p>
+      {/* Generate Questions Section */}
+      {pendingBatches.length > 0 && (
+        <div className="mb-8 p-6 bg-blue-900/20 border border-blue-500/30 rounded-xl">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-semibold text-white mb-2">Generate Questions</h2>
+              <p className="text-gray-300">
+                You have {pendingBatches.length} batch{pendingBatches.length > 1 ? 'es' : ''} ready for question generation.
+              </p>
+            </div>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleGenerateQuestions}
+              disabled={generatingQuestions}
+              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+            >
+              {generatingQuestions ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Generating...
+                </div>
+              ) : (
+                `Generate Questions (${pendingBatches.length})`
+              )}
+            </Button>
           </div>
           
-          <table className="w-full text-left border-separate border-spacing-y-2 bg-gray-900 rounded-b-lg">
-            <thead>
-              <tr>
-                <th className="text-foreground font-semibold py-2 px-4">
-                  <Checkbox
-                    onChange={(e) => {
-                      const newSelected = { ...selectedQuestions };
-                      batch.questions.forEach(q => {
-                        if (q.question_status === 'questions_generated') {
-                          newSelected[q.id] = e.target.checked;
-                        }
-                      });
-                      setSelectedQuestions(newSelected);
-                    }}
-                    checked={batch.questions.some(q => 
-                      q.question_status === 'questions_generated' && selectedQuestions[q.id]
-                    )}
-                  />
-                </th>
-                <th className="text-foreground font-semibold py-2 px-4">Topic</th>
-                <th className="text-foreground font-semibold py-2 px-4">Question</th>
-                <th className="text-foreground font-semibold py-2 px-4">Actions</th>
-                <th className="text-foreground font-semibold py-2 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batch.questions.map((question) => {
-                const isApproved = question.question_status === 'question_approved';
-                const isEditing = editingQuestions.hasOwnProperty(question.id);
-                
-                return (
-                  <tr 
-                    key={question.id} 
-                    className={`border-b border-gray-700 ${
-                      isApproved ? 'bg-gray-800' : 'bg-transparent'
-                    }`}
-                  >
-                    <td className="text-foreground py-1 px-4">
-                      {!isApproved && (
-                        <Checkbox
-                          checked={!!selectedQuestions[question.id]}
-                          onChange={(e) => handleSelectQuestion(question.id, e.target.checked)}
-                        />
-                      )}
-                    </td>
-                    <td className="text-foreground py-1 px-4 align-top w-1/6">
-                      {question.topic}
-                    </td>
-                    <td className="text-foreground py-1 px-4 align-top w-2/5">
-                      {isEditing ? (
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={editingQuestions[question.id]}
-                            onChange={(e) => handleEditQuestion(question.id, e.target.value)}
-                            className="flex-1 bg-gray-800 text-white border border-gray-600 rounded px-2 py-1"
-                          />
-                          <button
-                            onClick={() => handleSaveEdit(question.id)}
-                            className="bg-green-600 text-white px-3 py-1 rounded text-sm"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      ) : (
-                        <div>
-                          <span>{question.question}</span>
-                          {question.ai_response_answers && (
-                            <div className="mt-2 p-2 bg-green-900 rounded text-sm">
-                              {question.ai_response_answers}
+          {/* Pending Batches List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingBatches.map((batch) => (
+              <div key={batch.unique_batch_id} className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Batch ID</div>
+                <div className="text-white font-mono text-xs mb-2">{batch.unique_batch_id}</div>
+                <div className="text-sm text-gray-400 mb-1">Organisation</div>
+                <div className="text-white">{batch.organisation}</div>
+                <div className="text-sm text-gray-400 mb-1">Date</div>
+                <div className="text-white">{new Date(batch.batch_date).toLocaleDateString()}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Existing Questions Section */}
+      {questions.length > 0 && (
+        <>
+          <div className="mb-4">
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={handleApproveSelected}
+              disabled={Object.values(selectedQuestions).every(v => !v)}
+            >
+              Approve Selected
+            </Button>
+          </div>
+          
+          {groupedQuestions.map((batch, batchIndex) => (
+            <div key={batch.batchId} className="mb-8">
+              <div className="bg-gray-800 p-4 rounded-t-lg">
+                <h2 className="text-xl font-semibold text-white">
+                  Batch ID: {batch.batchId}
+                </h2>
+                <p className="text-gray-300">Cluster: {batch.batchCluster}</p>
+              </div>
+              
+              <table className="w-full text-left border-separate border-spacing-y-2 bg-gray-900 rounded-b-lg">
+                <thead>
+                  <tr>
+                    <th className="text-foreground font-semibold py-2 px-4">
+                      <Checkbox
+                        onChange={(e) => {
+                          const newSelected = { ...selectedQuestions };
+                          batch.questions.forEach(q => {
+                            if (q.question_status === 'questions_generated') {
+                              newSelected[q.id] = e.target.checked;
+                            }
+                          });
+                          setSelectedQuestions(newSelected);
+                        }}
+                        checked={batch.questions.some(q => 
+                          q.question_status === 'questions_generated' && selectedQuestions[q.id]
+                        )}
+                      />
+                    </th>
+                    <th className="text-foreground font-semibold py-2 px-4">Topic</th>
+                    <th className="text-foreground font-semibold py-2 px-4">Question</th>
+                    <th className="text-foreground font-semibold py-2 px-4">Actions</th>
+                    <th className="text-foreground font-semibold py-2 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batch.questions.map((question) => {
+                    const isApproved = question.question_status === 'question_approved';
+                    const isEditing = editingQuestions.hasOwnProperty(question.id);
+                    
+                    return (
+                      <tr 
+                        key={question.id} 
+                        className={`border-b border-gray-700 ${
+                          isApproved ? 'bg-gray-800' : 'bg-transparent'
+                        }`}
+                      >
+                        <td className="text-foreground py-1 px-4">
+                          {!isApproved && (
+                            <Checkbox
+                              checked={!!selectedQuestions[question.id]}
+                              onChange={(e) => handleSelectQuestion(question.id, e.target.checked)}
+                            />
+                          )}
+                        </td>
+                        <td className="text-foreground py-1 px-4 align-top w-1/6">
+                          {question.topic}
+                        </td>
+                        <td className="text-foreground py-1 px-4 align-top w-2/5">
+                          {isEditing ? (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={editingQuestions[question.id]}
+                                onChange={(e) => handleEditQuestion(question.id, e.target.value)}
+                                className="flex-1 bg-gray-800 text-white border border-gray-600 rounded px-2 py-1"
+                              />
+                              <button
+                                onClick={() => handleSaveEdit(question.id)}
+                                className="bg-green-600 text-white px-3 py-1 rounded text-sm"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          ) : (
+                            <div>
+                              <span>{question.question}</span>
+                              {question.ai_response_answers && (
+                                <div className="mt-2 p-2 bg-green-900 rounded text-sm">
+                                  {question.ai_response_answers}
+                                </div>
+                              )}
                             </div>
                           )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="text-foreground py-1 px-4 align-top w-1/6">
-                      {!isApproved && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEditQuestion(question.id, question.question)}
-                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleApproveQuestion(question.id)}
-                            className="bg-green-600 text-white px-3 py-1 rounded text-sm"
-                          >
-                            Approve
-                          </button>
-                        </div>
-                      )}
-                      {isApproved && (
-                        <div className="flex gap-2">
-                          {!question.ai_response_answers && question.answer_status !== 'completed' ? (
-                            <button
-                              onClick={() => handleAskQuestion(question.id)}
-                              disabled={askingQuestions[question.id] || question.answer_status === 'generating'}
-                              className={`px-3 py-1 rounded text-sm ${
-                                askingQuestions[question.id] 
-                                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
-                                  : 'bg-purple-600 text-white hover:bg-purple-700'
-                              }`}
-                            >
-                              {askingQuestions[question.id] ? (
-                                <span className="flex items-center gap-2">
-                                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                                  </svg>
-                                  Thinking...
-                                </span>
-                              ) : 'Ask Question'}
-                            </button>
-                          ) : (
-                            <span className="text-green-400 text-sm">✓ Answered</span>
+                        </td>
+                        <td className="text-foreground py-1 px-4 align-top w-1/6">
+                          {!isApproved && (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditQuestion(question.id, question.question)}
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleApproveQuestion(question.id)}
+                                className="bg-green-600 text-white px-3 py-1 rounded text-sm"
+                              >
+                                Approve
+                              </button>
+                            </div>
                           )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="text-foreground py-1 px-4 align-top w-1/6">
-                      {isApproved ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-green-400">✓ Approved</span>
-                        </div>
-                      ) : (
-                        <span className="text-yellow-400">Pending</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ))}
+                          {isApproved && (
+                            <div className="flex gap-2">
+                              {!question.ai_response_answers && question.answer_status !== 'completed' ? (
+                                <button
+                                  onClick={() => handleAskQuestion(question.id)}
+                                  disabled={askingQuestions[question.id] || question.answer_status === 'generating'}
+                                  className={`px-3 py-1 rounded text-sm ${
+                                    askingQuestions[question.id] 
+                                      ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                                  }`}
+                                >
+                                  {askingQuestions[question.id] ? (
+                                    <span className="flex items-center gap-2">
+                                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                      </svg>
+                                      Thinking...
+                                    </span>
+                                  ) : 'Ask Question'}
+                                </button>
+                              ) : (
+                                <span className="text-green-400 text-sm">✓ Answered</span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-foreground py-1 px-4 align-top w-1/6">
+                          {isApproved ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-green-400">✓ Approved</span>
+                            </div>
+                          ) : (
+                            <span className="text-yellow-400">Pending</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 } 

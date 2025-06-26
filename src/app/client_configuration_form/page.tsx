@@ -208,28 +208,10 @@ export default function ClientConfigurationForm() {
         return;
       }
 
-      setProcessingStatus(`Merge complete! Processed ${mergeData.processed_count} schedule rows. Starting question generation...`);
-      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay after merge
+      setProcessingStatus(`Merge complete! Processed ${mergeData.processed_count} schedule rows.`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
 
-      // Call open_ai_request_questions for pending rows
-      setProcessingStatus('Generating AI questions...');
-      const questionsResponse = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/open_ai_request_questions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
-          "x-client-info": "supabase-js/2.39.3",
-          "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        },
-        body: JSON.stringify({ auth_user_id: user.id }),
-      });
-
-      const questionsData = await questionsResponse.json();
-      if (!questionsResponse.ok) {
-        throw new Error(`Questions generation failed: ${questionsData.error || 'Unknown error'}`);
-      }
-
-      setMessage(`✅ Configuration saved and ${mergeData.processed_count} FAQ batches queued for generation!`);
+      setMessage(`✅ Configuration saved and ${mergeData.processed_count} FAQ batches created!`);
       setProcessingStatus('Redirecting to review questions...');
       
       setTimeout(() => {
