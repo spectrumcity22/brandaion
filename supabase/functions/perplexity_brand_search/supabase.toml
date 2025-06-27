@@ -1,0 +1,2 @@
+[functions.perplexity_brand_search]
+verify_jwt = true 

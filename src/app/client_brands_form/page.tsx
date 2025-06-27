@@ -17,6 +17,7 @@ interface Brand {
   brand_name: string;
   brand_url: string;
   brand_jsonld_object: any;
+  ai_response?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -65,6 +66,7 @@ export default function ClientBrandsForm() {
   const [analyzingBrand, setAnalyzingBrand] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -237,17 +239,34 @@ export default function ClientBrandsForm() {
 
       if (error) throw error;
       
+      // If this was a new brand and we have pending analysis, save it
+      if (!editingBrand && pendingAnalysis && data) {
+        const { error: analysisError } = await supabase
+          .from('brands')
+          .update({
+            ai_response: pendingAnalysis.analysis
+          })
+          .eq('id', data.id);
+        
+        if (analysisError) {
+          console.error('Failed to save pending analysis:', analysisError);
+        } else {
+          console.log('Pending analysis saved successfully');
+        }
+      }
+      
       // Show success message
       setError(''); // Clear any previous errors
       setSuccess(true);
+      
+      // Clear pending analysis
+      setPendingAnalysis(null);
       
       // Refresh data
       await loadData();
       setShowForm(false);
       setEditingBrand(null);
       setFormData({});
-      
-      // Remove auto-redirect - let user stay on the page
     } catch (err) {
       console.error('Error saving brand:', err);
       setError('Error saving brand.');
@@ -413,6 +432,26 @@ export default function ClientBrandsForm() {
       if (result.success) {
         setAiResponse(result.data);
         setSuccess('✅ AI analysis completed successfully!');
+        
+        // Save the analysis to the brands table if we have a brand ID
+        if (editingBrand?.id) {
+          const { error: saveError } = await supabase
+            .from('brands')
+            .update({
+              ai_response: result.data.analysis
+            })
+            .eq('id', editingBrand.id);
+          
+          if (saveError) {
+            console.error('Failed to save analysis to database:', saveError);
+            // Don't throw error here as the analysis was successful, just log it
+          } else {
+            console.log('Analysis saved to database successfully');
+          }
+        } else {
+          // Store pending analysis for new brands
+          setPendingAnalysis(result.data);
+        }
       } else {
         throw new Error(result.error || 'Analysis failed');
       }
@@ -597,64 +636,19 @@ export default function ClientBrandsForm() {
               <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">🤖 AI Analysis Results</h3>
                 <div className="space-y-4">
-                  {aiResponse.brand_identity && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-300 mb-2">Brand Identity</h4>
-                      <div className="bg-gray-700/30 rounded p-3">
-                        <p className="text-white text-sm">
-                          <strong>Name:</strong> {aiResponse.brand_identity.name || 'N/A'}
-                        </p>
-                        <p className="text-white text-sm">
-                          <strong>Industry:</strong> {aiResponse.brand_identity.industry || 'N/A'}
-                        </p>
-                        <p className="text-white text-sm">
-                          <strong>Value Proposition:</strong> {aiResponse.brand_identity.value_proposition || 'N/A'}
-                        </p>
-                      </div>
+                  <div>
+                    <h4 className="text-md font-medium text-gray-300 mb-2">Analysis</h4>
+                    <div className="bg-gray-700/30 rounded p-3">
+                      <p className="text-white text-sm whitespace-pre-wrap">
+                        {aiResponse.analysis || 'No analysis available'}
+                      </p>
                     </div>
-                  )}
+                  </div>
                   
-                  {aiResponse.content_summary && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-300 mb-2">Content Summary</h4>
-                      <div className="bg-gray-700/30 rounded p-3">
-                        {aiResponse.content_summary.main_products_services && (
-                          <p className="text-white text-sm">
-                            <strong>Services:</strong> {aiResponse.content_summary.main_products_services.join(', ')}
-                          </p>
-                        )}
-                        {aiResponse.content_summary.key_features && (
-                          <p className="text-white text-sm">
-                            <strong>Features:</strong> {aiResponse.content_summary.key_features.join(', ')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {aiResponse.faq_generation_insights && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-300 mb-2">FAQ Insights</h4>
-                      <div className="bg-gray-700/30 rounded p-3">
-                        {aiResponse.faq_generation_insights.potential_questions && (
-                          <div>
-                            <p className="text-white text-sm font-medium mb-1">Potential Questions:</p>
-                            <ul className="text-white text-sm space-y-1">
-                              {aiResponse.faq_generation_insights.potential_questions.slice(0, 5).map((question: string, index: number) => (
-                                <li key={index} className="ml-4">• {question}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {aiResponse.faq_generation_insights.recommended_topics && (
-                          <div className="mt-2">
-                            <p className="text-white text-sm font-medium mb-1">Recommended Topics:</p>
-                            <p className="text-white text-sm">{aiResponse.faq_generation_insights.recommended_topics.join(', ')}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex justify-between text-sm text-gray-400">
+                    <span>Brand: {aiResponse.brand_name || 'N/A'}</span>
+                    <span>Query: {aiResponse.query || 'N/A'}</span>
+                  </div>
                   
                   <div className="mt-4">
                     <button
@@ -761,6 +755,9 @@ export default function ClientBrandsForm() {
                         <div className="pt-2 border-t border-gray-600/30">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-gray-400 text-sm">AI Analysis</p>
+                            {brand.ai_response && (
+                              <span className="text-green-400 text-xs">✅ Available</span>
+                            )}
                           </div>
                           
                           <button
@@ -780,7 +777,7 @@ export default function ClientBrandsForm() {
                                 Analyzing...
                               </div>
                             ) : (
-                              '🔍 Analyze Brand'
+                              brand.ai_response ? '🔄 Re-analyze' : '🔍 Analyze Brand'
                             )}
                           </button>
                         </div>
