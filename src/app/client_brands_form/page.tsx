@@ -20,6 +20,7 @@ interface Brand {
   ai_response?: string;
   created_at?: string;
   updated_at?: string;
+  logo_url?: string;
 }
 
 interface Organisation {
@@ -31,6 +32,13 @@ interface Organisation {
 interface SubscriptionInfo {
   package_tier: string;
   status: string;
+}
+
+interface AIFormData {
+  industry: string;
+  targetAudience: string;
+  valueProposition: string;
+  mainServices: string;
 }
 
 interface BrandAnalysis {
@@ -65,12 +73,14 @@ export default function ClientBrandsForm() {
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
-  const [aiFormData, setAiFormData] = useState({
+  const [aiFormData, setAiFormData] = useState<AIFormData>({
     industry: '',
     targetAudience: '',
     valueProposition: '',
     mainServices: ''
   });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -293,6 +303,60 @@ export default function ClientBrandsForm() {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Logo file size must be less than 5MB');
+        return;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file');
+        return;
+      }
+      
+      setLogoFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile) return null;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, logoFile);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('logos')
+        .getPublicUrl(fileName);
+      
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setError('Failed to upload logo');
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -303,12 +367,46 @@ export default function ClientBrandsForm() {
         return;
       }
 
-      // Check package limits for new brands
-      if (!editingBrand && !canCreateBrand()) {
-        const packageInfo = getPackageLimits(subscription?.package_tier || 'startup');
-        setError(`You have reached your brand limit for ${packageInfo.name} package. Please upgrade to create more brands.`);
+      // Upload logo if present
+      let logoUrl = formData.logo_url || null;
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+        if (!logoUrl) {
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Fetch organisation_id for the user
+      const { data: org, error: orgError } = await supabase
+        .from('client_organisation')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+      if (orgError || !org) {
+        setError('No organisation found for this user.');
         setSaving(false);
         return;
+      }
+
+      // Prepare the data to save
+      const saveData: any = {
+        auth_user_id: user.id,
+        organisation_id: formData.organisation_id || org.id,
+        brand_name: formData.brand_name || '',
+        brand_url: formData.brand_url || '',
+        logo_url: logoUrl
+      };
+
+      // If we have AI form data, convert it to JSON and include it
+      if (aiFormData.industry || aiFormData.targetAudience || aiFormData.valueProposition || aiFormData.mainServices) {
+        const aiData = {
+          industry: aiFormData.industry,
+          targetAudience: aiFormData.targetAudience,
+          valueProposition: aiFormData.valueProposition,
+          mainServices: aiFormData.mainServices
+        };
+        saveData.ai_response = JSON.stringify(aiData);
       }
 
       let data, error;
@@ -317,13 +415,7 @@ export default function ClientBrandsForm() {
         // Update existing brand
         const { data: updateData, error: updateError } = await supabase
           .from('brands')
-          .update({
-            auth_user_id: user.id,
-            organisation_id: formData.organisation_id,
-            organisation_name: formData.organisation_name || '',
-            brand_name: formData.brand_name || '',
-            brand_url: formData.brand_url || ''
-          })
+          .update(saveData)
           .eq('id', editingBrand.id)
           .select()
           .single();
@@ -334,13 +426,7 @@ export default function ClientBrandsForm() {
         // Insert new brand
         const { data: insertData, error: insertError } = await supabase
           .from('brands')
-          .insert({
-            auth_user_id: user.id,
-            organisation_id: formData.organisation_id,
-            organisation_name: formData.organisation_name || '',
-            brand_name: formData.brand_name || '',
-            brand_url: formData.brand_url || ''
-          })
+          .insert(saveData)
           .select()
           .single();
         
@@ -368,16 +454,25 @@ export default function ClientBrandsForm() {
       
       // Show success message
       setError(''); // Clear any previous errors
-      setSuccess(true);
+      setSuccess('Brand saved successfully!');
       
-      // Clear pending analysis
+      // Clear pending analysis and logo
       setPendingAnalysis(null);
+      setLogoFile(null);
+      setLogoPreview(null);
       
       // Refresh data
       await loadData();
       setShowForm(false);
       setEditingBrand(null);
       setFormData({});
+      setAiFormData({
+        industry: '',
+        targetAudience: '',
+        valueProposition: '',
+        mainServices: ''
+      });
+      setAiResponse(null);
     } catch (err) {
       console.error('Error saving brand:', err);
       setError('Error saving brand.');
@@ -757,6 +852,32 @@ export default function ClientBrandsForm() {
                     placeholder="https://yourbrand.com"
                   />
                 </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-gray-300 mb-2 font-medium">Brand Logo</label>
+                  <div className="flex items-center space-x-4">
+                    {(logoPreview || formData.logo_url) && (
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border border-gray-600/50">
+                        <img
+                          src={logoPreview || formData.logo_url}
+                          alt="Brand logo"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                        className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Recommended size: 100x100px to 300x300px, max 5MB
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex space-x-4">
@@ -815,7 +936,7 @@ export default function ClientBrandsForm() {
                     <input
                       type="text"
                       value={aiFormData.industry}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, industry: e.target.value }))}
+                      onChange={(e) => setAiFormData((prev: AIFormData) => ({ ...prev, industry: e.target.value }))}
                       className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                       placeholder="e.g., Technology, Healthcare, E-commerce"
                     />
@@ -826,7 +947,7 @@ export default function ClientBrandsForm() {
                     <input
                       type="text"
                       value={aiFormData.targetAudience}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, targetAudience: e.target.value }))}
+                      onChange={(e) => setAiFormData((prev: AIFormData) => ({ ...prev, targetAudience: e.target.value }))}
                       className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                       placeholder="e.g., Small businesses, Enterprise clients"
                     />
@@ -836,7 +957,7 @@ export default function ClientBrandsForm() {
                     <label className="block text-gray-300 mb-2 font-medium">Value Proposition</label>
                     <textarea
                       value={aiFormData.valueProposition}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, valueProposition: e.target.value }))}
+                      onChange={(e) => setAiFormData((prev: AIFormData) => ({ ...prev, valueProposition: e.target.value }))}
                       className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                       rows={3}
                       placeholder="What unique value does your brand provide?"
@@ -847,7 +968,7 @@ export default function ClientBrandsForm() {
                     <label className="block text-gray-300 mb-2 font-medium">Main Services</label>
                     <textarea
                       value={aiFormData.mainServices}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, mainServices: e.target.value }))}
+                      onChange={(e) => setAiFormData((prev: AIFormData) => ({ ...prev, mainServices: e.target.value }))}
                       className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                       rows={3}
                       placeholder="List your main services, separated by commas"
@@ -901,7 +1022,18 @@ export default function ClientBrandsForm() {
                   return (
                     <div key={brand.id} className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
                       <div className="flex items-start justify-between mb-3">
-                        <h4 className="text-lg font-semibold text-white truncate">{brand.brand_name}</h4>
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          {brand.logo_url && (
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700/50 border border-gray-600/50 flex-shrink-0">
+                              <img
+                                src={brand.logo_url}
+                                alt={`${brand.brand_name} logo`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+                          <h4 className="text-lg font-semibold text-white truncate">{brand.brand_name}</h4>
+                        </div>
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleEdit(brand)}

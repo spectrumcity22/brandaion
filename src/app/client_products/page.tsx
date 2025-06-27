@@ -22,6 +22,7 @@ interface Product {
   brand_id?: string;
   inserted_at?: string;
   ai_response?: any;
+  logo_url?: string;
 }
 
 interface Brand {
@@ -66,6 +67,8 @@ export default function ClientProducts() {
   });
   const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -343,6 +346,16 @@ export default function ClientProducts() {
         category: formData.category || ''
       };
 
+      // Upload logo if present
+      if (logoFile) {
+        const logoUrl = await uploadLogo();
+        if (!logoUrl) {
+          setSaving(false);
+          return;
+        }
+        saveData.logo_url = logoUrl;
+      }
+
       // If we have AI form data, convert it to JSON and include it
       if (aiFormData.industry || aiFormData.targetAudience || aiFormData.valueProposition || aiFormData.mainFeatures || aiFormData.competitors) {
         const aiData = {
@@ -402,8 +415,10 @@ export default function ClientProducts() {
       setError(''); // Clear any previous errors
       setSuccess('Product saved successfully!');
       
-      // Clear pending analysis
+      // Clear pending analysis and logo
       setPendingAnalysis(null);
+      setLogoFile(null);
+      setLogoPreview(null);
       
       // Refresh data
       await loadData();
@@ -611,6 +626,60 @@ export default function ClientProducts() {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Logo file size must be less than 5MB');
+        return;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file');
+        return;
+      }
+      
+      setLogoFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile) return null;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, logoFile);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('logos')
+        .getPublicUrl(fileName);
+      
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setError('Failed to upload logo');
+      return null;
+    }
+  };
+
   const productsByBrand = getProductsByBrand();
   const totalProducts = products.length;
   const activeProducts = products.filter(p => p.product_name && p.product_name.trim() !== '').length;
@@ -767,6 +836,32 @@ export default function ClientProducts() {
                     value={formData.url || ''} 
                     onChange={handleChange} 
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-gray-300 mb-2 font-medium">Product Logo</label>
+                  <div className="flex items-center space-x-4">
+                    {(logoPreview || formData.logo_url) && (
+                      <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border border-gray-600/50">
+                        <img
+                          src={logoPreview || formData.logo_url}
+                          alt="Product logo"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                        className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Recommended size: 100x100px to 300x300px, max 5MB
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -937,7 +1032,18 @@ export default function ClientProducts() {
                         {brandProducts.map((product) => (
                           <div key={product.id} className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
                             <div className="flex items-start justify-between mb-3">
-                              <h4 className="text-lg font-semibold text-white truncate">{product.product_name || 'Unnamed Product'}</h4>
+                              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                {product.logo_url && (
+                                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700/50 border border-gray-600/50 flex-shrink-0">
+                                    <img
+                                      src={product.logo_url}
+                                      alt={`${product.product_name} logo`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <h4 className="text-lg font-semibold text-white truncate">{product.product_name || 'Unnamed Product'}</h4>
+                              </div>
                               <div className="flex space-x-2">
                                 <button
                                   onClick={() => handleEdit(product)}
