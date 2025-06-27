@@ -979,6 +979,41 @@ export default function ClientBrandsForm() {
                     </div>
                   );
                 })}
+
+                {/* Upgrade Cards to fill empty slots */}
+                {(() => {
+                  const currentBrandCount = brands.length;
+                  const limits = subscription ? getPackageLimits(subscription.package_tier) : { limit: 0 };
+                  const maxBrands = limits.limit === Infinity ? 999 : limits.limit;
+                  const emptySlots = Math.max(0, 3 - (currentBrandCount % 3));
+                  
+                  if (currentBrandCount >= maxBrands && emptySlots > 0) {
+                    return Array.from({ length: emptySlots }, (_, index) => (
+                      <div key={`upgrade-${index}`} className="relative bg-gray-800/30 backdrop-blur-sm border border-gray-600/30 rounded-xl p-4 overflow-hidden">
+                        {/* Blurred overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10 backdrop-blur-sm"></div>
+                        
+                        {/* Content */}
+                        <div className="relative z-10 text-center py-6">
+                          <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                          </div>
+                          <h4 className="text-lg font-semibold text-white mb-2">Upgrade Your Plan</h4>
+                          <p className="text-gray-400 text-sm mb-3">Unlock more brands and features</p>
+                          <button
+                            onClick={() => router.push('/packages')}
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-all duration-200 transform hover:scale-105 text-sm"
+                          >
+                            View Plans
+                          </button>
+                        </div>
+                      </div>
+                    ));
+                  }
+                  return null;
+                })()}
               </div>
             </div>
           )}
