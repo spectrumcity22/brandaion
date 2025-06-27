@@ -88,6 +88,7 @@ export default function ClientBrandsForm() {
       if (brandsError) {
         setError('Failed to load brands.');
       } else {
+        console.log('Loaded brands:', brandsData);
         setBrands(brandsData || []);
       }
 
@@ -166,6 +167,10 @@ export default function ClientBrandsForm() {
     return brands.length < packageInfo.limit;
   };
 
+  const hasValidAIResponse = (brand: Brand) => {
+    return brand.ai_response && brand.ai_response.trim().length > 0;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'organisation_id') {
@@ -242,7 +247,7 @@ export default function ClientBrandsForm() {
         const { error: analysisError } = await supabase
           .from('brands')
           .update({
-            ai_response: JSON.stringify(pendingAnalysis)
+            ai_response: pendingAnalysis.analysis
           })
           .eq('id', data.id);
         
@@ -279,13 +284,11 @@ export default function ClientBrandsForm() {
     
     // Load existing AI response if available
     if (brand.ai_response) {
-      try {
-        const parsedResponse = JSON.parse(brand.ai_response);
-        setAiResponse(parsedResponse);
-      } catch (parseError) {
-        console.error('Failed to parse existing AI response:', parseError);
-        setAiResponse(null);
-      }
+      setAiResponse({
+        analysis: brand.ai_response,
+        brand_name: brand.brand_name,
+        query: `Analyze this website: ${brand.brand_url}`
+      });
     } else {
       setAiResponse(null);
     }
@@ -383,7 +386,7 @@ export default function ClientBrandsForm() {
           const { error: saveError } = await supabase
             .from('brands')
             .update({
-              ai_response: JSON.stringify(result.data)
+              ai_response: result.data.analysis
             })
             .eq('id', editingBrand.id);
           
@@ -581,44 +584,19 @@ export default function ClientBrandsForm() {
               <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">🤖 AI Analysis Results</h3>
                 <div className="space-y-4">
-                  {aiResponse.brand_summary && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-300 mb-2">Brand Summary</h4>
-                      <div className="bg-gray-700/30 rounded p-3 space-y-2">
-                        <p className="text-white text-sm">
-                          <strong>Name:</strong> {aiResponse.brand_summary.name || 'Not found'}
-                        </p>
-                        <p className="text-white text-sm">
-                          <strong>Industry:</strong> {aiResponse.brand_summary.industry || 'Not found'}
-                        </p>
-                        <p className="text-white text-sm">
-                          <strong>Target Audience:</strong> {aiResponse.brand_summary.target_audience || 'Not found'}
-                        </p>
-                        <p className="text-white text-sm">
-                          <strong>Value Proposition:</strong> {aiResponse.brand_summary.value_proposition || 'Not found'}
-                        </p>
-                        {aiResponse.brand_summary.main_services && aiResponse.brand_summary.main_services.length > 0 && (
-                          <div>
-                            <p className="text-white text-sm font-medium">Main Services:</p>
-                            <ul className="text-white text-sm ml-4">
-                              {aiResponse.brand_summary.main_services.map((service: string, index: number) => (
-                                <li key={index}>• {service}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
+                  <div>
+                    <h4 className="text-md font-medium text-gray-300 mb-2">Analysis</h4>
+                    <div className="bg-gray-700/30 rounded p-3">
+                      <p className="text-white text-sm whitespace-pre-wrap">
+                        {aiResponse.analysis || 'No analysis available'}
+                      </p>
                     </div>
-                  )}
+                  </div>
                   
-                  {aiResponse.analysis_status && (
-                    <div className="flex justify-between text-sm text-gray-400">
-                      <span>Status: {aiResponse.analysis_status.url_accessible ? '✅ Accessible' : '❌ Not Accessible'}</span>
-                      {aiResponse.analysis_status.error_message && (
-                        <span>Error: {aiResponse.analysis_status.error_message}</span>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex justify-between text-sm text-gray-400">
+                    <span>Brand: {aiResponse.brand_name || 'N/A'}</span>
+                    <span>Query: {aiResponse.query || 'N/A'}</span>
+                  </div>
                   
                   <div className="mt-4">
                     <button
@@ -723,7 +701,7 @@ export default function ClientBrandsForm() {
                         <div className="pt-2 border-t border-gray-600/30">
                           <div className="flex items-center justify-between">
                             <p className="text-gray-400 text-sm">AI Analysis</p>
-                            {brand.ai_response && (
+                            {hasValidAIResponse(brand) && (
                               <span className="text-green-400 text-xs">✅ Available</span>
                             )}
                           </div>
