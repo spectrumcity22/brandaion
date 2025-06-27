@@ -21,6 +21,7 @@ interface Product {
   schema_json: any;
   brand_id?: string;
   inserted_at?: string;
+  ai_response?: any;
 }
 
 interface Brand {
@@ -30,16 +31,33 @@ interface Brand {
   auth_user_id: string;
 }
 
+interface AIFormData {
+  industry: string;
+  targetAudience: string;
+  valueProposition: string;
+  mainFeatures: string;
+}
+
 export default function ClientProducts() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<any>(null);
+  const [aiFormData, setAiFormData] = useState<AIFormData>({
+    industry: '',
+    targetAudience: '',
+    valueProposition: '',
+    mainFeatures: ''
+  });
+  const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -95,6 +113,138 @@ export default function ClientProducts() {
     }
   };
 
+  const handleAIFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setAiFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const hasValidAIResponse = (product: Product) => {
+    if (!product.ai_response) return false;
+    try {
+      const parsed = typeof product.ai_response === 'string' 
+        ? JSON.parse(product.ai_response) 
+        : product.ai_response;
+      return parsed && (parsed.analysis || parsed.industry || parsed.targetAudience);
+    } catch {
+      return false;
+    }
+  };
+
+  const askAI = async () => {
+    if (!formData.url) {
+      setError('Please enter a product URL first.');
+      return;
+    }
+
+    setAiLoading(true);
+    setError('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('User not authenticated.');
+        return;
+      }
+
+      const requestData = {
+        query: `Analyze this product: ${formData.url}`,
+        product_name: formData.product_name || 'Unknown Product'
+      };
+
+      console.log('Sending to Perplexity:', requestData);
+
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/perplexity_product_search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: Failed to analyze product`;
+        try {
+          const errorData = await response.json();
+          console.error('API Error:', errorData);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Could not parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log('API Result:', result);
+      
+      if (result.success) {
+        // Store the structured response for display
+        setAiResponse(result.data);
+        
+        console.log('AI Response data:', result.data);
+        
+        // Parse the simple text response from the analysis field
+        let parsedFormData = {
+          industry: '',
+          targetAudience: '',
+          valueProposition: '',
+          mainFeatures: ''
+        };
+
+        if (result.data.analysis) {
+          // Parse the simple text format: "industry: value\ntarget_audience: value\n..."
+          const lines = result.data.analysis.trim().split('\n');
+          lines.forEach((line: string) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('industry:')) {
+              parsedFormData.industry = trimmedLine.replace('industry:', '').trim();
+            } else if (trimmedLine.startsWith('target_audience:')) {
+              parsedFormData.targetAudience = trimmedLine.replace('target_audience:', '').trim();
+            } else if (trimmedLine.startsWith('value_proposition:')) {
+              parsedFormData.valueProposition = trimmedLine.replace('value_proposition:', '').trim();
+            } else if (trimmedLine.startsWith('main_features:')) {
+              parsedFormData.mainFeatures = trimmedLine.replace('main_features:', '').trim();
+            }
+          });
+        }
+        
+        console.log('Setting form data:', parsedFormData);
+        setAiFormData(parsedFormData);
+        
+        setSuccess('✅ AI analysis completed successfully! Review and save the results below.');
+        
+        // Save the analysis as JSON string to the products table if we have a product ID
+        if (editingProduct?.id) {
+          const { error: saveError } = await supabase
+            .from('products')
+            .update({
+              ai_response: JSON.stringify(result.data)
+            })
+            .eq('id', editingProduct.id);
+          
+          if (saveError) {
+            console.error('Failed to save analysis to database:', saveError);
+            // Don't throw error here as the analysis was successful, just log it
+          } else {
+            console.log('Analysis saved to database successfully');
+          }
+        } else {
+          // Store pending analysis for new products
+          setPendingAnalysis(result.data);
+        }
+      } else {
+        throw new Error(result.error || 'Analysis failed');
+      }
+    } catch (err: any) {
+      console.error('AI Analysis Error:', err);
+      setError(`❌ AI Analysis failed: ${err.message}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -117,24 +267,38 @@ export default function ClientProducts() {
         return;
       }
 
+      // Prepare the data to save
+      const saveData: any = {
+        auth_user_id: user.id,
+        user_email: user.email,
+        organisation: formData.organisation || '',
+        organisation_id: org.id,
+        brand_id: formData.brand_id,
+        product_name: formData.product_name || '',
+        description: formData.description || '',
+        keywords: formData.keywords || '',
+        url: formData.url || '',
+        category: formData.category || ''
+      };
+
+      // If we have AI form data, convert it to JSON and include it
+      if (aiFormData.industry || aiFormData.targetAudience || aiFormData.valueProposition || aiFormData.mainFeatures) {
+        const aiData = {
+          industry: aiFormData.industry,
+          targetAudience: aiFormData.targetAudience,
+          valueProposition: aiFormData.valueProposition,
+          mainFeatures: aiFormData.mainFeatures
+        };
+        saveData.ai_response = JSON.stringify(aiData);
+      }
+
       let data, error;
 
       if (editingProduct) {
         // Update existing product
         const { data: updateData, error: updateError } = await supabase
           .from('products')
-          .update({
-            auth_user_id: user.id,
-            user_email: user.email,
-            organisation: formData.organisation || '',
-            organisation_id: org.id,
-            brand_id: formData.brand_id,
-            product_name: formData.product_name || '',
-            description: formData.description || '',
-            keywords: formData.keywords || '',
-            url: formData.url || '',
-            category: formData.category || ''
-          })
+          .update(saveData)
           .eq('id', editingProduct.id)
           .select()
           .single();
@@ -145,18 +309,7 @@ export default function ClientProducts() {
         // Insert new product
         const { data: insertData, error: insertError } = await supabase
           .from('products')
-          .insert({
-            auth_user_id: user.id,
-            user_email: user.email,
-            organisation: formData.organisation || '',
-            organisation_id: org.id,
-            brand_id: formData.brand_id,
-            product_name: formData.product_name || '',
-            description: formData.description || '',
-            keywords: formData.keywords || '',
-            url: formData.url || '',
-            category: formData.category || ''
-          })
+          .insert(saveData)
           .select()
           .single();
         
@@ -166,12 +319,41 @@ export default function ClientProducts() {
 
       if (error) throw error;
       
+      // If this was a new product and we have pending analysis, save it
+      if (!editingProduct && pendingAnalysis && data) {
+        const { error: analysisError } = await supabase
+          .from('products')
+          .update({
+            ai_response: JSON.stringify(pendingAnalysis)
+          })
+          .eq('id', data.id);
+        
+        if (analysisError) {
+          console.error('Failed to save pending analysis:', analysisError);
+        } else {
+          console.log('Pending analysis saved successfully');
+        }
+      }
+      
+      // Show success message
+      setError(''); // Clear any previous errors
+      setSuccess('Product saved successfully!');
+      
+      // Clear pending analysis
+      setPendingAnalysis(null);
+      
       // Refresh data
       await loadData();
       setShowForm(false);
       setEditingProduct(null);
       setFormData({});
-      setError('');
+      setAiFormData({
+        industry: '',
+        targetAudience: '',
+        valueProposition: '',
+        mainFeatures: ''
+      });
+      setAiResponse(null);
     } catch (err) {
       console.error('Error saving product:', err);
       setError('Error saving product.');
@@ -183,6 +365,70 @@ export default function ClientProducts() {
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
     setFormData(product);
+    
+    // Parse AI response if it exists
+    if (product.ai_response) {
+      try {
+        const parsedResponse = typeof product.ai_response === 'string' 
+          ? JSON.parse(product.ai_response) 
+          : product.ai_response;
+        
+        if (parsedResponse.analysis) {
+          // Parse the simple text format
+          const lines = parsedResponse.analysis.trim().split('\n');
+          const parsedFormData = {
+            industry: '',
+            targetAudience: '',
+            valueProposition: '',
+            mainFeatures: ''
+          };
+          
+          lines.forEach((line: string) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('industry:')) {
+              parsedFormData.industry = trimmedLine.replace('industry:', '').trim();
+            } else if (trimmedLine.startsWith('target_audience:')) {
+              parsedFormData.targetAudience = trimmedLine.replace('target_audience:', '').trim();
+            } else if (trimmedLine.startsWith('value_proposition:')) {
+              parsedFormData.valueProposition = trimmedLine.replace('value_proposition:', '').trim();
+            } else if (trimmedLine.startsWith('main_features:')) {
+              parsedFormData.mainFeatures = trimmedLine.replace('main_features:', '').trim();
+            }
+          });
+          
+          setAiFormData(parsedFormData);
+          setAiResponse(parsedResponse);
+        } else {
+          // Handle old JSON format
+          setAiFormData({
+            industry: parsedResponse.industry || '',
+            targetAudience: parsedResponse.targetAudience || '',
+            valueProposition: parsedResponse.valueProposition || '',
+            mainFeatures: parsedResponse.mainFeatures || ''
+          });
+          setAiResponse(parsedResponse);
+        }
+      } catch (parseError) {
+        // If parsing fails, treat as plain text
+        console.log('AI response is plain text, not JSON');
+        setAiFormData({
+          industry: '',
+          targetAudience: '',
+          valueProposition: '',
+          mainFeatures: ''
+        });
+        setAiResponse(null);
+      }
+    } else {
+      setAiFormData({
+        industry: '',
+        targetAudience: '',
+        valueProposition: '',
+        mainFeatures: ''
+      });
+      setAiResponse(null);
+    }
+    
     setShowForm(true);
   };
 
@@ -205,98 +451,80 @@ export default function ClientProducts() {
 
   const handleNewProduct = () => {
     setEditingProduct(null);
-    if (products.length > 0) {
-      const firstProduct = products[0];
-      setFormData({
-        user_email: firstProduct.user_email,
-        organisation: firstProduct.organisation,
-        brand_id: firstProduct.brand_id,
-        product_name: '',
-        description: '',
-        keywords: '',
-        url: '',
-        category: ''
-      });
-    } else {
-      setFormData({});
-    }
+    setFormData({});
+    setAiFormData({
+      industry: '',
+      targetAudience: '',
+      valueProposition: '',
+      mainFeatures: ''
+    });
+    setAiResponse(null);
+    setPendingAnalysis(null);
     setShowForm(true);
   };
 
   const getProductsByBrand = () => {
     const grouped: { [key: string]: { brand: Brand; products: Product[] } } = {};
     
-    brands.forEach(brand => {
-      grouped[brand.id] = {
-        brand,
-        products: products.filter(p => p.brand_id === brand.id)
-      };
+    products.forEach(product => {
+      const brand = brands.find(b => b.id === product.brand_id);
+      if (brand) {
+        if (!grouped[brand.id]) {
+          grouped[brand.id] = { brand, products: [] };
+        }
+        grouped[brand.id].products.push(product);
+      }
     });
-
+    
     return grouped;
   };
 
+  const productsByBrand = getProductsByBrand();
+  const totalProducts = products.length;
+  const activeProducts = products.filter(p => p.product_name && p.product_name.trim() !== '').length;
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading products...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 text-center">
-            <h2 className="text-xl font-semibold text-red-400 mb-2">Error</h2>
-            <p className="text-gray-300">{error}</p>
-          </div>
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
         </div>
       </div>
     );
   }
-
-  const productsByBrand = getProductsByBrand();
-  const totalProducts = products.length;
-  const totalBrands = brands.length;
-  const activeProducts = products.filter(p => p.product_name && p.product_name.trim() !== '').length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">Product Management</h1>
-              <p className="text-gray-400">Manage your brands and products across all markets</p>
-            </div>
-            <button
-              onClick={handleNewProduct}
-              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
-            >
-              + New Product
-            </button>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Products</h1>
+            <p className="text-gray-400">Manage your product portfolio and generate AI-powered schemas</p>
           </div>
+          <button
+            onClick={handleNewProduct}
+            className="mt-4 md:mt-0 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
+          >
+            + Add Product
+          </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Total Brands</p>
-                <p className="text-3xl font-bold text-white">{totalBrands}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-              </div>
-            </div>
+        {/* Error/Success Messages */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6">
+            <p className="text-red-400">{error}</p>
           </div>
+        )}
 
+        {success && (
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-6">
+            <p className="text-green-400">{success}</p>
+          </div>
+        )}
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-gradient-to-br from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -339,6 +567,13 @@ export default function ClientProducts() {
                     setShowForm(false);
                     setEditingProduct(null);
                     setFormData({});
+                    setAiFormData({
+                      industry: '',
+                      targetAudience: '',
+                      valueProposition: '',
+                      mainFeatures: ''
+                    });
+                    setAiResponse(null);
                   }}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
@@ -418,6 +653,78 @@ export default function ClientProducts() {
                   </div>
                 </div>
 
+                {/* AI Analysis Section */}
+                <div className="border-t border-gray-700/50 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-white">AI Analysis</h3>
+                    <button
+                      type="button"
+                      onClick={askAI}
+                      disabled={aiLoading || !formData.url}
+                      className={`px-4 py-2 rounded-lg transition-colors ${
+                        aiLoading || !formData.url
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-purple-600 hover:bg-purple-700 text-white'
+                      }`}
+                    >
+                      {aiLoading ? (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Analyzing...
+                        </div>
+                      ) : (
+                        '🤖 Ask AI'
+                      )}
+                    </button>
+                  </div>
+
+                  {aiResponse && (
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
+                      <p className="text-blue-400 text-sm mb-3">✅ AI analysis completed! Review and edit the fields below:</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-gray-300 mb-2 text-sm">Industry</label>
+                          <input
+                            name="industry"
+                            value={aiFormData.industry}
+                            onChange={handleAIFormChange}
+                            className="w-full p-2 rounded bg-gray-800/50 border border-gray-600/50 text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-300 mb-2 text-sm">Target Audience</label>
+                          <input
+                            name="targetAudience"
+                            value={aiFormData.targetAudience}
+                            onChange={handleAIFormChange}
+                            className="w-full p-2 rounded bg-gray-800/50 border border-gray-600/50 text-white text-sm"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-gray-300 mb-2 text-sm">Value Proposition</label>
+                          <textarea
+                            name="valueProposition"
+                            value={aiFormData.valueProposition}
+                            onChange={handleAIFormChange}
+                            className="w-full p-2 rounded bg-gray-800/50 border border-gray-600/50 text-white text-sm"
+                            rows={2}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-gray-300 mb-2 text-sm">Main Features</label>
+                          <textarea
+                            name="mainFeatures"
+                            value={aiFormData.mainFeatures}
+                            onChange={handleAIFormChange}
+                            className="w-full p-2 rounded bg-gray-800/50 border border-gray-600/50 text-white text-sm"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex justify-end space-x-4 pt-6 border-t border-gray-700/50">
                   <button
                     type="button"
@@ -425,6 +732,13 @@ export default function ClientProducts() {
                       setShowForm(false);
                       setEditingProduct(null);
                       setFormData({});
+                      setAiFormData({
+                        industry: '',
+                        targetAudience: '',
+                        valueProposition: '',
+                        mainFeatures: ''
+                      });
+                      setAiResponse(null);
                     }}
                     className="px-6 py-3 bg-gray-700/50 hover:bg-gray-600/50 text-white rounded-lg transition-colors"
                   >
@@ -501,15 +815,58 @@ export default function ClientProducts() {
                           </button>
                         </div>
                       </div>
-                      
-                      <div className="space-y-2 text-sm">
-                        {product.url && (
-                          <div className="text-gray-400 truncate">
-                            <a href={product.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors">
+
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-gray-400 text-sm">Category</p>
+                          <p className="text-white text-sm font-medium">{product.category || 'No category'}</p>
+                        </div>
+                        
+                        <div>
+                          <p className="text-gray-400 text-sm">URL</p>
+                          {product.url ? (
+                            <a 
+                              href={product.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:text-blue-300 text-sm truncate block"
+                            >
                               {product.url}
                             </a>
+                          ) : (
+                            <span className="text-gray-500 text-sm">No URL</span>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <p className="text-gray-400 text-sm">Created</p>
+                          <p className="text-white text-sm">
+                            {product.inserted_at ? new Date(product.inserted_at).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Analysis Section */}
+                        <div className="pt-2 border-t border-gray-600/30">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-gray-400 text-sm">AI Analysis</p>
+                              {hasValidAIResponse(product) && (
+                                <span className="text-green-400 text-xs">✅ Available</span>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <p className="text-gray-400 text-sm">Schema.org</p>
+                              {product.schema_json ? (
+                                <span className="text-blue-400 text-xs">✅ Generated</span>
+                              ) : hasValidAIResponse(product) ? (
+                                <span className="text-yellow-400 text-xs">⚠️ Ready to generate</span>
+                              ) : (
+                                <span className="text-gray-500 text-xs">Not available</span>
+                              )}
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -517,34 +874,6 @@ export default function ClientProducts() {
               )}
             </div>
           ))}
-        </div>
-
-        {/* Empty State */}
-        {brands.length === 0 && (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-4">No Brands Found</h3>
-            <p className="text-gray-400 mb-6">You need to create brands before adding products</p>
-            <button
-              onClick={() => router.push('/organisation_form')}
-              className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
-            >
-              Create Your First Brand
-            </button>
-          </div>
-        )}
-
-        <div className="flex justify-end mt-8">
-          <button
-            onClick={() => router.push('/client_product_persona_form')}
-            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 transform hover:scale-105"
-          >
-            + Create Persona (Next Step)
-          </button>
         </div>
       </div>
     </div>

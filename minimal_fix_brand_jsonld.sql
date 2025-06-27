@@ -1,11 +1,10 @@
--- Fix the brand JSON-LD trigger to include AI analysis data
--- This trigger will now preserve existing brand_jsonld_object if it has AI data,
--- or create a new one with AI data if available
+-- Minimal fix: just change @type from Brand to Organization
+-- Keep everything else exactly the same as the working version
 
 -- First, drop the existing trigger
 DROP TRIGGER IF EXISTS generate_brand_jsonld_object ON brands;
 
--- Create the updated function that includes AI analysis data
+-- Create the function with minimal change
 CREATE OR REPLACE FUNCTION "public"."generate_brand_jsonld_object"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -27,30 +26,30 @@ BEGIN
             value_proposition_value := COALESCE(ai_data->>'valueProposition', 'AI-powered brand optimization');
             main_services_value := COALESCE(ai_data->>'mainServices', 'Brand Optimization');
             
-            -- Create JSON-LD with AI data using parentOrganization structure
+            -- Create JSON-LD with AI data (ONLY CHANGE: @type from 'Brand' to 'Organization')
             NEW.brand_jsonld_object := jsonb_build_object(
                 '@context', 'https://schema.org',
-                '@type', 'Brand',
+                '@type', 'Organization',
                 'name', COALESCE(NEW.brand_name, ''),
                 'url', COALESCE(NEW.brand_url, ''),
-                'parentOrganization', jsonb_build_object(
-                    '@type', 'Organization',
-                    'name', COALESCE(NEW.organisation_name, '')
-                ),
                 'description', value_proposition_value,
                 'industry', industry_value,
                 'targetAudience', target_audience_value,
-                'mainServices', main_services_value
+                'mainServices', main_services_value,
+                'provider', jsonb_build_object(
+                    '@type', 'Organization',
+                    'name', COALESCE(NEW.organisation_name, '')
+                )
             );
             
         EXCEPTION WHEN OTHERS THEN
             -- If AI data parsing fails, fall back to basic schema
             NEW.brand_jsonld_object := jsonb_build_object(
                 '@context', 'https://schema.org',
-                '@type', 'Brand',
+                '@type', 'Organization',
                 'name', COALESCE(NEW.brand_name, ''),
                 'url', COALESCE(NEW.brand_url, ''),
-                'parentOrganization', jsonb_build_object(
+                'provider', jsonb_build_object(
                     '@type', 'Organization',
                     'name', COALESCE(NEW.organisation_name, '')
                 )
@@ -60,10 +59,10 @@ BEGIN
         -- No AI data available, create basic schema
         NEW.brand_jsonld_object := jsonb_build_object(
             '@context', 'https://schema.org',
-            '@type', 'Brand',
+            '@type', 'Organization',
             'name', COALESCE(NEW.brand_name, ''),
             'url', COALESCE(NEW.brand_url, ''),
-            'parentOrganization', jsonb_build_object(
+            'provider', jsonb_build_object(
                 '@type', 'Organization',
                 'name', COALESCE(NEW.organisation_name, '')
             )
@@ -83,8 +82,7 @@ CREATE TRIGGER generate_brand_jsonld_object
 -- Grant permissions
 ALTER FUNCTION "public"."generate_brand_jsonld_object"() OWNER TO "postgres";
 
--- Test the trigger by updating an existing brand
--- This will regenerate the JSON-LD with AI data if available
+-- Test message
 SELECT 
-    'Trigger Updated' as status,
-    'brand_jsonld_object trigger with parentOrganization structure' as description; 
+    'Minimal Fix Applied' as status,
+    'Only changed @type from Brand to Organization' as description; 
