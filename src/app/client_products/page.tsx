@@ -124,10 +124,10 @@ export default function ClientProducts() {
 
   const getPackageLimits = (packageTier: string) => {
     const limits = {
-      pack1: { name: 'Starter', limit: 5 },
-      pack2: { name: 'Growth', limit: 10 },
-      pack3: { name: 'Professional', limit: 15 },
-      pack4: { name: 'Enterprise', limit: 20 }
+      pack1: { name: 'Starter', limit: 1 },
+      pack2: { name: 'Growth', limit: 2 },
+      pack3: { name: 'Professional', limit: 5 },
+      pack4: { name: 'Enterprise', limit: Infinity }
     };
     return limits[packageTier as keyof typeof limits] || { name: 'Unknown', limit: 0 };
   };
@@ -727,7 +727,7 @@ export default function ClientProducts() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-300 mb-2 font-medium">URL</label>
+                  <label className="block text-gray-300 mb-2 font-medium">Product URL</label>
                   <input 
                     name="url" 
                     className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
@@ -737,9 +737,31 @@ export default function ClientProducts() {
                 </div>
               </div>
 
-              {/* AI Analysis Fields - Always Visible */}
+              {/* AI Analysis Section */}
               <div className="border-t border-gray-700/50 pt-6">
-                <h3 className="text-lg font-semibold text-white mb-4">AI Analysis</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">AI Analysis</h3>
+                  <button
+                    type="button"
+                    onClick={askAI}
+                    disabled={aiLoading || !formData.url}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      aiLoading || !formData.url
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-purple-600 hover:bg-purple-700 text-white'
+                    }`}
+                  >
+                    {aiLoading ? (
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        Analyzing...
+                      </div>
+                    ) : (
+                      '🤖 Complete with AI'
+                    )}
+                  </button>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-gray-300 mb-2 font-medium">Industry</label>
@@ -783,6 +805,17 @@ export default function ClientProducts() {
                       placeholder="Key features separated by semicolons"
                     />
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-300 mb-2 font-medium">Competitors</label>
+                    <textarea
+                      name="competitors"
+                      value={aiFormData.competitors}
+                      onChange={handleAIFormChange}
+                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      rows={2}
+                      placeholder="Direct competitors separated by semicolons"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -793,25 +826,6 @@ export default function ClientProducts() {
                   className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-6 py-2 rounded-lg transition-colors"
                 >
                   {saving ? 'Saving...' : (editingProduct ? 'Update Product' : 'Create Product')}
-                </button>
-                <button
-                  type="button"
-                  onClick={askAI}
-                  disabled={aiLoading || !formData.url}
-                  className={`px-6 py-2 rounded-lg transition-colors ${
-                    aiLoading || !formData.url
-                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                      : 'bg-purple-600 hover:bg-purple-700 text-white'
-                  }`}
-                >
-                  {aiLoading ? (
-                    <div className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Analyzing...
-                    </div>
-                  ) : (
-                    '🤖 Complete with AI'
-                  )}
                 </button>
                 <button
                   type="button"
@@ -918,7 +932,7 @@ export default function ClientProducts() {
                               </div>
                               
                               <div>
-                                <p className="text-gray-400 text-sm">URL</p>
+                                <p className="text-gray-400 text-sm">Product URL</p>
                                 {product.url ? (
                                   <a 
                                     href={product.url} 
@@ -969,6 +983,41 @@ export default function ClientProducts() {
                     )}
                   </div>
                 ))}
+
+                {/* Upgrade Cards to fill empty slots */}
+                {(() => {
+                  const currentProductCount = products.length;
+                  const limits = subscription ? getPackageLimits(subscription.package_tier) : { limit: 0 };
+                  const maxProducts = limits.limit === Infinity ? 999 : limits.limit;
+                  const emptySlots = Math.max(0, 3 - (currentProductCount % 3));
+                  
+                  if (currentProductCount >= maxProducts && emptySlots > 0) {
+                    return Array.from({ length: emptySlots }, (_, index) => (
+                      <div key={`upgrade-${index}`} className="relative bg-gray-900/30 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 overflow-hidden">
+                        {/* Blurred overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-purple-600/10 backdrop-blur-sm"></div>
+                        
+                        {/* Content */}
+                        <div className="relative z-10 text-center py-8">
+                          <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-xl font-bold text-white mb-2">Upgrade Your Plan</h3>
+                          <p className="text-gray-400 mb-4">Unlock more products and features</p>
+                          <button
+                            onClick={() => router.push('/packages')}
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg transition-all duration-200 transform hover:scale-105"
+                          >
+                            View Plans
+                          </button>
+                        </div>
+                      </div>
+                    ));
+                  }
+                  return null;
+                })()}
               </div>
             </div>
           )}
