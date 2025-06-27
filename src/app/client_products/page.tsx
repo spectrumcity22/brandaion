@@ -576,10 +576,27 @@ export default function ClientProducts() {
         return;
       }
 
+      // Get the current product data
+      const { data: product, error: fetchError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       // Trigger the schema update by updating the product (this will fire the trigger)
       const { error } = await supabase
         .from('products')
-        .update({ updated_at: new Date().toISOString() })
+        .update({
+          product_name: product.product_name, // Just update with same data to trigger the function
+          description: product.description,
+          keywords: product.keywords,
+          url: product.url,
+          category: product.category,
+          brand_id: product.brand_id,
+          organisation: product.organisation
+        })
         .eq('id', productId);
 
       if (error) throw error;
