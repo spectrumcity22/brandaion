@@ -28,6 +28,7 @@ export default function ClientConfigurationForm() {
   const [hasConfig, setHasConfig] = useState(false);
   const [status, setStatus] = useState('');
   const [organisation, setOrganisation] = useState<any>(null);
+  const [showAudiences, setShowAudiences] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -466,6 +467,101 @@ export default function ClientConfigurationForm() {
               </button>
             </div>
           </form>
+        </div>
+
+        {/* Audiences Panel */}
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Audience Insights</h2>
+              <p className="text-gray-400">Explore your target audience archetypes and their characteristics</p>
+            </div>
+            <button
+              onClick={() => setShowAudiences(!showAudiences)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 rounded-lg transition-colors"
+            >
+              <span className="text-blue-400 font-semibold">
+                {showAudiences ? 'Hide' : 'Show'} Audiences
+              </span>
+              <svg 
+                className={`w-5 h-5 text-blue-400 transition-transform ${showAudiences ? 'rotate-45' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </button>
+          </div>
+
+          {showAudiences && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {audiences.map((audience, index) => {
+                const colors = [
+                  'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-400',
+                  'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400',
+                  'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400',
+                  'from-orange-500/20 to-red-500/20 border-orange-500/30 text-orange-400',
+                  'from-indigo-500/20 to-purple-500/20 border-indigo-500/30 text-indigo-400',
+                  'from-teal-500/20 to-cyan-500/20 border-teal-500/30 text-teal-400'
+                ];
+                const colorClass = colors[index % colors.length];
+                
+                return (
+                  <div key={audience.id} className="group relative bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${colorClass} border flex items-center justify-center`}>
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-white font-semibold">{audience.target_audience}</h3>
+                        <p className="text-gray-400 text-sm">Audience {index + 1}</p>
+                      </div>
+                    </div>
+                    
+                    <p className="text-gray-300 text-sm mb-4">
+                      Target audience for your brand and product configuration.
+                    </p>
+
+                    <div className="flex space-x-2">
+                      <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                        Run Report
+                      </button>
+                      <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                        Chat
+                      </button>
+                    </div>
+
+                    {/* Hover Popup */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-80 bg-gray-900 border border-gray-600 rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                      <h4 className="text-white font-semibold mb-2">{audience.target_audience}</h4>
+                      <div className="space-y-2 text-sm text-gray-300">
+                        <p><strong>Audience ID:</strong> {audience.id}</p>
+                        <p><strong>Target:</strong> {audience.target_audience}</p>
+                        <p><strong>Status:</strong> Ready for analysis</p>
+                        <p><strong>Features:</strong> Report generation and chat coming soon</p>
+                      </div>
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {audiences.length === 0 && (
+                <div className="md:col-span-4 text-center py-8">
+                  <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-400 mb-2">No audiences found</p>
+                  <p className="text-gray-500 text-sm">Audiences will appear here when configured</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Help Section */}
