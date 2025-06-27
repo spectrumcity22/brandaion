@@ -191,8 +191,24 @@ export default function ClientBrandsForm() {
   };
 
   const cancelEditingAIResponse = () => {
-    setAiLoading(false);
     setAiResponse(null);
+    setAiFormData({
+      industry: '',
+      targetAudience: '',
+      valueProposition: '',
+      mainServices: ''
+    });
+  };
+
+  const closeAIPanel = () => {
+    setAiResponse(null);
+    setAiFormData({
+      industry: '',
+      targetAudience: '',
+      valueProposition: '',
+      mainServices: ''
+    });
+    setSuccess(''); // Clear success message when closing panel
   };
 
   const generateSchemaOrg = (brand: Brand, aiData: any) => {
@@ -576,7 +592,7 @@ export default function ClientBrandsForm() {
         console.log('Setting form data:', parsedFormData);
         setAiFormData(parsedFormData);
         
-        setSuccess('✅ AI analysis completed successfully!');
+        setSuccess('✅ AI analysis completed successfully! Review and save the results below.');
         
         // Save the analysis as JSON string to the brands table if we have a brand ID
         if (editingBrand?.id) {
@@ -782,10 +798,10 @@ export default function ClientBrandsForm() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-white">🤖 Brand Analysis</h3>
                   <button
-                    onClick={() => setAiResponse(null)}
+                    onClick={closeAIPanel}
                     className="text-gray-400 hover:text-white text-sm"
                   >
-                    Clear
+                    Close
                   </button>
                 </div>
 
@@ -935,11 +951,24 @@ export default function ClientBrandsForm() {
 
                         {/* Analysis Section */}
                         <div className="pt-2 border-t border-gray-600/30">
-                          <div className="flex items-center justify-between">
-                            <p className="text-gray-400 text-sm">AI Analysis</p>
-                            {hasValidAIResponse(brand) && (
-                              <span className="text-green-400 text-xs">✅ Available</span>
-                            )}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-gray-400 text-sm">AI Analysis</p>
+                              {hasValidAIResponse(brand) && (
+                                <span className="text-green-400 text-xs">✅ Available</span>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center justify-between">
+                              <p className="text-gray-400 text-sm">Schema.org</p>
+                              {brand.brand_jsonld_object ? (
+                                <span className="text-blue-400 text-xs">✅ Generated</span>
+                              ) : hasValidAIResponse(brand) ? (
+                                <span className="text-yellow-400 text-xs">⚠️ Ready to generate</span>
+                              ) : (
+                                <span className="text-gray-500 text-xs">Not available</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
