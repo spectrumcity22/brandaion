@@ -234,63 +234,13 @@ export default function ClientBrandsForm() {
     }
 
     try {
-      console.log('Generating schema.org JSON-LD...');
-      // Generate schema.org JSON-LD with AI analysis data
-      const schemaOrg = {
-        "@context": "https://schema.org",
-        "@type": "Brand",
-        "name": editingBrand.brand_name,
-        "url": editingBrand.brand_url,
-        "description": aiFormData.valueProposition || `AI-powered brand optimization for ${editingBrand.brand_name}`,
-        "parentOrganization": {
-          "@type": "Organization",
-          "name": editingBrand.organisation_name
-        },
-        "industry": aiFormData.industry || "Technology",
-        "targetAudience": aiFormData.targetAudience || "Businesses and brands",
-        "mainEntity": {
-          "@type": "Service",
-          "name": editingBrand.brand_name,
-          "description": aiFormData.valueProposition || `AI-powered brand optimization services`,
-          "serviceType": aiFormData.mainServices.split(',')[0] || "Brand Optimization",
-          "provider": {
-            "@type": "Organization",
-            "name": editingBrand.organisation_name
-          }
-        },
-        "additionalProperty": [
-          {
-            "@type": "PropertyValue",
-            "name": "Industry",
-            "value": aiFormData.industry || "Technology"
-          },
-          {
-            "@type": "PropertyValue", 
-            "name": "Target Audience",
-            "value": aiFormData.targetAudience || "Businesses and brands"
-          },
-          {
-            "@type": "PropertyValue",
-            "name": "Value Proposition", 
-            "value": aiFormData.valueProposition || `AI-powered brand optimization for ${editingBrand.brand_name}`
-          },
-          {
-            "@type": "PropertyValue",
-            "name": "Main Services",
-            "value": aiFormData.mainServices || "Brand Optimization"
-          }
-        ]
-      };
+      console.log('Saving AI response to trigger schema generation...');
 
-      console.log('Generated schemaOrg:', schemaOrg);
-      console.log('Saving to database...');
-
-      // Save both AI response and schema.org
+      // Save the AI response - this will trigger the database trigger to regenerate schema.org
       const { error } = await supabase
         .from('brands')
         .update({
-          ai_response: JSON.stringify(aiFormData),
-          brand_jsonld_object: schemaOrg
+          ai_response: JSON.stringify(aiFormData)
         })
         .eq('id', editingBrand.id);
 
@@ -299,7 +249,7 @@ export default function ClientBrandsForm() {
         throw error;
       }
 
-      console.log('Successfully saved to database');
+      console.log('Successfully saved AI response and triggered schema generation');
       setSuccess('✅ Brand analysis saved and schema.org generated!');
       // Refresh the brand data
       await loadData();
