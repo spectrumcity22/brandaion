@@ -267,6 +267,10 @@ export default function ClientBrandsForm() {
 
       console.log('Successfully saved AI response and triggered schema generation');
       setSuccess('✅ Brand analysis saved and schema.org generated!');
+      
+      // Close the AI panel
+      closeAIPanel();
+      
       // Refresh the brand data
       await loadData();
     } catch (err) {

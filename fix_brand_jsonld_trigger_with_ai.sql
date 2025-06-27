@@ -27,50 +27,19 @@ BEGIN
             value_proposition_value := COALESCE(ai_data->>'valueProposition', 'AI-powered brand optimization');
             main_services_value := COALESCE(ai_data->>'mainServices', 'Brand Optimization');
             
-            -- Create enhanced JSON-LD with AI data
+            -- Create simplified JSON-LD with AI data (no duplication)
             NEW.brand_jsonld_object := jsonb_build_object(
                 '@context', 'https://schema.org',
                 '@type', 'Brand',
                 'name', COALESCE(NEW.brand_name, ''),
                 'url', COALESCE(NEW.brand_url, ''),
                 'description', value_proposition_value,
-                'parentOrganization', jsonb_build_object(
-                    '@type', 'Organization',
-                    'name', COALESCE(NEW.organisation_name, '')
-                ),
                 'industry', industry_value,
                 'targetAudience', target_audience_value,
-                'mainEntity', jsonb_build_object(
-                    '@type', 'Service',
-                    'name', COALESCE(NEW.brand_name, ''),
-                    'description', value_proposition_value,
-                    'serviceType', split_part(main_services_value, ',', 1),
-                    'provider', jsonb_build_object(
-                        '@type', 'Organization',
-                        'name', COALESCE(NEW.organisation_name, '')
-                    )
-                ),
-                'additionalProperty', jsonb_build_array(
-                    jsonb_build_object(
-                        '@type', 'PropertyValue',
-                        'name', 'Industry',
-                        'value', industry_value
-                    ),
-                    jsonb_build_object(
-                        '@type', 'PropertyValue',
-                        'name', 'Target Audience',
-                        'value', target_audience_value
-                    ),
-                    jsonb_build_object(
-                        '@type', 'PropertyValue',
-                        'name', 'Value Proposition',
-                        'value', value_proposition_value
-                    ),
-                    jsonb_build_object(
-                        '@type', 'PropertyValue',
-                        'name', 'Main Services',
-                        'value', main_services_value
-                    )
+                'mainServices', main_services_value,
+                'provider', jsonb_build_object(
+                    '@type', 'Organization',
+                    'name', COALESCE(NEW.organisation_name, '')
                 )
             );
             
@@ -81,7 +50,7 @@ BEGIN
                 '@type', 'Brand',
                 'name', COALESCE(NEW.brand_name, ''),
                 'url', COALESCE(NEW.brand_url, ''),
-                'parentOrganization', jsonb_build_object(
+                'provider', jsonb_build_object(
                     '@type', 'Organization',
                     'name', COALESCE(NEW.organisation_name, '')
                 )
@@ -94,7 +63,7 @@ BEGIN
             '@type', 'Brand',
             'name', COALESCE(NEW.brand_name, ''),
             'url', COALESCE(NEW.brand_url, ''),
-            'parentOrganization', jsonb_build_object(
+            'provider', jsonb_build_object(
                 '@type', 'Organization',
                 'name', COALESCE(NEW.organisation_name, '')
             )
@@ -118,4 +87,4 @@ ALTER FUNCTION "public"."generate_brand_jsonld_object"() OWNER TO "postgres";
 -- This will regenerate the JSON-LD with AI data if available
 SELECT 
     'Trigger Updated' as status,
-    'brand_jsonld_object trigger now includes AI analysis data' as description; 
+    'brand_jsonld_object trigger simplified - no duplication' as description; 
