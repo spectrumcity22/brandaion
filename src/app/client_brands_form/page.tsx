@@ -388,13 +388,38 @@ export default function ClientBrandsForm() {
       try {
         // Try to parse as JSON first (for structured responses)
         const parsedResponse = JSON.parse(brand.ai_response);
-        setAiFormData({
-          industry: parsedResponse.industry || '',
-          targetAudience: parsedResponse.targetAudience || '',
-          valueProposition: parsedResponse.valueProposition || '',
-          mainServices: parsedResponse.mainServices || ''
-        });
-        setAiResponse(parsedResponse); // Show the form
+        console.log('Loaded AI response:', parsedResponse);
+        
+        let brandSummary = null;
+        
+        // Handle nested structure where data is in analysis field
+        if (parsedResponse.analysis) {
+          try {
+            const analysisData = JSON.parse(parsedResponse.analysis);
+            brandSummary = analysisData.brand_summary;
+          } catch (parseError) {
+            console.error('Failed to parse analysis JSON:', parseError);
+          }
+        }
+        
+        if (brandSummary) {
+          setAiFormData({
+            industry: brandSummary.industry || '',
+            targetAudience: brandSummary.target_audience || '',
+            valueProposition: brandSummary.value_proposition || '',
+            mainServices: brandSummary.main_services?.join(', ') || ''
+          });
+          setAiResponse(parsedResponse); // Show the form
+        } else {
+          // Fallback to direct fields if no nested structure
+          setAiFormData({
+            industry: parsedResponse.industry || '',
+            targetAudience: parsedResponse.targetAudience || '',
+            valueProposition: parsedResponse.valueProposition || '',
+            mainServices: parsedResponse.mainServices || ''
+          });
+          setAiResponse(parsedResponse);
+        }
       } catch (parseError) {
         // If parsing fails, treat as plain text
         console.log('AI response is plain text, not JSON');
@@ -505,15 +530,30 @@ export default function ClientBrandsForm() {
         setAiResponse(result.data);
         
         console.log('AI Response data:', result.data);
-        console.log('Brand summary:', result.data.brand_summary);
+        
+        // Parse the nested structure - the actual data is in result.data.analysis as a JSON string
+        let brandSummary = null;
+        
+        if (result.data.analysis) {
+          try {
+            // The analysis field contains a JSON string, so we need to parse it
+            const analysisData = JSON.parse(result.data.analysis);
+            console.log('Parsed analysis data:', analysisData);
+            brandSummary = analysisData.brand_summary;
+          } catch (parseError) {
+            console.error('Failed to parse analysis JSON:', parseError);
+          }
+        }
+        
+        console.log('Brand summary:', brandSummary);
         
         // Populate the form with AI response data
-        if (result.data.brand_summary) {
+        if (brandSummary) {
           const newFormData = {
-            industry: result.data.brand_summary.industry || '',
-            targetAudience: result.data.brand_summary.target_audience || '',
-            valueProposition: result.data.brand_summary.value_proposition || '',
-            mainServices: result.data.brand_summary.main_services?.join(', ') || ''
+            industry: brandSummary.industry || '',
+            targetAudience: brandSummary.target_audience || '',
+            valueProposition: brandSummary.value_proposition || '',
+            mainServices: brandSummary.main_services?.join(', ') || ''
           };
           
           console.log('Setting form data:', newFormData);
