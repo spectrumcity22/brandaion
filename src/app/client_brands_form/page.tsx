@@ -115,19 +115,6 @@ export default function ClientBrandsForm() {
         setSubscription(subscriptionData[0]);
       }
 
-      // Fetch brand analyses for this user
-      const { data: analysesData, error: analysesError } = await supabase
-        .from('brand_analyses')
-        .select('*')
-        .eq('auth_user_id', user.id)
-        .order('analysis_date', { ascending: false });
-
-      if (analysesError) {
-        setError('Failed to load brand analyses.');
-      } else {
-        setBrandAnalyses(analysesData || []);
-      }
-
       setLoading(false);
     } catch (err) {
       console.error('Error loading data:', err);
@@ -389,6 +376,11 @@ export default function ClientBrandsForm() {
         return;
       }
 
+      console.log('Sending to Perplexity:', {
+        url: formData.brand_url,
+        brand: formData.brand_name || 'Unknown Brand'
+      });
+
       const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/perplexity_brand_search', {
         method: 'POST',
         headers: {
@@ -396,17 +388,21 @@ export default function ClientBrandsForm() {
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          brand_url: formData.brand_url,
-          brand_name: formData.brand_name || 'Unknown Brand'
+          url: formData.brand_url,
+          brand: formData.brand_name || 'Unknown Brand'
         })
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to analyze brand');
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to analyze brand`);
       }
 
       const result = await response.json();
+      console.log('API Result:', result);
       
       if (result.success) {
         setAiResponse(result.data);
@@ -415,6 +411,7 @@ export default function ClientBrandsForm() {
         throw new Error(result.error || 'Analysis failed');
       }
     } catch (err: any) {
+      console.error('AI Analysis Error:', err);
       setError(`❌ AI Analysis failed: ${err.message}`);
     } finally {
       setAiLoading(false);
@@ -697,7 +694,6 @@ export default function ClientBrandsForm() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {brands.map((brand) => {
-                  const analysis = getAnalysisForBrand(brand.id);
                   const isAnalyzing = analyzingBrand === brand.id;
                   
                   return (
@@ -759,33 +755,7 @@ export default function ClientBrandsForm() {
                         <div className="pt-2 border-t border-gray-600/30">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-gray-400 text-sm">AI Analysis</p>
-                            {analysis && (
-                              <span className="text-xs text-gray-500">
-                                {getAnalysisStatusIcon(analysis.analysis_status)}
-                              </span>
-                            )}
                           </div>
-                          
-                          {analysis && analysis.analysis_status === 'completed' && (
-                            <div className="space-y-1">
-                              {analysis.brand_identity?.industry && (
-                                <p className="text-xs text-gray-300">
-                                  Industry: {analysis.brand_identity.industry}
-                                </p>
-                              )}
-                              {analysis.content_summary?.main_products_services?.length > 0 && (
-                                <p className="text-xs text-gray-300">
-                                  Services: {analysis.content_summary.main_products_services.slice(0, 2).join(', ')}
-                                  {analysis.content_summary.main_products_services.length > 2 && '...'}
-                                </p>
-                              )}
-                              {analysis.faq_generation_insights?.potential_questions?.length > 0 && (
-                                <p className="text-xs text-green-400">
-                                  {analysis.faq_generation_insights.potential_questions.length} potential FAQ topics
-                                </p>
-                              )}
-                            </div>
-                          )}
                           
                           <button
                             onClick={() => analyzeBrand(brand)}
