@@ -295,7 +295,7 @@ export default function ReviewAnswers() {
         
         return (
           <div key={batch.batchId} className="mb-8">
-            <div className="bg-gray-800 p-4 rounded-t-lg">
+            <div className="bg-gray-800 p-4 rounded-t-lg flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-white">
                   Batch ID: {batch.batchId}
@@ -305,6 +305,38 @@ export default function ReviewAnswers() {
                   Progress: {approvedCount}/{totalCount} answers approved
                 </p>
               </div>
+              
+              {/* Process Batch Panel */}
+              {isComplete && (
+                <div className="bg-gray-700/50 border border-gray-600/50 rounded-lg p-4">
+                  {batch.answers[0]?.batch_faq_pairs ? (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="font-semibold">Processed</span>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={() => handleProcessBatch(batch.batchId)}
+                      disabled={processingBatches[batch.batchId]}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {processingBatches[batch.batchId] ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                          </svg>
+                          Processing...
+                        </span>
+                      ) : 'Process Batch'}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
             
             <table className="w-full text-left border-separate border-spacing-y-2 bg-gray-900 rounded-b-lg">
@@ -420,28 +452,6 @@ export default function ReviewAnswers() {
                 })}
               </tbody>
             </table>
-            
-            {isComplete && (
-              <div className="mt-4 flex justify-center">
-                <Button
-                  variant="contained"
-                  color="success"
-                  onClick={() => handleProcessBatch(batch.batchId)}
-                  disabled={processingBatches[batch.batchId]}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {processingBatches[batch.batchId] ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                      </svg>
-                      Processing...
-                    </span>
-                  ) : 'Process Batch'}
-                </Button>
-              </div>
-            )}
           </div>
         );
       })}
