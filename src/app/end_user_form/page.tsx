@@ -108,12 +108,7 @@ export default function EndUserForm() {
       });
       setIsEditing(false);
       
-      // Auto-redirect to organisation form after 2 seconds if no org exists
-      if (!existingProfile?.org_name) {
-        setTimeout(() => {
-          router.push('/organisation_form');
-        }, 2000);
-      }
+      // Remove auto-redirect - let user stay on the page
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {
@@ -196,6 +191,13 @@ export default function EndUserForm() {
                 className="glass-input p-4 hover:bg-white/10 transition-colors"
               >
                 🏠 Back to Dashboard
+              </button>
+              
+              <button
+                onClick={() => router.push('/organisation_form')}
+                className="glass-input p-4 hover:bg-white/10 transition-colors"
+              >
+                🏢 Organisation
               </button>
             </div>
 
@@ -294,7 +296,7 @@ export default function EndUserForm() {
                   Submitting...
                 </div>
               ) : (
-                existingProfile ? '✨ Update Profile' : '✨ Complete Profile'
+                existingProfile ? '✨ Update Profile' : '✨ Save Profile'
               )}
             </button>
             
@@ -312,6 +314,13 @@ export default function EndUserForm() {
               className="glass-input p-4 hover:bg-white/10 transition-colors"
             >
               🏠 Back to Dashboard
+            </button>
+            
+            <button
+              onClick={() => router.push('/organisation_form')}
+              className="glass-input p-4 hover:bg-white/10 transition-colors"
+            >
+              🏢 Organisation
             </button>
           </div>
         </div>
