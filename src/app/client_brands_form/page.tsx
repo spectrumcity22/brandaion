@@ -65,8 +65,12 @@ export default function ClientBrandsForm() {
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
-  const [editingAIResponse, setEditingAIResponse] = useState(false);
-  const [editedAIResponse, setEditedAIResponse] = useState<any>(null);
+  const [aiFormData, setAiFormData] = useState({
+    industry: '',
+    targetAudience: '',
+    valueProposition: '',
+    mainServices: ''
+  });
 
   useEffect(() => {
     loadData();
@@ -106,42 +110,24 @@ export default function ClientBrandsForm() {
         setOrganisations(orgsData || []);
       }
 
-      // Load subscription info - check for active subscription based on billing period
+      // Load subscription info - ignore status field, just check for any paid invoices
       const { data: subscriptionData } = await supabase
         .from('invoices')
-        .select('package_tier, status, billing_period_end')
+        .select('package_tier')
         .eq('auth_user_id', user.id)
-        .eq('status', 'paid')
-        .gte('billing_period_end', new Date().toISOString())
         .order('inserted_at', { ascending: false })
         .limit(1);
 
       if (subscriptionData?.[0]) {
         setSubscription({
           package_tier: subscriptionData[0].package_tier,
-          status: 'active'
+          status: 'active' // Assume active if they have any invoice
         });
       } else {
-        // Check if there's any paid invoice (even if expired)
-        const { data: anyPaidInvoice } = await supabase
-          .from('invoices')
-          .select('package_tier, status')
-          .eq('auth_user_id', user.id)
-          .eq('status', 'paid')
-          .order('inserted_at', { ascending: false })
-          .limit(1);
-
-        if (anyPaidInvoice?.[0]) {
-          setSubscription({
-            package_tier: anyPaidInvoice[0].package_tier,
-            status: 'expired'
-          });
-        } else {
-          setSubscription({
-            package_tier: 'startup',
-            status: 'inactive'
-          });
-        }
+        setSubscription({
+          package_tier: 'startup',
+          status: 'inactive'
+        });
       }
 
       setLoading(false);
@@ -200,35 +186,13 @@ export default function ClientBrandsForm() {
   };
 
   const startEditingAIResponse = () => {
-    setEditingAIResponse(true);
-    setEditedAIResponse(JSON.parse(JSON.stringify(aiResponse))); // Deep copy
-  };
-
-  const saveEditedAIResponse = async () => {
-    if (!editingBrand?.id) return;
-
-    try {
-      const { error } = await supabase
-        .from('brands')
-        .update({
-          ai_response: JSON.stringify(editedAIResponse)
-        })
-        .eq('id', editingBrand.id);
-
-      if (error) throw error;
-
-      setAiResponse(editedAIResponse);
-      setEditingAIResponse(false);
-      setSuccess('✅ AI response updated successfully!');
-    } catch (err) {
-      console.error('Error saving edited AI response:', err);
-      setError('Failed to save edited AI response.');
-    }
+    setAiLoading(true);
+    setAiResponse(null);
   };
 
   const cancelEditingAIResponse = () => {
-    setEditingAIResponse(false);
-    setEditedAIResponse(null);
+    setAiLoading(false);
+    setAiResponse(null);
   };
 
   const generateSchemaOrg = (brand: Brand, aiData: any) => {
@@ -260,26 +224,51 @@ export default function ClientBrandsForm() {
   };
 
   const approveAndGenerateSchema = async () => {
-    if (!editingBrand?.id || !aiResponse) return;
+    if (!editingBrand?.id) return;
 
     try {
-      const schemaOrg = generateSchemaOrg(editingBrand, aiResponse);
-      
+      // Generate schema.org JSON-LD
+      const schemaOrg = {
+        "@context": "https://schema.org",
+        "@type": "Brand",
+        "name": editingBrand.brand_name,
+        "url": editingBrand.brand_url,
+        "description": aiFormData.valueProposition || `AI-powered brand optimization for ${editingBrand.brand_name}`,
+        "parentOrganization": {
+          "@type": "Organization",
+          "name": editingBrand.organisation_name
+        },
+        "industry": aiFormData.industry || "Technology",
+        "targetAudience": aiFormData.targetAudience || "Businesses and brands",
+        "mainEntity": {
+          "@type": "Service",
+          "name": editingBrand.brand_name,
+          "description": aiFormData.valueProposition || `AI-powered brand optimization services`,
+          "serviceType": aiFormData.mainServices.split(',')[0] || "Brand Optimization",
+          "provider": {
+            "@type": "Organization",
+            "name": editingBrand.organisation_name
+          }
+        }
+      };
+
+      // Save both AI response and schema.org
       const { error } = await supabase
         .from('brands')
         .update({
+          ai_response: JSON.stringify(aiFormData),
           brand_jsonld_object: schemaOrg
         })
         .eq('id', editingBrand.id);
 
       if (error) throw error;
 
-      setSuccess('✅ Schema.org JSON-LD generated and saved!');
+      setSuccess('✅ Brand analysis saved and schema.org generated!');
       // Refresh the brand data
       await loadData();
     } catch (err) {
-      console.error('Error generating schema.org:', err);
-      setError('Failed to generate schema.org JSON-LD.');
+      console.error('Error saving brand analysis:', err);
+      setError('Failed to save brand analysis.');
     }
   };
 
@@ -399,21 +388,31 @@ export default function ClientBrandsForm() {
       try {
         // Try to parse as JSON first (for structured responses)
         const parsedResponse = JSON.parse(brand.ai_response);
-        setAiResponse({
-          ...parsedResponse,
-          brand_name: brand.brand_name,
-          query: `Analyze this website: ${brand.brand_url}`
+        setAiFormData({
+          industry: parsedResponse.industry || '',
+          targetAudience: parsedResponse.targetAudience || '',
+          valueProposition: parsedResponse.valueProposition || '',
+          mainServices: parsedResponse.mainServices || ''
         });
+        setAiResponse(parsedResponse); // Show the form
       } catch (parseError) {
         // If parsing fails, treat as plain text
         console.log('AI response is plain text, not JSON');
-        setAiResponse({
-          analysis: brand.ai_response,
-          brand_name: brand.brand_name,
-          query: `Analyze this website: ${brand.brand_url}`
+        setAiFormData({
+          industry: '',
+          targetAudience: '',
+          valueProposition: '',
+          mainServices: ''
         });
+        setAiResponse(null);
       }
     } else {
+      setAiFormData({
+        industry: '',
+        targetAudience: '',
+        valueProposition: '',
+        mainServices: ''
+      });
       setAiResponse(null);
     }
     
@@ -504,6 +503,17 @@ export default function ClientBrandsForm() {
       if (result.success) {
         // Store the structured response for display
         setAiResponse(result.data);
+        
+        // Populate the form with AI response data
+        if (result.data.brand_summary) {
+          setAiFormData({
+            industry: result.data.brand_summary.industry || '',
+            targetAudience: result.data.brand_summary.target_audience || '',
+            valueProposition: result.data.brand_summary.value_proposition || '',
+            mainServices: result.data.brand_summary.main_services?.join(', ') || ''
+          });
+        }
+        
         setSuccess('✅ AI analysis completed successfully!');
         
         // Save the analysis as JSON string to the brands table if we have a brand ID
@@ -708,201 +718,66 @@ export default function ClientBrandsForm() {
             {aiResponse && (
               <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">🤖 AI Analysis Results</h3>
-                  <div className="flex space-x-2">
-                    {!editingAIResponse && (
-                      <>
-                        <button
-                          onClick={startEditingAIResponse}
-                          className="text-blue-400 hover:text-blue-300 text-sm px-3 py-1 border border-blue-400/30 rounded"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button
-                          onClick={approveAndGenerateSchema}
-                          className="text-green-400 hover:text-green-300 text-sm px-3 py-1 border border-green-400/30 rounded"
-                        >
-                          ✅ Approve & Generate Schema
-                        </button>
-                      </>
-                    )}
-                    {editingAIResponse && (
-                      <>
-                        <button
-                          onClick={saveEditedAIResponse}
-                          className="text-green-400 hover:text-green-300 text-sm px-3 py-1 border border-green-400/30 rounded"
-                        >
-                          💾 Save
-                        </button>
-                        <button
-                          onClick={cancelEditingAIResponse}
-                          className="text-gray-400 hover:text-gray-300 text-sm px-3 py-1 border border-gray-400/30 rounded"
-                        >
-                          ❌ Cancel
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  <h3 className="text-lg font-semibold text-white">🤖 Brand Analysis</h3>
+                  <button
+                    onClick={() => setAiResponse(null)}
+                    className="text-gray-400 hover:text-white text-sm"
+                  >
+                    Clear
+                  </button>
                 </div>
 
                 <div className="space-y-4">
-                  {/* Brand Summary - Key Values Only */}
-                  {aiResponse.brand_summary && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-300 mb-2">Brand Summary</h4>
-                      <div className="bg-gray-700/30 rounded p-3 space-y-3">
-                        <div>
-                          <span className="text-gray-400 text-sm">Industry:</span>
-                          {editingAIResponse ? (
-                            <input
-                              type="text"
-                              value={editedAIResponse.brand_summary.industry || ''}
-                              onChange={(e) => setEditedAIResponse((prev: any) => ({
-                                ...prev,
-                                brand_summary: {
-                                  ...prev.brand_summary,
-                                  industry: e.target.value
-                                }
-                              }))}
-                              className="w-full mt-1 p-2 bg-gray-600/50 border border-gray-500/50 text-white rounded"
-                            />
-                          ) : (
-                            <p className="text-white">{aiResponse.brand_summary.industry}</p>
-                          )}
-                        </div>
-                        <div>
-                          <span className="text-gray-400 text-sm">Target Audience:</span>
-                          {editingAIResponse ? (
-                            <input
-                              type="text"
-                              value={editedAIResponse.brand_summary.target_audience || ''}
-                              onChange={(e) => setEditedAIResponse((prev: any) => ({
-                                ...prev,
-                                brand_summary: {
-                                  ...prev.brand_summary,
-                                  target_audience: e.target.value
-                                }
-                              }))}
-                              className="w-full mt-1 p-2 bg-gray-600/50 border border-gray-500/50 text-white rounded"
-                            />
-                          ) : (
-                            <p className="text-white">{aiResponse.brand_summary.target_audience}</p>
-                          )}
-                        </div>
-                        <div>
-                          <span className="text-gray-400 text-sm">Value Proposition:</span>
-                          {editingAIResponse ? (
-                            <textarea
-                              value={editedAIResponse.brand_summary.value_proposition || ''}
-                              onChange={(e) => setEditedAIResponse((prev: any) => ({
-                                ...prev,
-                                brand_summary: {
-                                  ...prev.brand_summary,
-                                  value_proposition: e.target.value
-                                }
-                              }))}
-                              className="w-full mt-1 p-2 bg-gray-600/50 border border-gray-500/50 text-white rounded"
-                              rows={3}
-                            />
-                          ) : (
-                            <p className="text-white">{aiResponse.brand_summary.value_proposition}</p>
-                          )}
-                        </div>
-                        {aiResponse.brand_summary.main_services && (
-                          <div>
-                            <span className="text-gray-400 text-sm">Main Services:</span>
-                            {editingAIResponse ? (
-                              <div className="mt-1 space-y-2">
-                                {editedAIResponse.brand_summary.main_services.map((service: string, index: number) => (
-                                  <div key={index} className="flex items-center space-x-2">
-                                    <input
-                                      type="text"
-                                      value={service}
-                                      onChange={(e) => {
-                                        const newServices = [...editedAIResponse.brand_summary.main_services];
-                                        newServices[index] = e.target.value;
-                                        setEditedAIResponse((prev: any) => ({
-                                          ...prev,
-                                          brand_summary: {
-                                            ...prev.brand_summary,
-                                            main_services: newServices
-                                          }
-                                        }));
-                                      }}
-                                      className="flex-1 p-2 bg-gray-600/50 border border-gray-500/50 text-white rounded"
-                                    />
-                                    <button
-                                      onClick={() => {
-                                        const newServices = editedAIResponse.brand_summary.main_services.filter((_: string, i: number) => i !== index);
-                                        setEditedAIResponse((prev: any) => ({
-                                          ...prev,
-                                          brand_summary: {
-                                            ...prev.brand_summary,
-                                            main_services: newServices
-                                          }
-                                        }));
-                                      }}
-                                      className="text-red-400 hover:text-red-300"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ))}
-                                <button
-                                  onClick={() => {
-                                    const newServices = [...editedAIResponse.brand_summary.main_services, ''];
-                                    setEditedAIResponse((prev: any) => ({
-                                      ...prev,
-                                      brand_summary: {
-                                        ...prev.brand_summary,
-                                        main_services: newServices
-                                      }
-                                    }));
-                                  }}
-                                  className="text-blue-400 hover:text-blue-300 text-sm"
-                                >
-                                  + Add Service
-                                </button>
-                              </div>
-                            ) : (
-                              <ul className="text-white mt-1 space-y-1">
-                                {aiResponse.brand_summary.main_services.map((service: string, index: number) => (
-                                  <li key={index} className="flex items-start">
-                                    <span className="text-blue-400 mr-2">•</span>
-                                    {service}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Raw Analysis (fallback) */}
-                  {aiResponse.analysis && !aiResponse.brand_summary && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-300 mb-2">Analysis</h4>
-                      <div className="bg-gray-700/30 rounded p-3">
-                        <p className="text-white text-sm whitespace-pre-wrap">
-                          {aiResponse.analysis}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="flex justify-between text-sm text-gray-400">
-                    <span>Brand: {aiResponse.brand_name || 'N/A'}</span>
-                    <span>Query: {aiResponse.query || 'N/A'}</span>
+                  <div>
+                    <label className="block text-gray-300 mb-2 font-medium">Industry</label>
+                    <input
+                      type="text"
+                      value={aiFormData.industry}
+                      onChange={(e) => setAiFormData(prev => ({ ...prev, industry: e.target.value }))}
+                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      placeholder="e.g., Technology, Healthcare, E-commerce"
+                    />
                   </div>
-                  
-                  <div className="mt-4">
+
+                  <div>
+                    <label className="block text-gray-300 mb-2 font-medium">Target Audience</label>
+                    <input
+                      type="text"
+                      value={aiFormData.targetAudience}
+                      onChange={(e) => setAiFormData(prev => ({ ...prev, targetAudience: e.target.value }))}
+                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      placeholder="e.g., Small businesses, Enterprise clients"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 mb-2 font-medium">Value Proposition</label>
+                    <textarea
+                      value={aiFormData.valueProposition}
+                      onChange={(e) => setAiFormData(prev => ({ ...prev, valueProposition: e.target.value }))}
+                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      rows={3}
+                      placeholder="What unique value does your brand provide?"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-300 mb-2 font-medium">Main Services</label>
+                    <textarea
+                      value={aiFormData.mainServices}
+                      onChange={(e) => setAiFormData(prev => ({ ...prev, mainServices: e.target.value }))}
+                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      rows={3}
+                      placeholder="List your main services, separated by commas"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
                     <button
-                      onClick={() => setAiResponse(null)}
-                      className="text-gray-400 hover:text-white text-sm"
+                      onClick={approveAndGenerateSchema}
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
                     >
-                      Clear Results
+                      💾 Save & Generate Schema
                     </button>
                   </div>
                 </div>
