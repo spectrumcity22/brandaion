@@ -1,0 +1,2 @@
+[functions.analyze-brand]
+verify_jwt = true 

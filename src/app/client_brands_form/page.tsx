@@ -32,18 +32,39 @@ interface SubscriptionInfo {
   status: string;
 }
 
+interface BrandAnalysis {
+  id: string;
+  brand_id: string;
+  analysis_status: string;
+  url_analyzed: string;
+  analysis_date: string;
+  perplexity_status: string;
+  perplexity_cost_usd?: number;
+  perplexity_response_time_ms?: number;
+  brand_identity?: any;
+  content_summary?: any;
+  technical_insights?: any;
+  customer_insights?: any;
+  competitive_positioning?: any;
+  faq_generation_insights?: any;
+}
+
 export default function ClientBrandsForm() {
   const router = useRouter();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [organisations, setOrganisations] = useState<Organisation[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [brandAnalyses, setBrandAnalyses] = useState<BrandAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [formData, setFormData] = useState<Partial<Brand>>({});
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | boolean>(false);
+  const [analyzingBrand, setAnalyzingBrand] = useState<string | null>(null);
+  const [aiResponse, setAiResponse] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -92,6 +113,19 @@ export default function ClientBrandsForm() {
 
       if (subscriptionData?.[0]) {
         setSubscription(subscriptionData[0]);
+      }
+
+      // Fetch brand analyses for this user
+      const { data: analysesData, error: analysesError } = await supabase
+        .from('brand_analyses')
+        .select('*')
+        .eq('auth_user_id', user.id)
+        .order('analysis_date', { ascending: false });
+
+      if (analysesError) {
+        setError('Failed to load brand analyses.');
+      } else {
+        setBrandAnalyses(analysesData || []);
       }
 
       setLoading(false);
@@ -271,6 +305,122 @@ export default function ClientBrandsForm() {
     setError('');
   };
 
+  const analyzeBrand = async (brand: Brand) => {
+    if (!brand.brand_url) {
+      setError('Brand URL is required for analysis.');
+      return;
+    }
+
+    setAnalyzingBrand(brand.id);
+    setError('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('User not authenticated.');
+        return;
+      }
+
+      const response = await fetch('/api/analyze-brand', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          brand_id: brand.id,
+          brand_url: brand.brand_url,
+          brand_name: brand.brand_name
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze brand');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setSuccess('✅ Brand analysis completed successfully!');
+        // Refresh analyses data
+        await loadData();
+      } else {
+        throw new Error(result.error || 'Analysis failed');
+      }
+    } catch (err: any) {
+      setError(`❌ Analysis failed: ${err.message}`);
+    } finally {
+      setAnalyzingBrand(null);
+    }
+  };
+
+  const getAnalysisForBrand = (brandId: string) => {
+    return brandAnalyses.find(analysis => analysis.brand_id === brandId);
+  };
+
+  const getAnalysisStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return '✅';
+      case 'processing':
+        return '⏳';
+      case 'failed':
+        return '❌';
+      default:
+        return '⏳';
+    }
+  };
+
+  const askAI = async () => {
+    if (!formData.brand_url) {
+      setError('Brand URL is required for AI analysis.');
+      return;
+    }
+
+    setAiLoading(true);
+    setError('');
+    setAiResponse(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('User not authenticated.');
+        return;
+      }
+
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/perplexity_brand_search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          brand_url: formData.brand_url,
+          brand_name: formData.brand_name || 'Unknown Brand'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze brand');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setAiResponse(result.data);
+        setSuccess('✅ AI analysis completed successfully!');
+      } else {
+        throw new Error(result.error || 'Analysis failed');
+      }
+    } catch (err: any) {
+      setError(`❌ AI Analysis failed: ${err.message}`);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -412,6 +562,25 @@ export default function ClientBrandsForm() {
                 </button>
                 <button
                   type="button"
+                  onClick={askAI}
+                  disabled={aiLoading || !formData.brand_url}
+                  className={`px-6 py-2 rounded-lg transition-colors ${
+                    aiLoading || !formData.brand_url
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  }`}
+                >
+                  {aiLoading ? (
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      Analyzing...
+                    </div>
+                  ) : (
+                    '🤖 Ask AI'
+                  )}
+                </button>
+                <button
+                  type="button"
                   onClick={handleCancel}
                   className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors"
                 >
@@ -419,6 +588,82 @@ export default function ClientBrandsForm() {
                 </button>
               </div>
             </form>
+
+            {/* AI Response Display */}
+            {aiResponse && (
+              <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">🤖 AI Analysis Results</h3>
+                <div className="space-y-4">
+                  {aiResponse.brand_identity && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-300 mb-2">Brand Identity</h4>
+                      <div className="bg-gray-700/30 rounded p-3">
+                        <p className="text-white text-sm">
+                          <strong>Name:</strong> {aiResponse.brand_identity.name || 'N/A'}
+                        </p>
+                        <p className="text-white text-sm">
+                          <strong>Industry:</strong> {aiResponse.brand_identity.industry || 'N/A'}
+                        </p>
+                        <p className="text-white text-sm">
+                          <strong>Value Proposition:</strong> {aiResponse.brand_identity.value_proposition || 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {aiResponse.content_summary && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-300 mb-2">Content Summary</h4>
+                      <div className="bg-gray-700/30 rounded p-3">
+                        {aiResponse.content_summary.main_products_services && (
+                          <p className="text-white text-sm">
+                            <strong>Services:</strong> {aiResponse.content_summary.main_products_services.join(', ')}
+                          </p>
+                        )}
+                        {aiResponse.content_summary.key_features && (
+                          <p className="text-white text-sm">
+                            <strong>Features:</strong> {aiResponse.content_summary.key_features.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {aiResponse.faq_generation_insights && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-300 mb-2">FAQ Insights</h4>
+                      <div className="bg-gray-700/30 rounded p-3">
+                        {aiResponse.faq_generation_insights.potential_questions && (
+                          <div>
+                            <p className="text-white text-sm font-medium mb-1">Potential Questions:</p>
+                            <ul className="text-white text-sm space-y-1">
+                              {aiResponse.faq_generation_insights.potential_questions.slice(0, 5).map((question: string, index: number) => (
+                                <li key={index} className="ml-4">• {question}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {aiResponse.faq_generation_insights.recommended_topics && (
+                          <div className="mt-2">
+                            <p className="text-white text-sm font-medium mb-1">Recommended Topics:</p>
+                            <p className="text-white text-sm">{aiResponse.faq_generation_insights.recommended_topics.join(', ')}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setAiResponse(null)}
+                      className="text-gray-400 hover:text-white text-sm"
+                    >
+                      Clear Results
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -451,61 +696,122 @@ export default function ClientBrandsForm() {
           ) : (
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {brands.map((brand) => (
-                  <div key={brand.id} className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
-                    <div className="flex items-start justify-between mb-3">
-                      <h4 className="text-lg font-semibold text-white truncate">{brand.brand_name}</h4>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(brand)}
-                          className="text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(brand.id)}
-                          className="text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-gray-400 text-sm">Organisation</p>
-                        <p className="text-white text-sm font-medium">{brand.organisation_name}</p>
-                      </div>
-                      
-                      <div>
-                        <p className="text-gray-400 text-sm">URL</p>
-                        {brand.brand_url ? (
-                          <a 
-                            href={brand.brand_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 text-sm truncate block"
+                {brands.map((brand) => {
+                  const analysis = getAnalysisForBrand(brand.id);
+                  const isAnalyzing = analyzingBrand === brand.id;
+                  
+                  return (
+                    <div key={brand.id} className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
+                      <div className="flex items-start justify-between mb-3">
+                        <h4 className="text-lg font-semibold text-white truncate">{brand.brand_name}</h4>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(brand)}
+                            className="text-blue-400 hover:text-blue-300 transition-colors"
+                            title="Edit Brand"
                           >
-                            {brand.brand_url}
-                          </a>
-                        ) : (
-                          <span className="text-gray-500 text-sm">No URL</span>
-                        )}
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(brand.id)}
+                            className="text-red-400 hover:text-red-300 transition-colors"
+                            title="Delete Brand"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       
-                      <div>
-                        <p className="text-gray-400 text-sm">Created</p>
-                        <p className="text-white text-sm">
-                          {brand.created_at ? new Date(brand.created_at).toLocaleDateString() : 'N/A'}
-                        </p>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-gray-400 text-sm">Organisation</p>
+                          <p className="text-white text-sm font-medium">{brand.organisation_name}</p>
+                        </div>
+                        
+                        <div>
+                          <p className="text-gray-400 text-sm">URL</p>
+                          {brand.brand_url ? (
+                            <a 
+                              href={brand.brand_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:text-blue-300 text-sm truncate block"
+                            >
+                              {brand.brand_url}
+                            </a>
+                          ) : (
+                            <span className="text-gray-500 text-sm">No URL</span>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <p className="text-gray-400 text-sm">Created</p>
+                          <p className="text-white text-sm">
+                            {brand.created_at ? new Date(brand.created_at).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+
+                        {/* Analysis Section */}
+                        <div className="pt-2 border-t border-gray-600/30">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-gray-400 text-sm">AI Analysis</p>
+                            {analysis && (
+                              <span className="text-xs text-gray-500">
+                                {getAnalysisStatusIcon(analysis.analysis_status)}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {analysis && analysis.analysis_status === 'completed' && (
+                            <div className="space-y-1">
+                              {analysis.brand_identity?.industry && (
+                                <p className="text-xs text-gray-300">
+                                  Industry: {analysis.brand_identity.industry}
+                                </p>
+                              )}
+                              {analysis.content_summary?.main_products_services?.length > 0 && (
+                                <p className="text-xs text-gray-300">
+                                  Services: {analysis.content_summary.main_products_services.slice(0, 2).join(', ')}
+                                  {analysis.content_summary.main_products_services.length > 2 && '...'}
+                                </p>
+                              )}
+                              {analysis.faq_generation_insights?.potential_questions?.length > 0 && (
+                                <p className="text-xs text-green-400">
+                                  {analysis.faq_generation_insights.potential_questions.length} potential FAQ topics
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          
+                          <button
+                            onClick={() => analyzeBrand(brand)}
+                            disabled={isAnalyzing || !brand.brand_url}
+                            className={`mt-2 w-full text-xs px-3 py-1 rounded transition-colors ${
+                              isAnalyzing
+                                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                : brand.brand_url
+                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {isAnalyzing ? (
+                              <div className="flex items-center justify-center">
+                                <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                                Analyzing...
+                              </div>
+                            ) : (
+                              '🔍 Analyze Brand'
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
