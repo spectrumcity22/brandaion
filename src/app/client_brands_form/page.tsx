@@ -542,7 +542,7 @@ export default function ClientBrandsForm() {
         if (result.data.analysis) {
           // Parse the simple text format: "industry: value\ntarget_audience: value\n..."
           const lines = result.data.analysis.trim().split('\n');
-          lines.forEach(line => {
+          lines.forEach((line: string) => {
             const trimmedLine = line.trim();
             if (trimmedLine.startsWith('industry:')) {
               parsedFormData.industry = trimmedLine.replace('industry:', '').trim();
