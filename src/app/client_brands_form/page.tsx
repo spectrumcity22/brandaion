@@ -224,9 +224,17 @@ export default function ClientBrandsForm() {
   };
 
   const approveAndGenerateSchema = async () => {
-    if (!editingBrand?.id) return;
+    console.log('approveAndGenerateSchema called');
+    console.log('editingBrand:', editingBrand);
+    console.log('aiFormData:', aiFormData);
+    
+    if (!editingBrand?.id) {
+      console.log('No editingBrand.id found');
+      return;
+    }
 
     try {
+      console.log('Generating schema.org JSON-LD...');
       // Generate schema.org JSON-LD
       const schemaOrg = {
         "@context": "https://schema.org",
@@ -252,6 +260,9 @@ export default function ClientBrandsForm() {
         }
       };
 
+      console.log('Generated schemaOrg:', schemaOrg);
+      console.log('Saving to database...');
+
       // Save both AI response and schema.org
       const { error } = await supabase
         .from('brands')
@@ -261,8 +272,12 @@ export default function ClientBrandsForm() {
         })
         .eq('id', editingBrand.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
 
+      console.log('Successfully saved to database');
       setSuccess('✅ Brand analysis saved and schema.org generated!');
       // Refresh the brand data
       await loadData();
