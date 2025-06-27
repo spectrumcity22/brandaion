@@ -77,7 +77,7 @@ export default function ReviewAnswers() {
         .from('review_questions')
         .select('id, topic, question, ai_response_answers, answer_status, unique_batch_id, unique_batch_cluster, organisation, product_name, audience_name, batch_faq_pairs')
         .eq('auth_user_id', user.id) // Filter by current user
-        .eq('answer_status', 'completed')
+        .in('answer_status', ['completed', 'approved'])
         .not('ai_response_answers', 'is', null)
         .order('created_at', { ascending: false });
 

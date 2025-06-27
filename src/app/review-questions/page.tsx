@@ -435,17 +435,6 @@ export default function ReviewQuestions() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-white">Review Generated Questions</h2>
           <div className="flex gap-2">
-            <Button 
-              variant="contained" 
-              color="secondary"
-              onClick={() => {
-                console.log('Manual refresh clicked');
-                fetchQuestions();
-              }}
-              className="bg-gray-600 hover:bg-gray-700"
-            >
-              Refresh Data
-            </Button>
             {questions.length > 0 && (
               <Button 
                 variant="contained" 
@@ -605,7 +594,7 @@ export default function ReviewQuestions() {
                                 <span>{question.question}</span>
                                 {question.ai_response_answers && (
                                   <div className="mt-2 p-2 bg-green-900 rounded text-sm">
-                                    {question.ai_response_answers}
+                                    {question.ai_response_answers.split(' ').slice(0, 12).join(' ') + (question.ai_response_answers.split(' ').length > 12 ? '...' : '')}
                                   </div>
                                 )}
                               </div>
