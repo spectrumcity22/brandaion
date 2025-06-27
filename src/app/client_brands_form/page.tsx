@@ -247,7 +247,7 @@ export default function ClientBrandsForm() {
         const { error: analysisError } = await supabase
           .from('brands')
           .update({
-            ai_response: pendingAnalysis.analysis
+            ai_response: JSON.stringify(pendingAnalysis)
           })
           .eq('id', data.id);
         
@@ -284,11 +284,23 @@ export default function ClientBrandsForm() {
     
     // Load existing AI response if available
     if (brand.ai_response) {
-      setAiResponse({
-        analysis: brand.ai_response,
-        brand_name: brand.brand_name,
-        query: `Analyze this website: ${brand.brand_url}`
-      });
+      try {
+        // Try to parse as JSON first (for structured responses)
+        const parsedResponse = JSON.parse(brand.ai_response);
+        setAiResponse({
+          ...parsedResponse,
+          brand_name: brand.brand_name,
+          query: `Analyze this website: ${brand.brand_url}`
+        });
+      } catch (parseError) {
+        // If parsing fails, treat as plain text
+        console.log('AI response is plain text, not JSON');
+        setAiResponse({
+          analysis: brand.ai_response,
+          brand_name: brand.brand_name,
+          query: `Analyze this website: ${brand.brand_url}`
+        });
+      }
     } else {
       setAiResponse(null);
     }
@@ -378,15 +390,16 @@ export default function ClientBrandsForm() {
       console.log('API Result:', result);
       
       if (result.success) {
+        // Store the structured response for display
         setAiResponse(result.data);
         setSuccess('✅ AI analysis completed successfully!');
         
-        // Save the analysis to the brands table if we have a brand ID
+        // Save the analysis as JSON string to the brands table if we have a brand ID
         if (editingBrand?.id) {
           const { error: saveError } = await supabase
             .from('brands')
             .update({
-              ai_response: result.data.analysis
+              ai_response: JSON.stringify(result.data)
             })
             .eq('id', editingBrand.id);
           
@@ -584,14 +597,73 @@ export default function ClientBrandsForm() {
               <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">🤖 AI Analysis Results</h3>
                 <div className="space-y-4">
-                  <div>
-                    <h4 className="text-md font-medium text-gray-300 mb-2">Analysis</h4>
-                    <div className="bg-gray-700/30 rounded p-3">
-                      <p className="text-white text-sm whitespace-pre-wrap">
-                        {aiResponse.analysis || 'No analysis available'}
-                      </p>
+                  {/* Analysis Status */}
+                  {aiResponse.analysis_status && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-300 mb-2">Analysis Status</h4>
+                      <div className="bg-gray-700/30 rounded p-3">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className={`w-2 h-2 rounded-full ${aiResponse.analysis_status.url_accessible ? 'bg-green-400' : 'bg-red-400'}`}></span>
+                          <span className="text-white text-sm">
+                            URL {aiResponse.analysis_status.url_accessible ? 'Accessible' : 'Not Accessible'}
+                          </span>
+                        </div>
+                        {aiResponse.analysis_status.error_message && (
+                          <p className="text-red-400 text-sm">{aiResponse.analysis_status.error_message}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Brand Summary */}
+                  {aiResponse.brand_summary && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-300 mb-2">Brand Summary</h4>
+                      <div className="bg-gray-700/30 rounded p-3 space-y-3">
+                        <div>
+                          <span className="text-gray-400 text-sm">Name:</span>
+                          <p className="text-white font-medium">{aiResponse.brand_summary.name}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 text-sm">Industry:</span>
+                          <p className="text-white">{aiResponse.brand_summary.industry}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 text-sm">Target Audience:</span>
+                          <p className="text-white">{aiResponse.brand_summary.target_audience}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-400 text-sm">Value Proposition:</span>
+                          <p className="text-white">{aiResponse.brand_summary.value_proposition}</p>
+                        </div>
+                        {aiResponse.brand_summary.main_services && (
+                          <div>
+                            <span className="text-gray-400 text-sm">Main Services:</span>
+                            <ul className="text-white mt-1 space-y-1">
+                              {aiResponse.brand_summary.main_services.map((service: string, index: number) => (
+                                <li key={index} className="flex items-start">
+                                  <span className="text-blue-400 mr-2">•</span>
+                                  {service}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Raw Analysis (fallback) */}
+                  {aiResponse.analysis && !aiResponse.brand_summary && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-300 mb-2">Analysis</h4>
+                      <div className="bg-gray-700/30 rounded p-3">
+                        <p className="text-white text-sm whitespace-pre-wrap">
+                          {aiResponse.analysis}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex justify-between text-sm text-gray-400">
                     <span>Brand: {aiResponse.brand_name || 'N/A'}</span>
