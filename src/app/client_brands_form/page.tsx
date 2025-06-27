@@ -376,10 +376,13 @@ export default function ClientBrandsForm() {
         return;
       }
 
-      console.log('Sending to Perplexity:', {
-        url: formData.brand_url,
-        brand: formData.brand_name || 'Unknown Brand'
-      });
+      // Try different request formats - let's test what works
+      const requestData = {
+        query: `Analyze this website: ${formData.brand_url}`,
+        brand_name: formData.brand_name || 'Unknown Brand'
+      };
+
+      console.log('Sending to Perplexity:', requestData);
 
       const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/perplexity_brand_search', {
         method: 'POST',
@@ -387,18 +390,21 @@ export default function ClientBrandsForm() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          url: formData.brand_url,
-          brand: formData.brand_name || 'Unknown Brand'
-        })
+        body: JSON.stringify(requestData)
       });
 
       console.log('Response status:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: Failed to analyze brand`);
+        let errorMessage = `HTTP ${response.status}: Failed to analyze brand`;
+        try {
+          const errorData = await response.json();
+          console.error('API Error:', errorData);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Could not parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
