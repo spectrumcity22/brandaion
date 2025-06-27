@@ -427,35 +427,65 @@ export default function ClientBrandsForm() {
         const parsedResponse = JSON.parse(brand.ai_response);
         console.log('Loaded AI response:', parsedResponse);
         
-        let brandSummary = null;
-        
-        // Handle nested structure where data is in analysis field
-        if (parsedResponse.analysis) {
-          try {
-            const analysisData = JSON.parse(parsedResponse.analysis);
-            brandSummary = analysisData.brand_summary;
-          } catch (parseError) {
-            console.error('Failed to parse analysis JSON:', parseError);
-          }
-        }
-        
-        if (brandSummary) {
-          setAiFormData({
-            industry: brandSummary.industry || '',
-            targetAudience: brandSummary.target_audience || '',
-            valueProposition: brandSummary.value_proposition || '',
-            mainServices: brandSummary.main_services?.join(', ') || ''
+        // Check if this is the new simple text format
+        if (parsedResponse.analysis && typeof parsedResponse.analysis === 'string') {
+          // Parse the simple text format: "industry: value\ntarget_audience: value\n..."
+          const lines = parsedResponse.analysis.trim().split('\n');
+          const parsedFormData = {
+            industry: '',
+            targetAudience: '',
+            valueProposition: '',
+            mainServices: ''
+          };
+
+          lines.forEach((line: string) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('industry:')) {
+              parsedFormData.industry = trimmedLine.replace('industry:', '').trim();
+            } else if (trimmedLine.startsWith('target_audience:')) {
+              parsedFormData.targetAudience = trimmedLine.replace('target_audience:', '').trim();
+            } else if (trimmedLine.startsWith('value_proposition:')) {
+              parsedFormData.valueProposition = trimmedLine.replace('value_proposition:', '').trim();
+            } else if (trimmedLine.startsWith('main_services:')) {
+              parsedFormData.mainServices = trimmedLine.replace('main_services:', '').trim();
+            }
           });
-          setAiResponse(parsedResponse); // Show the form
-        } else {
-          // Fallback to direct fields if no nested structure
-          setAiFormData({
-            industry: parsedResponse.industry || '',
-            targetAudience: parsedResponse.targetAudience || '',
-            valueProposition: parsedResponse.valueProposition || '',
-            mainServices: parsedResponse.mainServices || ''
-          });
+
+          console.log('Parsed simple text format:', parsedFormData);
+          setAiFormData(parsedFormData);
           setAiResponse(parsedResponse);
+        } else {
+          // Handle old JSON format
+          let brandSummary = null;
+          
+          // Handle nested structure where data is in analysis field
+          if (parsedResponse.analysis) {
+            try {
+              const analysisData = JSON.parse(parsedResponse.analysis);
+              brandSummary = analysisData.brand_summary;
+            } catch (parseError) {
+              console.error('Failed to parse analysis JSON:', parseError);
+            }
+          }
+          
+          if (brandSummary) {
+            setAiFormData({
+              industry: brandSummary.industry || '',
+              targetAudience: brandSummary.target_audience || '',
+              valueProposition: brandSummary.value_proposition || '',
+              mainServices: brandSummary.main_services?.join(', ') || ''
+            });
+            setAiResponse(parsedResponse); // Show the form
+          } else {
+            // Fallback to direct fields if no nested structure
+            setAiFormData({
+              industry: parsedResponse.industry || '',
+              targetAudience: parsedResponse.targetAudience || '',
+              valueProposition: parsedResponse.valueProposition || '',
+              mainServices: parsedResponse.mainServices || ''
+            });
+            setAiResponse(parsedResponse);
+          }
         }
       } catch (parseError) {
         // If parsing fails, treat as plain text
