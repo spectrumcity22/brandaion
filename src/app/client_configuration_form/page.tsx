@@ -29,6 +29,7 @@ export default function ClientConfigurationForm() {
   const [status, setStatus] = useState('');
   const [organisation, setOrganisation] = useState<any>(null);
   const [showAudiences, setShowAudiences] = useState(false);
+  const [selectedAudienceId, setSelectedAudienceId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -139,6 +140,11 @@ export default function ClientConfigurationForm() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const handleAudienceSelect = (audienceId: string) => {
+    setSelectedAudienceId(audienceId);
+    setForm({ ...form, audience_id: audienceId });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
@@ -240,6 +246,30 @@ export default function ClientConfigurationForm() {
   const totalProducts = products.length;
   const totalPersonas = personas.length;
   const isFormComplete = form.brand_id && form.persona_id && form.market_id && form.audience_id;
+
+  // Categorize audiences into B2C and B2B
+  const b2cAudiences = audiences.filter(audience => 
+    audience.target_audience.toLowerCase().includes('consumer') ||
+    audience.target_audience.toLowerCase().includes('customer') ||
+    audience.target_audience.toLowerCase().includes('individual') ||
+    audience.target_audience.toLowerCase().includes('personal') ||
+    audience.target_audience.toLowerCase().includes('retail') ||
+    audience.target_audience.toLowerCase().includes('end user')
+  );
+  
+  const b2bAudiences = audiences.filter(audience => 
+    audience.target_audience.toLowerCase().includes('business') ||
+    audience.target_audience.toLowerCase().includes('enterprise') ||
+    audience.target_audience.toLowerCase().includes('corporate') ||
+    audience.target_audience.toLowerCase().includes('professional') ||
+    audience.target_audience.toLowerCase().includes('industry') ||
+    audience.target_audience.toLowerCase().includes('commercial')
+  );
+
+  // If no clear categorization, put all in B2C
+  const uncategorizedAudiences = audiences.filter(audience => 
+    !b2cAudiences.includes(audience) && !b2bAudiences.includes(audience)
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
@@ -426,20 +456,24 @@ export default function ClientConfigurationForm() {
 
               <div className="md:col-span-2">
                 <label className="block text-gray-300 mb-2 font-medium">Target Audience</label>
-                <select
-                  name="audience_id"
-                  value={form.audience_id || ''}
-                  onChange={handleChange}
-                  className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                  required
-                >
-                  <option value="">Select target audience</option>
-                  {audiences.map((audience) => (
-                    <option key={audience.id} value={audience.id}>
-                      {audience.target_audience}
-                    </option>
-                  ))}
-                </select>
+                <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
+                  {selectedAudienceId ? (
+                    <div className="flex items-center justify-between">
+                      <span>{audiences.find(a => a.id === selectedAudienceId)?.target_audience}</span>
+                      <button
+                        onClick={() => {
+                          setSelectedAudienceId(null);
+                          setForm({ ...form, audience_id: '' });
+                        }}
+                        className="text-red-400 hover:text-red-300 text-sm"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">Select an audience from the cards above</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -495,62 +529,169 @@ export default function ClientConfigurationForm() {
           </div>
 
           {showAudiences && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {audiences.map((audience, index) => {
-                const colors = [
-                  'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-400',
-                  'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400',
-                  'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400',
-                  'from-orange-500/20 to-red-500/20 border-orange-500/30 text-orange-400',
-                  'from-indigo-500/20 to-purple-500/20 border-indigo-500/30 text-indigo-400',
-                  'from-teal-500/20 to-cyan-500/20 border-teal-500/30 text-teal-400'
-                ];
-                const colorClass = colors[index % colors.length];
-                
-                return (
-                  <div key={audience.id} className="group relative bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${colorClass} border flex items-center justify-center`}>
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="text-white font-semibold">{audience.target_audience}</h3>
-                        <p className="text-gray-400 text-sm">Audience {index + 1}</p>
-                      </div>
-                    </div>
-                    
-                    <p className="text-gray-300 text-sm mb-4">
-                      Target audience for your brand and product configuration.
-                    </p>
+            <div className="space-y-8">
+              {/* B2C Audiences */}
+              {(b2cAudiences.length > 0 || uncategorizedAudiences.length > 0) && (
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-600 pb-2">
+                    Business to Consumer (B2C)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[...b2cAudiences, ...uncategorizedAudiences].map((audience, index) => {
+                      const colors = [
+                        'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-400',
+                        'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400',
+                        'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400',
+                        'from-orange-500/20 to-red-500/20 border-orange-500/30 text-orange-400',
+                        'from-indigo-500/20 to-purple-500/20 border-indigo-500/30 text-indigo-400',
+                        'from-teal-500/20 to-cyan-500/20 border-teal-500/30 text-teal-400'
+                      ];
+                      const colorClass = colors[index % colors.length];
+                      const isSelected = selectedAudienceId === audience.id;
+                      
+                      return (
+                        <div 
+                          key={audience.id} 
+                          className={`group relative bg-gray-800/30 border rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200 cursor-pointer ${
+                            isSelected 
+                              ? 'border-green-500/50 bg-green-500/10' 
+                              : 'border-gray-600/30'
+                          }`}
+                          onClick={() => handleAudienceSelect(audience.id)}
+                        >
+                          <div className="flex items-center space-x-3 mb-3">
+                            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${colorClass} border flex items-center justify-center`}>
+                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="text-white font-semibold">{audience.target_audience}</h3>
+                              <p className="text-gray-400 text-sm">B2C Audience</p>
+                            </div>
+                            {isSelected && (
+                              <div className="ml-auto">
+                                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <p className="text-gray-300 text-sm mb-4">
+                            Individual consumers and end users who purchase products or services for personal use.
+                          </p>
 
-                    <div className="flex space-x-2">
-                      <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
-                        Run Report
-                      </button>
-                      <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
-                        Chat
-                      </button>
-                    </div>
+                          <div className="flex space-x-2">
+                            <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                              Run Report
+                            </button>
+                            <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                              Chat
+                            </button>
+                          </div>
 
-                    {/* Hover Popup */}
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-80 bg-gray-900 border border-gray-600 rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
-                      <h4 className="text-white font-semibold mb-2">{audience.target_audience}</h4>
-                      <div className="space-y-2 text-sm text-gray-300">
-                        <p><strong>Audience ID:</strong> {audience.id}</p>
-                        <p><strong>Target:</strong> {audience.target_audience}</p>
-                        <p><strong>Status:</strong> Ready for analysis</p>
-                        <p><strong>Features:</strong> Report generation and chat coming soon</p>
-                      </div>
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                    </div>
+                          {/* Hover Popup */}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-80 bg-gray-900 border border-gray-600 rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                            <h4 className="text-white font-semibold mb-2">{audience.target_audience}</h4>
+                            <div className="space-y-2 text-sm text-gray-300">
+                              <p><strong>Type:</strong> Business to Consumer (B2C)</p>
+                              <p><strong>Description:</strong> Individual consumers who make purchasing decisions for personal or household use. They typically value convenience, quality, and personal benefits.</p>
+                              <p><strong>Decision Factors:</strong> Price, convenience, brand reputation, personal needs</p>
+                              <p><strong>Communication Style:</strong> Personal, emotional, benefit-focused</p>
+                              <p><strong>Status:</strong> {isSelected ? 'Selected' : 'Available for selection'}</p>
+                            </div>
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              {/* B2B Audiences */}
+              {b2bAudiences.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-4 border-b border-gray-600 pb-2">
+                    Business to Business (B2B)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {b2bAudiences.map((audience, index) => {
+                      const colors = [
+                        'from-purple-500/20 to-pink-500/20 border-purple-500/30 text-purple-400',
+                        'from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-400',
+                        'from-green-500/20 to-emerald-500/20 border-green-500/30 text-green-400',
+                        'from-orange-500/20 to-red-500/20 border-orange-500/30 text-orange-400',
+                        'from-indigo-500/20 to-purple-500/20 border-indigo-500/30 text-indigo-400',
+                        'from-teal-500/20 to-cyan-500/20 border-teal-500/30 text-teal-400'
+                      ];
+                      const colorClass = colors[index % colors.length];
+                      const isSelected = selectedAudienceId === audience.id;
+                      
+                      return (
+                        <div 
+                          key={audience.id} 
+                          className={`group relative bg-gray-800/30 border rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200 cursor-pointer ${
+                            isSelected 
+                              ? 'border-green-500/50 bg-green-500/10' 
+                              : 'border-gray-600/30'
+                          }`}
+                          onClick={() => handleAudienceSelect(audience.id)}
+                        >
+                          <div className="flex items-center space-x-3 mb-3">
+                            <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${colorClass} border flex items-center justify-center`}>
+                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="text-white font-semibold">{audience.target_audience}</h3>
+                              <p className="text-gray-400 text-sm">B2B Audience</p>
+                            </div>
+                            {isSelected && (
+                              <div className="ml-auto">
+                                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <p className="text-gray-300 text-sm mb-4">
+                            Business customers who purchase products or services for organizational use and growth.
+                          </p>
+
+                          <div className="flex space-x-2">
+                            <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                              Run Report
+                            </button>
+                            <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                              Chat
+                            </button>
+                          </div>
+
+                          {/* Hover Popup */}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-80 bg-gray-900 border border-gray-600 rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                            <h4 className="text-white font-semibold mb-2">{audience.target_audience}</h4>
+                            <div className="space-y-2 text-sm text-gray-300">
+                              <p><strong>Type:</strong> Business to Business (B2B)</p>
+                              <p><strong>Description:</strong> Business customers who make purchasing decisions for their organization. They focus on ROI, efficiency, and long-term partnerships.</p>
+                              <p><strong>Decision Factors:</strong> ROI, efficiency, scalability, support, integration</p>
+                              <p><strong>Communication Style:</strong> Professional, data-driven, solution-focused</p>
+                              <p><strong>Status:</strong> {isSelected ? 'Selected' : 'Available for selection'}</p>
+                            </div>
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               
               {audiences.length === 0 && (
-                <div className="md:col-span-4 text-center py-8">
+                <div className="text-center py-8">
                   <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
