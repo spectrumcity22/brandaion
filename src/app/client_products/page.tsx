@@ -22,7 +22,6 @@ interface Product {
   brand_id?: string;
   inserted_at?: string;
   ai_response?: any;
-  competitors?: string;
 }
 
 interface Brand {
@@ -341,8 +340,7 @@ export default function ClientProducts() {
         description: formData.description || '',
         keywords: formData.keywords || '',
         url: formData.url || '',
-        category: formData.category || '',
-        competitors: formData.competitors || ''
+        category: formData.category || ''
       };
 
       // If we have AI form data, convert it to JSON and include it
@@ -567,6 +565,35 @@ export default function ClientProducts() {
     return grouped;
   };
 
+  const handleUpdateSchema = async (productId: string) => {
+    try {
+      setError('');
+      setSuccess('');
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('User not authenticated.');
+        return;
+      }
+
+      // Trigger the schema update by updating the product (this will fire the trigger)
+      const { error } = await supabase
+        .from('products')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', productId);
+
+      if (error) throw error;
+      
+      setSuccess('✅ Schema updated successfully!');
+      
+      // Refresh data to show updated schema
+      await loadData();
+    } catch (err) {
+      console.error('Error updating schema:', err);
+      setError('Error updating schema.');
+    }
+  };
+
   const productsByBrand = getProductsByBrand();
   const totalProducts = products.length;
   const activeProducts = products.filter(p => p.product_name && p.product_name.trim() !== '').length;
@@ -691,17 +718,6 @@ export default function ClientProducts() {
                     className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
                     value={formData.category || ''} 
                     onChange={handleChange} 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Competitors</label>
-                  <input 
-                    name="competitors" 
-                    className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                    value={formData.competitors || ''} 
-                    onChange={handleChange} 
-                    placeholder="Direct competitors separated by semicolons"
                   />
                 </div>
 
@@ -966,13 +982,23 @@ export default function ClientProducts() {
                                   
                                   <div className="flex items-center justify-between">
                                     <p className="text-gray-400 text-sm">Schema.org</p>
-                                    {product.schema_json ? (
-                                      <span className="text-blue-400 text-xs">✅ Generated</span>
-                                    ) : hasValidAIResponse(product) ? (
-                                      <span className="text-yellow-400 text-xs">⚠️ Ready to generate</span>
-                                    ) : (
-                                      <span className="text-gray-500 text-xs">Not available</span>
-                                    )}
+                                    <div className="flex items-center space-x-2">
+                                      {product.schema_json ? (
+                                        <span className="text-blue-400 text-xs">✅ Generated</span>
+                                      ) : hasValidAIResponse(product) ? (
+                                        <span className="text-yellow-400 text-xs">⚠️ Ready to generate</span>
+                                      ) : (
+                                        <span className="text-gray-500 text-xs">Not available</span>
+                                      )}
+                                      {hasValidAIResponse(product) && (
+                                        <button
+                                          onClick={() => handleUpdateSchema(product.id)}
+                                          className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors"
+                                        >
+                                          Update Schema
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
