@@ -27,10 +27,16 @@ interface Organisation {
   auth_user_id: string;
 }
 
+interface SubscriptionInfo {
+  package_tier: string;
+  status: string;
+}
+
 export default function ClientBrandsForm() {
   const router = useRouter();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [organisations, setOrganisations] = useState<Organisation[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -76,12 +82,67 @@ export default function ClientBrandsForm() {
         setOrganisations(orgsData || []);
       }
 
+      // Load subscription info
+      const { data: subscriptionData } = await supabase
+        .from('invoices')
+        .select('package_tier, status')
+        .eq('auth_user_id', user.id)
+        .order('inserted_at', { ascending: false })
+        .limit(1);
+
+      if (subscriptionData?.[0]) {
+        setSubscription(subscriptionData[0]);
+      }
+
       setLoading(false);
     } catch (err) {
       console.error('Error loading data:', err);
       setError('Failed to load data.');
       setLoading(false);
     }
+  };
+
+  const getPackageLimits = (packageTier: string) => {
+    switch (packageTier?.toLowerCase()) {
+      case 'startup':
+      case 'pack1':
+        return { name: 'Startup', limit: 1 };
+      case 'growth':
+      case 'pack2':
+        return { name: 'Growth', limit: 2 };
+      case 'pro':
+      case 'pack3':
+        return { name: 'Pro', limit: 5 };
+      case 'enterprise':
+      case 'pack4':
+        return { name: 'Enterprise', limit: Infinity };
+      default:
+        return { name: 'Startup', limit: 1 };
+    }
+  };
+
+  const getPackageIcon = (packageTier: string) => {
+    switch (packageTier?.toLowerCase()) {
+      case 'startup':
+      case 'pack1':
+        return '🚀';
+      case 'growth':
+      case 'pack2':
+        return '📈';
+      case 'pro':
+      case 'pack3':
+        return '💎';
+      case 'enterprise':
+      case 'pack4':
+        return '👑';
+      default:
+        return '📦';
+    }
+  };
+
+  const canCreateBrand = () => {
+    const packageInfo = getPackageLimits(subscription?.package_tier || 'startup');
+    return brands.length < packageInfo.limit;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -105,6 +166,14 @@ export default function ClientBrandsForm() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError('User not authenticated.');
+        return;
+      }
+
+      // Check package limits for new brands
+      if (!editingBrand && !canCreateBrand()) {
+        const packageInfo = getPackageLimits(subscription?.package_tier || 'startup');
+        setError(`You have reached your brand limit for ${packageInfo.name} package. Please upgrade to create more brands.`);
+        setSaving(false);
         return;
       }
 
@@ -157,10 +226,7 @@ export default function ClientBrandsForm() {
       setEditingBrand(null);
       setFormData({});
       
-      // Auto-redirect to products page after 3 seconds
-      setTimeout(() => {
-        router.push('/client_products');
-      }, 3000);
+      // Remove auto-redirect - let user stay on the page
     } catch (err) {
       console.error('Error saving brand:', err);
       setError('Error saving brand.');
@@ -224,6 +290,31 @@ export default function ClientBrandsForm() {
           <p className="text-gray-400">Manage your brands and their configurations</p>
         </div>
 
+        {/* Package Information Panel */}
+        {subscription && (
+          <div className="mb-8 bg-gradient-to-br from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="text-3xl">{getPackageIcon(subscription.package_tier)}</div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">
+                    {getPackageLimits(subscription.package_tier).name} Package
+                  </h3>
+                  <p className="text-gray-300">
+                    {brands.length} / {getPackageLimits(subscription.package_tier).limit === Infinity ? '∞' : getPackageLimits(subscription.package_tier).limit} brands created
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-400">Status</p>
+                <p className={`font-semibold ${subscription.status === 'active' ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {subscription.status === 'active' ? 'Active' : 'Inactive'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-900/20 border border-red-500/50 rounded-lg">
@@ -234,7 +325,7 @@ export default function ClientBrandsForm() {
         {/* Success Message */}
         {success && (
           <div className="mb-6 p-4 bg-green-900/20 border border-green-500/50 rounded-lg">
-            <p className="text-green-400">✅ Brand saved successfully! Redirecting to Products page...</p>
+            <p className="text-green-400">✅ Brand saved successfully!</p>
           </div>
         )}
 
@@ -242,9 +333,14 @@ export default function ClientBrandsForm() {
         <div className="mb-6 flex justify-between items-center">
           <button
             onClick={handleNewBrand}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            disabled={!canCreateBrand()}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              canCreateBrand() 
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+            }`}
           >
-            + Add New Brand
+            {canCreateBrand() ? '+ Add New Brand' : 'Brand Limit Reached'}
           </button>
           <button
             onClick={() => router.push('/dashboard')}
@@ -326,7 +422,7 @@ export default function ClientBrandsForm() {
           </div>
         )}
 
-        {/* Brands List */}
+        {/* Brands Cards */}
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden">
           <div className="p-6 border-b border-gray-700">
             <h2 className="text-xl font-semibold text-white">Your Brands</h2>
@@ -334,84 +430,83 @@ export default function ClientBrandsForm() {
           
           {brands.length === 0 ? (
             <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
               <p className="text-gray-400 mb-4">No brands found. Create your first brand to get started.</p>
               <button
                 onClick={handleNewBrand}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                disabled={!canCreateBrand()}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  canCreateBrand() 
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                    : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                }`}
               >
-                Create Your First Brand
+                {canCreateBrand() ? 'Create Your First Brand' : 'Brand Limit Reached'}
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-700/50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Brand Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Organisation
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      URL
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Created
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700">
-                  {brands.map((brand) => (
-                    <tr key={brand.id} className="hover:bg-gray-700/30">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-white">{brand.brand_name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-300">{brand.organisation_name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-300">
-                          {brand.brand_url ? (
-                            <a 
-                              href={brand.brand_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-400 hover:text-blue-300"
-                            >
-                              {brand.brand_url}
-                            </a>
-                          ) : (
-                            <span className="text-gray-500">No URL</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-300">
-                          {brand.created_at ? new Date(brand.created_at).toLocaleDateString() : 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {brands.map((brand) => (
+                  <div key={brand.id} className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
+                    <div className="flex items-start justify-between mb-3">
+                      <h4 className="text-lg font-semibold text-white truncate">{brand.brand_name}</h4>
+                      <div className="flex space-x-2">
                         <button
                           onClick={() => handleEdit(brand)}
-                          className="text-blue-400 hover:text-blue-300 mr-4"
+                          className="text-blue-400 hover:text-blue-300 transition-colors"
                         >
-                          Edit
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
                         </button>
                         <button
                           onClick={() => handleDelete(brand.id)}
-                          className="text-red-400 hover:text-red-300"
+                          className="text-red-400 hover:text-red-300 transition-colors"
                         >
-                          Delete
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-gray-400 text-sm">Organisation</p>
+                        <p className="text-white text-sm font-medium">{brand.organisation_name}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-400 text-sm">URL</p>
+                        {brand.brand_url ? (
+                          <a 
+                            href={brand.brand_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-400 hover:text-blue-300 text-sm truncate block"
+                          >
+                            {brand.brand_url}
+                          </a>
+                        ) : (
+                          <span className="text-gray-500 text-sm">No URL</span>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-400 text-sm">Created</p>
+                        <p className="text-white text-sm">
+                          {brand.created_at ? new Date(brand.created_at).toLocaleDateString() : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

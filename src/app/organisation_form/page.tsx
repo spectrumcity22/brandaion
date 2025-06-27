@@ -241,10 +241,7 @@ export default function OrganisationForm() {
 
       setMessage('✅ Organisation, profile, and brand row created successfully!');
       
-      // Auto-redirect to brands page after 2 seconds
-      setTimeout(() => {
-        router.push('/client_brands_form');
-      }, 2000);
+      // Remove auto-redirect - let user stay on the page
     } catch (err: any) {
       setMessage(`❌ Error: ${err?.message || 'Unexpected failure'}`);
     } finally {
@@ -346,12 +343,20 @@ export default function OrganisationForm() {
 
             <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-center">
               <p className="text-blue-400 mb-3">Next step: Set up your brand management</p>
-              <button
-                onClick={() => router.push('/client_brands_form')}
-                className="premium-button"
-              >
-                🏷️ Continue to Brand Management
-              </button>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={() => router.push('/select_package')}
+                  className="premium-button"
+                >
+                  📦 Select Package
+                </button>
+                <button
+                  onClick={() => router.push('/client_brands_form')}
+                  className="premium-button"
+                >
+                  🏷️ Brand Management
+                </button>
+              </div>
             </div>
           </div>
         </div>
