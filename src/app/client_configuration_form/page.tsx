@@ -493,7 +493,7 @@ export default function ClientConfigurationForm() {
         <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-8 mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Audience Insights</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">Select a Target Audience</h2>
               <p className="text-gray-400">Explore your target audience archetypes and their characteristics</p>
             </div>
             <button
