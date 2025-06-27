@@ -244,7 +244,7 @@ export default function ClientBrandsForm() {
         const { error: analysisError } = await supabase
           .from('brands')
           .update({
-            ai_response: pendingAnalysis.analysis
+            ai_response: JSON.stringify(pendingAnalysis)
           })
           .eq('id', data.id);
         
@@ -438,7 +438,7 @@ export default function ClientBrandsForm() {
           const { error: saveError } = await supabase
             .from('brands')
             .update({
-              ai_response: result.data.analysis
+              ai_response: JSON.stringify(result.data)
             })
             .eq('id', editingBrand.id);
           
@@ -636,19 +636,44 @@ export default function ClientBrandsForm() {
               <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">🤖 AI Analysis Results</h3>
                 <div className="space-y-4">
-                  <div>
-                    <h4 className="text-md font-medium text-gray-300 mb-2">Analysis</h4>
-                    <div className="bg-gray-700/30 rounded p-3">
-                      <p className="text-white text-sm whitespace-pre-wrap">
-                        {aiResponse.analysis || 'No analysis available'}
-                      </p>
+                  {aiResponse.brand_summary && (
+                    <div>
+                      <h4 className="text-md font-medium text-gray-300 mb-2">Brand Summary</h4>
+                      <div className="bg-gray-700/30 rounded p-3 space-y-2">
+                        <p className="text-white text-sm">
+                          <strong>Name:</strong> {aiResponse.brand_summary.name || 'Not found'}
+                        </p>
+                        <p className="text-white text-sm">
+                          <strong>Industry:</strong> {aiResponse.brand_summary.industry || 'Not found'}
+                        </p>
+                        <p className="text-white text-sm">
+                          <strong>Target Audience:</strong> {aiResponse.brand_summary.target_audience || 'Not found'}
+                        </p>
+                        <p className="text-white text-sm">
+                          <strong>Value Proposition:</strong> {aiResponse.brand_summary.value_proposition || 'Not found'}
+                        </p>
+                        {aiResponse.brand_summary.main_services && aiResponse.brand_summary.main_services.length > 0 && (
+                          <div>
+                            <p className="text-white text-sm font-medium">Main Services:</p>
+                            <ul className="text-white text-sm ml-4">
+                              {aiResponse.brand_summary.main_services.map((service: string, index: number) => (
+                                <li key={index}>• {service}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="flex justify-between text-sm text-gray-400">
-                    <span>Brand: {aiResponse.brand_name || 'N/A'}</span>
-                    <span>Query: {aiResponse.query || 'N/A'}</span>
-                  </div>
+                  {aiResponse.analysis_status && (
+                    <div className="flex justify-between text-sm text-gray-400">
+                      <span>Status: {aiResponse.analysis_status.url_accessible ? '✅ Accessible' : '❌ Not Accessible'}</span>
+                      {aiResponse.analysis_status.error_message && (
+                        <span>Error: {aiResponse.analysis_status.error_message}</span>
+                      )}
+                    </div>
+                  )}
                   
                   <div className="mt-4">
                     <button

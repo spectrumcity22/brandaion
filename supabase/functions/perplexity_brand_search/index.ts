@@ -70,6 +70,24 @@ serve(async (req) => {
     // Call Perplexity API
     const startTime = Date.now()
     
+    const analysisQuery = `Please visit and analyze the website ${query} and provide a detailed analysis of:
+
+1. **Brand Identity & Purpose**: What is this brand/company? What do they do? What is their main value proposition?
+
+2. **Website Content**: What are the main products/services offered? What key features or benefits are highlighted?
+
+3. **Target Audience**: Who appears to be their target audience based on the content and messaging?
+
+4. **Website Design & UX**: How is the website designed? What's the user experience like? Any notable design elements?
+
+5. **Technical Aspects**: Any observations about the website's structure, performance, or technical implementation?
+
+6. **Competitive Positioning**: How does this brand position itself in the market? What makes them unique?
+
+7. **Content Quality**: What's the quality and depth of the content? Any gaps or areas for improvement?
+
+Please provide a comprehensive, specific analysis of this actual website, not generic advice about website analysis. Focus on what you can observe from visiting the site.`
+    
     const perplexityResponse = await fetch(`https://api.perplexity.ai/chat/completions`, {
       method: 'POST',
       headers: {
@@ -81,7 +99,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'user',
-            content: query
+            content: analysisQuery
           }
         ],
         max_tokens: 4000,
