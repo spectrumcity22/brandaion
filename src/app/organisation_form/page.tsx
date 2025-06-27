@@ -33,6 +33,7 @@ interface Organisation {
   industry: string;
   subcategory: string;
   headquarters: string;
+  logo_url?: string;
 }
 
 export default function OrganisationForm() {
@@ -53,6 +54,8 @@ export default function OrganisationForm() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -66,7 +69,7 @@ export default function OrganisationForm() {
       // Check if organization already exists (for existing users)
       const { data: org, error } = await supabase
         .from('client_organisation')
-        .select('id, organisation_name, organisation_url, linkedin_url, industry, subcategory, headquarters')
+        .select('id, organisation_name, organisation_url, linkedin_url, industry, subcategory, headquarters, logo_url')
         .eq('auth_user_id', user.id)
         .maybeSingle();
 
@@ -80,6 +83,7 @@ export default function OrganisationForm() {
         setIndustry(org.industry);
         setSubcategory(org.subcategory);
         setHeadquarters(org.headquarters);
+        setLogoPreview(org.logo_url || null);
       }
 
       // Load reference data
@@ -144,6 +148,17 @@ export default function OrganisationForm() {
     setMessage('Creating organisation...');
 
     try {
+      // Upload logo if present
+      let logoUrl: string | undefined = existingOrg?.logo_url;
+      if (logoFile) {
+        const uploadedUrl = await uploadLogo();
+        if (!uploadedUrl) {
+          setIsSubmitting(false);
+          return;
+        }
+        logoUrl = uploadedUrl;
+      }
+
       // Step 1: Create or update the organization record
       let organizationId = orgId;
       
@@ -158,6 +173,7 @@ export default function OrganisationForm() {
             industry: industry,
             subcategory: subcategory,
             headquarters: headquarters,
+            logo_url: logoUrl,
             auth_user_id: sessionUser.id,
             is_active: true
           })
@@ -178,6 +194,7 @@ export default function OrganisationForm() {
             industry: industry,
             subcategory: subcategory,
             headquarters: headquarters,
+            logo_url: logoUrl,
             is_active: true
           })
           .eq('id', orgId);
@@ -210,9 +227,11 @@ export default function OrganisationForm() {
         linkedin_url: linkedinUrl,
         industry: industry,
         subcategory: subcategory,
-        headquarters: headquarters
+        headquarters: headquarters,
+        logo_url: logoUrl
       });
       setIsEditing(false);
+      setLogoFile(null);
 
       // Step 4: Call the edge function to create a brand row with JWT
       const { data: { session } } = await supabase.auth.getSession();
@@ -249,6 +268,60 @@ export default function OrganisationForm() {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setMessage('❌ Logo file size must be less than 5MB');
+        return;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setMessage('❌ Please select a valid image file');
+        return;
+      }
+      
+      setLogoFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setLogoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadLogo = async (): Promise<string | null> => {
+    if (!logoFile) return null;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('logos')
+        .upload(fileName, logoFile);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('logos')
+        .getPublicUrl(fileName);
+      
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setMessage('❌ Failed to upload logo');
+      return null;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen p-4 lg:p-8">
@@ -278,9 +351,25 @@ export default function OrganisationForm() {
 
           <div className="glass-card p-8">
             <div className="mb-6 p-4 glass-card text-center">
-              <div className="text-2xl mb-2">📛</div>
-              <h2 className="text-xl font-semibold mb-1">{existingOrg.organisation_name}</h2>
-              <p className="text-gray-400 text-sm">Organisation Ready for Configuration</p>
+              <div className="flex items-center justify-center mb-4">
+                {existingOrg.logo_url ? (
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border border-gray-600/50 mr-4">
+                    <img
+                      src={existingOrg.logo_url}
+                      alt={`${existingOrg.organisation_name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gray-700/50 border border-gray-600/50 flex items-center justify-center text-2xl mr-4">
+                    🏢
+                  </div>
+                )}
+                <div>
+                  <h2 className="text-xl font-semibold mb-1">{existingOrg.organisation_name}</h2>
+                  <p className="text-gray-400 text-sm">Organisation Ready for Configuration</p>
+                </div>
+              </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4 mb-8">
@@ -503,6 +592,34 @@ export default function OrganisationForm() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                🖼️ Organisation Logo
+              </label>
+              <div className="flex items-center space-x-4">
+                {(logoPreview || existingOrg?.logo_url) && (
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-700/50 border border-gray-600/50">
+                    <img
+                      src={logoPreview || existingOrg?.logo_url}
+                      alt="Organisation logo"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="glass-input w-full p-4"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Recommended size: 100x100px to 300x300px, max 5MB
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
