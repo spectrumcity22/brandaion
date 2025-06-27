@@ -14,6 +14,7 @@ export default function ClientConfigurationForm() {
   const [personas, setPersonas] = useState<any[]>([]);
   const [markets, setMarkets] = useState<any[]>([]);
   const [audiences, setAudiences] = useState<any[]>([]);
+  const [allUserProducts, setAllUserProducts] = useState<any[]>([]);
   const [form, setForm] = useState<any>({});
   const [user, setUser] = useState<any>(null);
   const [message, setMessage] = useState("");
@@ -46,6 +47,13 @@ export default function ClientConfigurationForm() {
         .select("id, brand_name, organisation_name, brand_jsonld_object")
         .eq("auth_user_id", user.id);
       setBrands(brandsData || []);
+      
+      // Fetch all products for this user (not just for selected brand)
+      const { data: allProductsData } = await supabase
+        .from("products")
+        .select("id, product_name, schema_json, brand_id")
+        .eq("auth_user_id", user.id);
+      setAllUserProducts(allProductsData || []);
       
       // Fetch organization data for this user
       const { data: orgData, error: orgError } = await supabase
@@ -243,7 +251,7 @@ export default function ClientConfigurationForm() {
   }
 
   const totalBrands = brands.length;
-  const totalProducts = products.length;
+  const totalProducts = allUserProducts.length;
   const totalPersonas = personas.length;
   const isFormComplete = form.brand_id && form.persona_id && form.market_id && form.audience_id;
 
@@ -452,28 +460,6 @@ export default function ClientConfigurationForm() {
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-gray-300 mb-2 font-medium">Target Audience</label>
-                <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
-                  {selectedAudienceId ? (
-                    <div className="flex items-center justify-between">
-                      <span>{audiences.find(a => a.id === selectedAudienceId)?.target_audience}</span>
-                      <button
-                        onClick={() => {
-                          setSelectedAudienceId(null);
-                          setForm({ ...form, audience_id: '' });
-                        }}
-                        className="text-red-400 hover:text-red-300 text-sm"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400">Select an audience from the cards above</span>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -703,6 +689,29 @@ export default function ClientConfigurationForm() {
               )}
             </div>
           )}
+
+          {/* Target Audience Selection Display */}
+          <div className="mt-6">
+            <label className="block text-gray-300 mb-2 font-medium">Target Audience</label>
+            <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
+              {selectedAudienceId ? (
+                <div className="flex items-center justify-between">
+                  <span>{audiences.find(a => a.id === selectedAudienceId)?.target_audience}</span>
+                  <button
+                    onClick={() => {
+                      setSelectedAudienceId(null);
+                      setForm({ ...form, audience_id: '' });
+                    }}
+                    className="text-red-400 hover:text-red-300 text-sm"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <span className="text-gray-400">Select an audience from the cards above</span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Help Section */}
