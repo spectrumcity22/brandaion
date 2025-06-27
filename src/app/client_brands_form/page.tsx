@@ -504,14 +504,22 @@ export default function ClientBrandsForm() {
         // Store the structured response for display
         setAiResponse(result.data);
         
+        console.log('AI Response data:', result.data);
+        console.log('Brand summary:', result.data.brand_summary);
+        
         // Populate the form with AI response data
         if (result.data.brand_summary) {
-          setAiFormData({
+          const newFormData = {
             industry: result.data.brand_summary.industry || '',
             targetAudience: result.data.brand_summary.target_audience || '',
             valueProposition: result.data.brand_summary.value_proposition || '',
             mainServices: result.data.brand_summary.main_services?.join(', ') || ''
-          });
+          };
+          
+          console.log('Setting form data:', newFormData);
+          setAiFormData(newFormData);
+        } else {
+          console.log('No brand_summary found in response');
         }
         
         setSuccess('✅ AI analysis completed successfully!');
@@ -701,7 +709,7 @@ export default function ClientBrandsForm() {
                       Analyzing...
                     </div>
                   ) : (
-                    '🤖 Ask AI'
+                    '🤖 Complete with AI'
                   )}
                 </button>
                 <button
