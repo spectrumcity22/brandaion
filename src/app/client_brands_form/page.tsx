@@ -55,7 +55,6 @@ export default function ClientBrandsForm() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [organisations, setOrganisations] = useState<Organisation[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [brandAnalyses, setBrandAnalyses] = useState<BrandAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -63,7 +62,6 @@ export default function ClientBrandsForm() {
   const [formData, setFormData] = useState<Partial<Brand>>({});
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | boolean>(false);
-  const [analyzingBrand, setAnalyzingBrand] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [pendingAnalysis, setPendingAnalysis] = useState<any>(null);
@@ -278,6 +276,20 @@ export default function ClientBrandsForm() {
   const handleEdit = (brand: Brand) => {
     setEditingBrand(brand);
     setFormData(brand);
+    
+    // Load existing AI response if available
+    if (brand.ai_response) {
+      try {
+        const parsedResponse = JSON.parse(brand.ai_response);
+        setAiResponse(parsedResponse);
+      } catch (parseError) {
+        console.error('Failed to parse existing AI response:', parseError);
+        setAiResponse(null);
+      }
+    } else {
+      setAiResponse(null);
+    }
+    
     setShowForm(true);
   };
 
@@ -309,73 +321,6 @@ export default function ClientBrandsForm() {
     setEditingBrand(null);
     setFormData({});
     setError('');
-  };
-
-  const analyzeBrand = async (brand: Brand) => {
-    if (!brand.brand_url) {
-      setError('Brand URL is required for analysis.');
-      return;
-    }
-
-    setAnalyzingBrand(brand.id);
-    setError('');
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setError('User not authenticated.');
-        return;
-      }
-
-      const response = await fetch('/api/analyze-brand', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          brand_id: brand.id,
-          brand_url: brand.brand_url,
-          brand_name: brand.brand_name
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to analyze brand');
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setSuccess('✅ Brand analysis completed successfully!');
-        // Refresh analyses data
-        await loadData();
-      } else {
-        throw new Error(result.error || 'Analysis failed');
-      }
-    } catch (err: any) {
-      setError(`❌ Analysis failed: ${err.message}`);
-    } finally {
-      setAnalyzingBrand(null);
-    }
-  };
-
-  const getAnalysisForBrand = (brandId: string) => {
-    return brandAnalyses.find(analysis => analysis.brand_id === brandId);
-  };
-
-  const getAnalysisStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '✅';
-      case 'processing':
-        return '⏳';
-      case 'failed':
-        return '❌';
-      default:
-        return '⏳';
-    }
   };
 
   const askAI = async () => {
@@ -719,8 +664,6 @@ export default function ClientBrandsForm() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {brands.map((brand) => {
-                  const isAnalyzing = analyzingBrand === brand.id;
-                  
                   return (
                     <div key={brand.id} className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
                       <div className="flex items-start justify-between mb-3">
@@ -778,33 +721,12 @@ export default function ClientBrandsForm() {
 
                         {/* Analysis Section */}
                         <div className="pt-2 border-t border-gray-600/30">
-                          <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center justify-between">
                             <p className="text-gray-400 text-sm">AI Analysis</p>
                             {brand.ai_response && (
                               <span className="text-green-400 text-xs">✅ Available</span>
                             )}
                           </div>
-                          
-                          <button
-                            onClick={() => analyzeBrand(brand)}
-                            disabled={isAnalyzing || !brand.brand_url}
-                            className={`mt-2 w-full text-xs px-3 py-1 rounded transition-colors ${
-                              isAnalyzing
-                                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                                : brand.brand_url
-                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                            }`}
-                          >
-                            {isAnalyzing ? (
-                              <div className="flex items-center justify-center">
-                                <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin mr-1"></div>
-                                Analyzing...
-                              </div>
-                            ) : (
-                              brand.ai_response ? '🔄 Re-analyze' : '🔍 Analyze Brand'
-                            )}
-                          </button>
                         </div>
                       </div>
                     </div>
