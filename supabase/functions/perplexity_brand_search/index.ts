@@ -6,26 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface BrandSearchRequest {
-  query: string;
-  brand_name: string;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
+    const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
     // Debug: Log the raw request body
     const rawBody = await req.text()
     console.log('Raw request body:', rawBody)
-    
     let requestData
     try {
       requestData = JSON.parse(rawBody)
@@ -34,26 +24,21 @@ serve(async (req) => {
       console.error('Failed to parse JSON:', parseError)
       throw new Error('Invalid JSON in request body')
     }
-
     const { query, brand_name } = requestData
-
-    console.log('Extracted fields:', { query, brand_name })
-
+    console.log('Extracted fields:', {
+      query,
+      brand_name
+    })
     if (!query || !brand_name) {
       console.log('Missing fields - query:', !!query, 'brand_name:', !!brand_name)
       throw new Error('Missing required fields: query and brand_name')
     }
-
     // Get user from JWT - but be more flexible for testing
     const authHeader = req.headers.get('Authorization')
     let user = null
-    
     if (authHeader) {
       try {
-        const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(
-          authHeader.replace('Bearer ', '')
-        )
-        
+        const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''))
         if (!authError && authUser) {
           user = authUser
           console.log('Authenticated user:', user.id)
@@ -66,33 +51,45 @@ serve(async (req) => {
     } else {
       console.log('No authorization header provided')
     }
-
     // Call Perplexity API
     const startTime = Date.now()
-    
-    const analysisQuery = `Please visit and analyze the website ${query} and provide a detailed analysis of:
+    const analysisQuery = `You are a brand analysis agent. Your ONLY task is to analyze the provided URL and return a simple text response with the EXACT format specified below.
 
-1. **Brand Identity & Purpose**: What is this brand/company? What do they do? What is their main value proposition?
+CRITICAL RULES:
+1. Visit and analyze ONLY the exact URL provided - do not search for similar brands
+2. Return ONLY the 4 specified fields in exact format - no JSON, no explanations, no commentary
+3. Follow the EXACT text structure below - no additional fields
+4. If the URL is not accessible, return "url_error: [error details]"
+5. If you cannot find specific information, use "Not found"
+6. Do not make assumptions or search for similar brands
+7. Do not provide generic advice or analysis methods
+8. DO NOT ADD ANY TEXT BEFORE OR AFTER THE 4 FIELDS - JUST THE 4 LINES
+9. DO NOT USE MARKDOWN CODE BLOCKS - RETURN RAW TEXT ONLY
 
-2. **Website Content**: What are the main products/services offered? What key features or benefits are highlighted?
+URL TO ANALYZE: ${query}
 
-3. **Target Audience**: Who appears to be their target audience based on the content and messaging?
+REQUIRED TEXT STRUCTURE:
+industry: [The industry this brand operates in]
+target_audience: [Who their target audience is]
+value_proposition: [Their main value proposition or what they offer]
+main_services: [Service 1, Service 2, Service 3]
 
-4. **Website Design & UX**: How is the website designed? What's the user experience like? Any notable design elements?
+RESPONSE FORMAT:
+- Return ONLY these 4 lines in exact format
+- No JSON formatting
+- No additional text or explanations
+- Ensure all 4 fields are present
+- Use "Not found" for missing information
+- Separate multiple services with commas
+- If site is not accessible, return "url_error: [error details]" as first line
+- ABSOLUTELY NO TEXT BEFORE OR AFTER THE 4 LINES - PURE TEXT ONLY
+- NO MARKDOWN CODE BLOCKS - RAW TEXT ONLY`
 
-5. **Technical Aspects**: Any observations about the website's structure, performance, or technical implementation?
-
-6. **Competitive Positioning**: How does this brand position itself in the market? What makes them unique?
-
-7. **Content Quality**: What's the quality and depth of the content? Any gaps or areas for improvement?
-
-Please provide a comprehensive, specific analysis of this actual website, not generic advice about website analysis. Focus on what you can observe from visiting the site.`
-    
     const perplexityResponse = await fetch(`https://api.perplexity.ai/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${Deno.env.get('PERPLEXITY_API_KEY')}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'llama-3.1-sonar-large-128k-online',
@@ -102,58 +99,57 @@ Please provide a comprehensive, specific analysis of this actual website, not ge
             content: analysisQuery
           }
         ],
-        max_tokens: 4000,
+        max_tokens: 1500,
         temperature: 0.1
       })
     })
-
     const responseTime = Date.now() - startTime
-
     if (!perplexityResponse.ok) {
       const errorText = await perplexityResponse.text()
       console.error('Perplexity API error:', perplexityResponse.status, errorText)
       throw new Error(`Perplexity API error: ${perplexityResponse.status} - ${errorText}`)
     }
-
     const perplexityData = await perplexityResponse.json()
     const responseContent = perplexityData.choices[0]?.message?.content
-
     if (!responseContent) {
       throw new Error('No response content from Perplexity')
     }
-
-    // Return the raw text analysis
-    const analysisData = {
-      analysis: responseContent,
-      brand_name: brand_name,
-      query: query
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: analysisData,
-        response_time_ms: responseTime,
-        user_id: user?.id || 'anonymous'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+    // Try to parse the response as JSON, if it fails, return as text
+    let parsedData
+    try {
+      parsedData = JSON.parse(responseContent)
+      console.log('Successfully parsed JSON response')
+    } catch (parseError) {
+      console.log('Failed to parse as JSON, returning as text')
+      parsedData = {
+        analysis: responseContent,
+        brand_name: brand_name,
+        query: query
       }
-    )
-
+    }
+    return new Response(JSON.stringify({
+      success: true,
+      data: parsedData,
+      response_time_ms: responseTime,
+      user_id: user?.id || 'anonymous'
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 200
+    })
   } catch (error) {
     console.error('Perplexity brand search error:', error)
-
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    )
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      },
+      status: 400
+    })
   }
 }) 

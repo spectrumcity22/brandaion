@@ -531,36 +531,33 @@ export default function ClientBrandsForm() {
         
         console.log('AI Response data:', result.data);
         
-        // Parse the nested structure - the actual data is in result.data.analysis as a JSON string
-        let brandSummary = null;
-        
+        // Parse the simple text response from the analysis field
+        let parsedFormData = {
+          industry: '',
+          targetAudience: '',
+          valueProposition: '',
+          mainServices: ''
+        };
+
         if (result.data.analysis) {
-          try {
-            // The analysis field contains a JSON string, so we need to parse it
-            const analysisData = JSON.parse(result.data.analysis);
-            console.log('Parsed analysis data:', analysisData);
-            brandSummary = analysisData.brand_summary;
-          } catch (parseError) {
-            console.error('Failed to parse analysis JSON:', parseError);
-          }
+          // Parse the simple text format: "industry: value\ntarget_audience: value\n..."
+          const lines = result.data.analysis.trim().split('\n');
+          lines.forEach(line => {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('industry:')) {
+              parsedFormData.industry = trimmedLine.replace('industry:', '').trim();
+            } else if (trimmedLine.startsWith('target_audience:')) {
+              parsedFormData.targetAudience = trimmedLine.replace('target_audience:', '').trim();
+            } else if (trimmedLine.startsWith('value_proposition:')) {
+              parsedFormData.valueProposition = trimmedLine.replace('value_proposition:', '').trim();
+            } else if (trimmedLine.startsWith('main_services:')) {
+              parsedFormData.mainServices = trimmedLine.replace('main_services:', '').trim();
+            }
+          });
         }
         
-        console.log('Brand summary:', brandSummary);
-        
-        // Populate the form with AI response data
-        if (brandSummary) {
-          const newFormData = {
-            industry: brandSummary.industry || '',
-            targetAudience: brandSummary.target_audience || '',
-            valueProposition: brandSummary.value_proposition || '',
-            mainServices: brandSummary.main_services?.join(', ') || ''
-          };
-          
-          console.log('Setting form data:', newFormData);
-          setAiFormData(newFormData);
-        } else {
-          console.log('No brand_summary found in response');
-        }
+        console.log('Setting form data:', parsedFormData);
+        setAiFormData(parsedFormData);
         
         setSuccess('✅ AI analysis completed successfully!');
         
