@@ -235,7 +235,7 @@ export default function ClientBrandsForm() {
 
     try {
       console.log('Generating schema.org JSON-LD...');
-      // Generate schema.org JSON-LD
+      // Generate schema.org JSON-LD with AI analysis data
       const schemaOrg = {
         "@context": "https://schema.org",
         "@type": "Brand",
@@ -257,7 +257,29 @@ export default function ClientBrandsForm() {
             "@type": "Organization",
             "name": editingBrand.organisation_name
           }
-        }
+        },
+        "additionalProperty": [
+          {
+            "@type": "PropertyValue",
+            "name": "Industry",
+            "value": aiFormData.industry || "Technology"
+          },
+          {
+            "@type": "PropertyValue", 
+            "name": "Target Audience",
+            "value": aiFormData.targetAudience || "Businesses and brands"
+          },
+          {
+            "@type": "PropertyValue",
+            "name": "Value Proposition", 
+            "value": aiFormData.valueProposition || `AI-powered brand optimization for ${editingBrand.brand_name}`
+          },
+          {
+            "@type": "PropertyValue",
+            "name": "Main Services",
+            "value": aiFormData.mainServices || "Brand Optimization"
+          }
+        ]
       };
 
       console.log('Generated schemaOrg:', schemaOrg);
