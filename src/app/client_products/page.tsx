@@ -22,6 +22,7 @@ interface Product {
   brand_id?: string;
   inserted_at?: string;
   ai_response?: any;
+  competitors?: string;
 }
 
 interface Brand {
@@ -340,7 +341,8 @@ export default function ClientProducts() {
         description: formData.description || '',
         keywords: formData.keywords || '',
         url: formData.url || '',
-        category: formData.category || ''
+        category: formData.category || '',
+        competitors: formData.competitors || ''
       };
 
       // If we have AI form data, convert it to JSON and include it
@@ -692,6 +694,17 @@ export default function ClientProducts() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-gray-300 mb-2 font-medium">Competitors</label>
+                  <input 
+                    name="competitors" 
+                    className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
+                    value={formData.competitors || ''} 
+                    onChange={handleChange} 
+                    placeholder="Direct competitors separated by semicolons"
+                  />
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-gray-300 mb-2 font-medium">Description</label>
                   <textarea 
@@ -770,17 +783,6 @@ export default function ClientProducts() {
                       placeholder="Key features separated by semicolons"
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-gray-300 mb-2 font-medium">Competitors</label>
-                    <textarea
-                      name="competitors"
-                      value={aiFormData.competitors}
-                      onChange={handleAIFormChange}
-                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                      rows={2}
-                      placeholder="Direct competitors separated by semicolons"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -820,87 +822,6 @@ export default function ClientProducts() {
                 </button>
               </div>
             </form>
-
-            {/* AI Response Display */}
-            {aiResponse && (
-              <div className="mt-6 bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">🤖 Product Analysis</h3>
-                  <button
-                    onClick={closeAIPanel}
-                    className="text-gray-400 hover:text-white text-sm"
-                  >
-                    Close
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-gray-300 mb-2 font-medium">Industry</label>
-                    <input
-                      type="text"
-                      value={aiFormData.industry}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, industry: e.target.value }))}
-                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                      placeholder="e.g., Technology, Automotive, SaaS"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 mb-2 font-medium">Target Audience</label>
-                    <input
-                      type="text"
-                      value={aiFormData.targetAudience}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, targetAudience: e.target.value }))}
-                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                      placeholder="e.g., Small businesses; Enterprise clients"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 mb-2 font-medium">Value Proposition</label>
-                    <textarea
-                      value={aiFormData.valueProposition}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, valueProposition: e.target.value }))}
-                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                      rows={3}
-                      placeholder="What problem does this product solve?"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 mb-2 font-medium">Main Features</label>
-                    <textarea
-                      value={aiFormData.mainFeatures}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, mainFeatures: e.target.value }))}
-                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                      rows={3}
-                      placeholder="Key features separated by semicolons"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-300 mb-2 font-medium">Competitors</label>
-                    <textarea
-                      value={aiFormData.competitors}
-                      onChange={(e) => setAiFormData(prev => ({ ...prev, competitors: e.target.value }))}
-                      className="w-full p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                      rows={3}
-                      placeholder="Direct competitors separated by semicolons"
-                    />
-                  </div>
-
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      onClick={handleSubmit}
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-colors"
-                    >
-                      💾 Save & Generate Schema
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -932,7 +853,7 @@ export default function ClientProducts() {
             </div>
           ) : (
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Object.values(productsByBrand).map(({ brand, products: brandProducts }) => (
                   <div key={brand.id} className="bg-gray-900/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-6">
@@ -965,7 +886,7 @@ export default function ClientProducts() {
                         </button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="space-y-4">
                         {brandProducts.map((product) => (
                           <div key={product.id} className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4 hover:border-gray-500/50 transition-all duration-200">
                             <div className="flex items-start justify-between mb-3">
