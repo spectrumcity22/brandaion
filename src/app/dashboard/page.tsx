@@ -511,7 +511,7 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <button
-                      onClick={() => router.push('/client_product_persona_form')}
+                      onClick={() => router.push('/client_personas')}
                       className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition-colors"
                     >
                       Go
@@ -906,7 +906,7 @@ export default function Dashboard() {
             </button>
             
             <button
-              onClick={() => router.push('/client_product_persona_form')}
+              onClick={() => router.push('/client_personas')}
               className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-105"
             >
               Manage Personas

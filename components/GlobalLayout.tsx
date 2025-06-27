@@ -49,7 +49,7 @@ export default function GlobalLayout({ children }: { children: React.ReactNode }
                 <div className="absolute left-0 mt-2 w-48 bg-black border border-gray-700 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50">
                   <Link href="/client_brands_form" className="block px-4 py-2 hover:bg-gray-800">Brand Management</Link>
                   <Link href="/client_products" className="block px-4 py-2 hover:bg-gray-800">Product Management</Link>
-                  <Link href="/client_product_persona_form" className="block px-4 py-2 hover:bg-gray-800">Persona Management</Link>
+                  <Link href="/client_personas" className="block px-4 py-2 hover:bg-gray-800">Persona Management</Link>
                 </div>
               </div>
               <Link href="/invoice_confirmation" className="hover:text-yellow-400">Invoice Payment</Link>

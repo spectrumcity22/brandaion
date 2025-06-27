@@ -351,7 +351,7 @@ export default function Schedule() {
             {productExists && (
               <div className="mt-6 text-center">
                 <button
-                  onClick={() => router.push('/client_product_persona_form')}
+                  onClick={() => router.push('/client_personas')}
                   className="premium-button"
                 >
                   🎭 Create Product Persona
