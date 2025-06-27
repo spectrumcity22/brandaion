@@ -624,20 +624,20 @@ export default function ClientPersonas() {
                       placeholder="e.g. jargon, slang, negative words, etc."
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Terms that don't align with your brand voice or should be avoided
+                      Terms that don&apos;t align with your brand voice or should be avoided
                     </p>
                   </div>
 
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Content Do's & Don'ts
+                      Content Do&apos;s &amp; Don&apos;ts
                     </label>
                     <textarea
                       name="content_dos_and_donts"
                       value={formData.content_dos_and_donts || ''}
                       onChange={handleChange}
                       className="glass-input w-full p-4 h-24 resize-none"
-                      placeholder="List specific do's and don'ts for your content..."
+                      placeholder="List specific do&apos;s and don&apos;ts for your content..."
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       Specific guidelines for what to include or avoid in your content
