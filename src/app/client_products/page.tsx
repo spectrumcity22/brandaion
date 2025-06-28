@@ -83,6 +83,7 @@ export default function ClientProducts() {
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [keywordsLoading, setKeywordsLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -729,6 +730,86 @@ export default function ClientProducts() {
     }
   };
 
+  const generateKeywords = async () => {
+    if (keywordsLoading) return;
+
+    // Check if we have enough data to generate keywords
+    if (!formData.product_name && !formData.description) {
+      setError('Please provide a product name and description before generating keywords.');
+      return;
+    }
+
+    setKeywordsLoading(true);
+    setError('');
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError('User not authenticated.');
+        return;
+      }
+
+      // Create a schema_json object for the AI to analyze
+      const schemaData = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": formData.product_name || '',
+        "description": formData.description || '',
+        "keywords": formData.keywords || '',
+        "url": formData.url || '',
+        "organisation": {
+          "@type": "Organization",
+          "name": formData.organisation || ''
+        },
+        "user_defined_category": formData.category || '',
+        "industry": formData.industry || '',
+        "subcategory": formData.subcategory || '',
+        "ai_defined_industry": aiFormData.industry || '',
+        "targetAudience": aiFormData.targetAudience || '',
+        "valueProposition": aiFormData.valueProposition || '',
+        "mainFeatures": aiFormData.mainFeatures || '',
+        "competitors": aiFormData.competitors || ''
+      };
+
+      const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/generate_keywords', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          schema_json: schemaData
+        })
+      });
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: Failed to generate keywords`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Could not parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.keywords) {
+        setFormData(prev => ({ ...prev, keywords: result.keywords }));
+        setSuccess('✅ Keywords generated successfully!');
+      } else {
+        throw new Error(result.error || 'Failed to generate keywords');
+      }
+
+    } catch (err: any) {
+      console.error('Keyword Generation Error:', err);
+      setError(`❌ Keyword generation failed: ${err.message}`);
+    } finally {
+      setKeywordsLoading(false);
+    }
+  };
+
   const productsByBrand = getProductsByBrand();
   const totalProducts = products.length;
   const activeProducts = products.filter(p => p.product_name && p.product_name.trim() !== '').length;
@@ -896,17 +977,6 @@ export default function ClientProducts() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Keywords</label>
-                  <input 
-                    name="keywords" 
-                    className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                    value={formData.keywords || ''} 
-                    onChange={handleChange} 
-                  />
-                  <small className="text-gray-400">Enter keywords separated by commas (e.g., AI, automation, SaaS, productivity)</small>
-                </div>
-
-                <div>
                   <label className="block text-gray-300 mb-2 font-medium">Product URL</label>
                   <input 
                     name="url" 
@@ -1023,6 +1093,46 @@ export default function ClientProducts() {
                       placeholder="Direct competitors separated by semicolons"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* AI Keyword Generation Section */}
+              <div className="border-t border-gray-700/50 pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">AI Keyword Generation</h3>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-gray-300 mb-2 font-medium">Keywords</label>
+                  <div className="flex space-x-3">
+                    <input 
+                      name="keywords" 
+                      className="flex-1 p-3 rounded-lg bg-gray-700/30 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
+                      value={formData.keywords || ''} 
+                      onChange={handleChange} 
+                      placeholder="AI-generated keywords will appear here"
+                    />
+                    <button
+                      type="button"
+                      onClick={generateKeywords}
+                      disabled={keywordsLoading || !formData.product_name || !formData.description}
+                      className={`px-4 py-3 rounded-lg transition-colors ${
+                        keywordsLoading || !formData.product_name || !formData.description
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : 'bg-green-600 hover:bg-green-700 text-white'
+                      }`}
+                    >
+                      {keywordsLoading ? (
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Generating...
+                        </div>
+                      ) : (
+                        'Generate Keywords'
+                      )}
+                    </button>
+                  </div>
+                  <small className="text-gray-400">AI will analyze your product and generate comprehensive, relevant keywords</small>
                 </div>
               </div>
 
