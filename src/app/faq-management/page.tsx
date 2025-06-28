@@ -551,7 +551,7 @@ export default function FAQManagement() {
                   {batch.faqPairs.map((faq) => (
                     <div key={faq.id} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       {/* Topic Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full items-start text-left">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Topic</h4>
                           <button
@@ -594,7 +594,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Question Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full items-start text-left">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
@@ -655,7 +655,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Answer Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full items-start text-left">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Answer</h4>
                           {faq.ai_response_answers && (
