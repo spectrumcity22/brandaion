@@ -852,12 +852,17 @@ export default function FAQManagement() {
                    >
                      {aiRefineLoading ? 'Refining...' : 'Request AI Refinement'}
                    </button>
-                  <button
-                    onClick={() => setAiRefineModalOpen(false)}
-                    className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
-                  >
-                    Cancel
-                  </button>
+                                     <button
+                     onClick={() => {
+                       setAiRefineModalOpen(false);
+                       setAiRefineStep('prompt');
+                       setAiRefinePrompt('');
+                       setAiRefineImprovedQuestion('');
+                     }}
+                     className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
+                   >
+                     Cancel
+                   </button>
                 </div>
               </>
             ) : (
@@ -896,6 +901,17 @@ export default function FAQManagement() {
                      className="bg-orange-500 text-white px-3 py-2 rounded text-sm"
                    >
                      Request Another
+                   </button>
+                   <button
+                     onClick={() => {
+                       setAiRefineModalOpen(false);
+                       setAiRefineStep('prompt');
+                       setAiRefinePrompt('');
+                       setAiRefineImprovedQuestion('');
+                     }}
+                     className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
+                   >
+                     Cancel
                    </button>
                 </div>
               </>
