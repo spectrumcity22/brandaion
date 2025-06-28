@@ -258,14 +258,13 @@ export default function FAQManagement() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'question_approved':
+        return 'bg-green-600 text-white border-green-400';
       case 'approved':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'completed':
-        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+        return 'bg-green-600 text-white border-green-400';
       case 'pending':
-        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+        return 'bg-amber-500 text-white border-amber-400';
       default:
-        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+        return 'bg-gray-700 text-gray-300 border-gray-500';
     }
   };
 
@@ -551,7 +550,7 @@ export default function FAQManagement() {
                   {batch.faqPairs.map((faq) => (
                     <div key={faq.id} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       {/* Topic Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full items-start text-left">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Topic</h4>
                           <button
@@ -594,7 +593,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Question Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full items-start text-left">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
@@ -634,7 +633,7 @@ export default function FAQManagement() {
                           <p className="text-white text-sm mb-4">{faq.question}</p>
                         )}
 
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-row items-start justify-between w-full mt-auto">
                           <Chip 
                             label={getStatusText(faq.question_status)} 
                             className={`${getStatusColor(faq.question_status)} text-xs text-white`} 
@@ -655,7 +654,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Answer Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full items-start text-left">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Answer</h4>
                           {faq.ai_response_answers && (
@@ -701,7 +700,7 @@ export default function FAQManagement() {
                               <p className="text-gray-500 text-sm italic">No answer generated yet</p>
                             )}
                             
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-row items-start justify-between w-full mt-auto">
                               <Chip 
                                 label={getStatusText(faq.answer_status)} 
                                 className={`${getStatusColor(faq.answer_status)} text-xs text-white`} 
