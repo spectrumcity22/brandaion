@@ -593,7 +593,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Question Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full min-h-[80px]">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
@@ -654,7 +654,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Answer Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full min-h-[180px]">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Answer</h4>
                           {faq.ai_response_answers && (
