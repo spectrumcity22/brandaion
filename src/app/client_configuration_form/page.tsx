@@ -572,7 +572,13 @@ export default function ClientConfigurationForm() {
                             <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
                               Run Report
                             </button>
-                            <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push('/chat-agent');
+                              }}
+                              className="flex-1 px-3 py-1.5 bg-blue-600/50 hover:bg-blue-600/70 text-blue-300 hover:text-blue-200 text-xs rounded-lg transition-colors"
+                            >
                               Chat
                             </button>
                           </div>
@@ -652,7 +658,13 @@ export default function ClientConfigurationForm() {
                             <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
                               Run Report
                             </button>
-                            <button className="flex-1 px-3 py-1.5 bg-gray-700/50 text-gray-400 text-xs rounded-lg cursor-not-allowed opacity-50">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push('/chat-agent');
+                              }}
+                              className="flex-1 px-3 py-1.5 bg-blue-600/50 hover:bg-blue-600/70 text-blue-300 hover:text-blue-200 text-xs rounded-lg transition-colors"
+                            >
                               Chat
                             </button>
                           </div>

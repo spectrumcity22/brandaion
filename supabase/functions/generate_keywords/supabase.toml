@@ -1,0 +1,2 @@
+[functions.generate_keywords]
+verify_jwt = false 
