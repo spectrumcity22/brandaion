@@ -63,6 +63,7 @@ Please consider this context when providing your response.`;
     }
 
     // Call Perplexity API with the collection/agent
+    console.log('Making Perplexity API call...');
     const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -93,12 +94,18 @@ Please consider this context when providing your response.`;
       })
     });
 
+    console.log('Perplexity response status:', perplexityResponse.status);
+    
     if (!perplexityResponse.ok) {
       const errorText = await perplexityResponse.text();
-      console.error('Perplexity API error:', perplexityResponse.status, errorText);
+      console.error('Perplexity API error details:', {
+        status: perplexityResponse.status,
+        statusText: perplexityResponse.statusText,
+        errorText: errorText
+      });
       return NextResponse.json({ 
         error: 'AI service error', 
-        details: `Perplexity API error: ${perplexityResponse.status}` 
+        details: `Perplexity API error: ${perplexityResponse.status} - ${errorText}` 
       }, { status: 500 });
     }
 
