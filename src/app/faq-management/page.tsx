@@ -593,8 +593,8 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Question Card */}
-                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full ${faq.ai_response_answers ? 'h-[320px]' : 'h-[180px]'}`}>
-                        <div className="flex items-start justify-between mb-3">
+                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full ${faq.ai_response_answers ? 'h-[480px]' : 'h-[160px]'}`}>
+                        <div className="flex flex-row items-start justify-between w-full mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
                             onClick={() => setEditingQuestion(prev => ({ ...prev, [faq.id]: faq.question }))}
@@ -608,13 +608,13 @@ export default function FAQManagement() {
                         </div>
                         
                         {editingQuestion[faq.id] !== undefined ? (
-                          <div className="space-y-2">
+                          <div className="flex flex-col flex-1 w-full">
                             <textarea
                               value={editingQuestion[faq.id]}
                               onChange={(e) => setEditingQuestion(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1"
+                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0"
                             />
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 mt-2">
                               <button
                                 onClick={() => handleSaveEdit(faq.id, 'question', editingQuestion[faq.id])}
                                 className="bg-green-600 text-white px-3 py-1 rounded text-xs"
@@ -654,8 +654,8 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Answer Card */}
-                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full ${faq.ai_response_answers ? 'h-[320px]' : 'h-[180px]'}`}>
-                        <div className="flex items-start justify-between mb-3">
+                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full ${faq.ai_response_answers ? 'h-[480px]' : 'h-[160px]'}`}>
+                        <div className="flex flex-row items-start justify-between w-full mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Answer</h4>
                           {faq.ai_response_answers && (
                             <button
@@ -671,11 +671,11 @@ export default function FAQManagement() {
                         </div>
                         
                         {editingAnswer[faq.id] !== undefined ? (
-                          <div className="space-y-2">
+                          <div className="flex flex-col flex-1 w-full">
                             <textarea
                               value={editingAnswer[faq.id]}
                               onChange={(e) => setEditingAnswer(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1"
+                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0"
                             />
                             <div className="flex gap-2">
                               <button
