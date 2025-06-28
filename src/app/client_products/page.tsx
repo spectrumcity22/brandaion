@@ -898,7 +898,7 @@ export default function ClientProducts() {
                     </>}
                     {/* Add more as needed */}
                   </select>
-                  <small className="text-gray-400">Select a subcategory for the chosen industry to further describe your product's focus.</small>
+                  <small className="text-gray-400">Select a subcategory for the chosen industry to further describe your product&apos;s focus.</small>
                 </div>
               </div>
 
