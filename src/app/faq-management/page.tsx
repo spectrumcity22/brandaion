@@ -612,7 +612,7 @@ export default function FAQManagement() {
                             <textarea
                               value={editingQuestion[faq.id]}
                               onChange={(e) => setEditingQuestion(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0"
+                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0 h-full"
                             />
                             <div className="flex gap-2 mt-2">
                               <button
@@ -671,11 +671,11 @@ export default function FAQManagement() {
                         </div>
                         
                         {editingAnswer[faq.id] !== undefined ? (
-                          <div className="flex flex-col flex-1 w-full">
+                          <div className="flex-1 flex flex-col w-full h-full">
                             <textarea
                               value={editingAnswer[faq.id]}
                               onChange={(e) => setEditingAnswer(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0"
+                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0 h-full"
                             />
                             <div className="flex gap-2">
                               <button
