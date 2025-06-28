@@ -760,32 +760,107 @@ export default function FAQManagement() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
           <div className="bg-white p-8 rounded-lg">
             <h2 className="text-2xl font-bold mb-4">AI Refine Prompt</h2>
-            <textarea
-              value={aiRefinePrompt}
-              onChange={(e) => setAiRefinePrompt(e.target.value)}
-              className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
-            />
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => {
-                  setAiRefineLoading(true);
-                  setTimeout(() => {
-                    if (aiRefineTargetId !== null) setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId]: 'Mock improved question' }));
-                    setAiRefineModalOpen(false);
-                    setAiRefineLoading(false);
-                  }, 1000);
-                }}
-                className="bg-blue-500 text-white px-3 py-2 rounded text-sm"
-              >
-                Refine with AI
-              </button>
-              <button
-                onClick={() => setAiRefineModalOpen(false)}
-                className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
-              >
-                Cancel
-              </button>
-            </div>
+            {aiRefineStep === 'prompt' ? (
+              <>
+                <div className="space-y-2 mb-4">
+                  <label htmlFor="topic" className="text-sm font-semibold text-gray-400">Topic</label>
+                  <input
+                    type="text"
+                    id="topic"
+                    value={editingTopic[aiRefineTargetId || 0] || ''}
+                    onChange={(e) => setEditingTopic(prev => ({ ...prev, [aiRefineTargetId || 0]: e.target.value }))}
+                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+                    readOnly
+                  />
+                </div>
+                <div className="space-y-2 mb-4">
+                  <label htmlFor="question" className="text-sm font-semibold text-gray-400">Question</label>
+                  <input
+                    type="text"
+                    id="question"
+                    value={editingQuestion[aiRefineTargetId || 0] || ''}
+                    onChange={(e) => setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId || 0]: e.target.value }))}
+                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+                    readOnly
+                  />
+                </div>
+                <div className="space-y-2 mb-4">
+                  <label htmlFor="instructions" className="text-sm font-semibold text-gray-400">Instructions</label>
+                  <textarea
+                    id="instructions"
+                    value={aiRefinePrompt}
+                    onChange={(e) => setAiRefinePrompt(e.target.value)}
+                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+                    placeholder="Enter instructions for the AI"
+                  />
+                </div>
+                <div className="space-y-2 mb-4">
+                  <label htmlFor="prompt" className="text-sm font-semibold text-gray-400">Prompt</label>
+                  <textarea
+                    id="prompt"
+                    value={aiRefinePrompt}
+                    onChange={(e) => setAiRefinePrompt(e.target.value)}
+                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+                    placeholder="Enter the prompt for the AI"
+                  />
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setAiRefineLoading(true);
+                      setTimeout(() => {
+                        if (aiRefineTargetId !== null) setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId]: 'Mock improved question' }));
+                        setAiRefineModalOpen(false);
+                        setAiRefineLoading(false);
+                      }, 1000);
+                    }}
+                    className="bg-blue-500 text-white px-3 py-2 rounded text-sm"
+                  >
+                    Request AI Refinement
+                  </button>
+                  <button
+                    onClick={() => setAiRefineModalOpen(false)}
+                    className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2 mb-4">
+                  <label htmlFor="improvedQuestion" className="text-sm font-semibold text-gray-400">Improved Question</label>
+                  <textarea
+                    id="improvedQuestion"
+                    value={aiRefineImprovedQuestion}
+                    onChange={(e) => setAiRefineImprovedQuestion(e.target.value)}
+                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+                    placeholder="Enter the improved question"
+                  />
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setAiRefineLoading(true);
+                      setTimeout(() => {
+                        if (aiRefineTargetId !== null) setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId]: aiRefineImprovedQuestion }));
+                        setAiRefineModalOpen(false);
+                        setAiRefineLoading(false);
+                      }, 1000);
+                    }}
+                    className="bg-blue-500 text-white px-3 py-2 rounded text-sm"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={() => setAiRefineModalOpen(false)}
+                    className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
+                  >
+                    Request Another
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
