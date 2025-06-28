@@ -23,6 +23,8 @@ interface Product {
   inserted_at?: string;
   ai_response?: any;
   logo_url?: string;
+  industry?: string;
+  subcategory?: string;
 }
 
 interface Brand {
@@ -343,7 +345,9 @@ export default function ClientProducts() {
         description: formData.description || '',
         keywords: formData.keywords || '',
         url: formData.url || '',
-        category: formData.category || ''
+        category: formData.category || '',
+        industry: formData.industry || '',
+        subcategory: formData.subcategory || ''
       };
 
       // Upload logo if present
@@ -826,6 +830,7 @@ export default function ClientProducts() {
                     value={formData.keywords || ''} 
                     onChange={handleChange} 
                   />
+                  <small className="text-gray-400">Enter keywords separated by commas (e.g., AI, automation, SaaS).</small>
                 </div>
 
                 <div>
@@ -862,6 +867,38 @@ export default function ClientProducts() {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2 font-medium">Industry</label>
+                  <select name="industry" value={formData.industry || ''} onChange={handleChange} className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
+                    <option value="">Select Industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                  </select>
+                  <small className="text-gray-400">Choose the main industry that best fits your product. This list is tailored to your organisation.</small>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2 font-medium">Industry Subcategory</label>
+                  <select name="subcategory" value={formData.subcategory || ''} onChange={handleChange} className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
+                    <option value="">Select Subcategory</option>
+                    {/* Example subcategories, can be dynamic */}
+                    {formData.industry === 'Technology' && <>
+                      <option value="SaaS">SaaS</option>
+                      <option value="AI">AI</option>
+                      <option value="Cloud">Cloud</option>
+                    </>}
+                    {formData.industry === 'Healthcare' && <>
+                      <option value="MedTech">MedTech</option>
+                      <option value="Pharma">Pharma</option>
+                    </>}
+                    {/* Add more as needed */}
+                  </select>
+                  <small className="text-gray-400">Select a subcategory for the chosen industry to further describe your product's focus.</small>
                 </div>
               </div>
 
