@@ -326,6 +326,7 @@ export default function FAQManagement() {
                 label="Product Discovery" 
                 className="bg-blue-600/80 text-white border-blue-400/80" 
                 size="small" 
+                style={{ color: '#fff' }}
               />
             </div>
             
@@ -362,6 +363,7 @@ export default function FAQManagement() {
               onClick={() => handleGenerateQuestions('faq')}
               disabled={generatingQuestions || pendingBatches.length === 0}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              style={{ color: '#fff' }}
             >
               {generatingQuestions ? (
                 <span className="flex items-center gap-2">
@@ -389,6 +391,7 @@ export default function FAQManagement() {
                 label="Brand Discovery" 
                 className="bg-purple-600/80 text-white border-purple-400/80" 
                 size="small" 
+                style={{ color: '#fff' }}
               />
             </div>
             
@@ -425,6 +428,7 @@ export default function FAQManagement() {
               onClick={() => handleGenerateQuestions('conversational')}
               disabled={generatingQuestions || pendingBatches.length === 0}
               className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+              style={{ color: '#fff' }}
             >
               {generatingQuestions ? (
                 <span className="flex items-center gap-2">
@@ -528,6 +532,7 @@ export default function FAQManagement() {
                       }}
                       className="ml-4 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 shadow-lg px-6 py-2 rounded-lg text-lg font-bold flex items-center gap-2"
                       disabled={batchApproving[batch.batchId]}
+                      style={{ color: '#fff' }}
                     >
                       {batchApproving[batch.batchId] ? (
                         <span className="flex items-center gap-2">
@@ -634,12 +639,14 @@ export default function FAQManagement() {
                             label={getStatusText(faq.question_status)} 
                             className={`${getStatusColor(faq.question_status)} text-xs text-white`} 
                             size="small" 
+                            style={{ color: '#fff' }}
                           />
                           {faq.question_status !== 'question_approved' && (
                             <button
                               onClick={() => handleApproveQuestion(faq.id)}
                               disabled={approvingQuestions[faq.id]}
                               className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50"
+                              style={{ color: '#fff' }}
                             >
                               {approvingQuestions[faq.id] ? 'Approving...' : 'Approve'}
                             </button>
@@ -699,12 +706,14 @@ export default function FAQManagement() {
                                 label={getStatusText(faq.answer_status)} 
                                 className={`${getStatusColor(faq.answer_status)} text-xs text-white`} 
                                 size="small" 
+                                style={{ color: '#fff' }}
                               />
                               {faq.ai_response_answers && faq.answer_status !== 'approved' && (
                                 <button
                                   onClick={() => handleApproveAnswer(faq.id)}
                                   disabled={approvingAnswers[faq.id]}
                                   className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50"
+                                  style={{ color: '#fff' }}
                                 >
                                   {approvingAnswers[faq.id] ? 'Approving...' : 'Approve'}
                                 </button>
