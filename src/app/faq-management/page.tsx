@@ -603,11 +603,7 @@ export default function FAQManagement() {
                         <div className="flex items-start justify-between w-full mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
-                            onClick={() => {
-                              setAiRefineModalOpen(true);
-                              setAiRefineTargetId(faq.id);
-                              setAiRefinePrompt('');
-                            }}
+                            onClick={() => setEditingQuestion(prev => ({ ...prev, [faq.id]: faq.question }))}
                             className="text-gray-400 hover:text-white transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -630,6 +626,18 @@ export default function FAQManagement() {
                                 className="bg-green-600 text-white px-3 py-1 rounded text-xs"
                               >
                                 Save
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setAiRefineModalOpen(true);
+                                  setAiRefineTargetId(faq.id);
+                                  setAiRefinePrompt('');
+                                  setAiRefineStep('prompt');
+                                  setAiRefineImprovedQuestion('');
+                                }}
+                                className="bg-blue-500 text-white px-3 py-1 rounded text-xs"
+                              >
+                                Refine with AI
                               </button>
                               <button
                                 onClick={() => setEditingQuestion(prev => { const newState = { ...prev }; delete newState[faq.id]; return newState; })}
@@ -762,28 +770,26 @@ export default function FAQManagement() {
             <h2 className="text-2xl font-bold mb-4">AI Refine Prompt</h2>
             {aiRefineStep === 'prompt' ? (
               <>
-                <div className="space-y-2 mb-4">
-                  <label htmlFor="topic" className="text-sm font-semibold text-gray-400">Topic</label>
-                  <input
-                    type="text"
-                    id="topic"
-                    value={editingTopic[aiRefineTargetId || 0] || ''}
-                    onChange={(e) => setEditingTopic(prev => ({ ...prev, [aiRefineTargetId || 0]: e.target.value }))}
-                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
-                    readOnly
-                  />
-                </div>
-                <div className="space-y-2 mb-4">
-                  <label htmlFor="question" className="text-sm font-semibold text-gray-400">Question</label>
-                  <input
-                    type="text"
-                    id="question"
-                    value={editingQuestion[aiRefineTargetId || 0] || ''}
-                    onChange={(e) => setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId || 0]: e.target.value }))}
-                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
-                    readOnly
-                  />
-                </div>
+                                 <div className="space-y-2 mb-4">
+                   <label htmlFor="topic" className="text-sm font-semibold text-gray-400">Topic</label>
+                   <input
+                     type="text"
+                     id="topic"
+                     value={faqPairs.find(f => f.id === aiRefineTargetId)?.topic || ''}
+                     className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+                     readOnly
+                   />
+                 </div>
+                 <div className="space-y-2 mb-4">
+                   <label htmlFor="question" className="text-sm font-semibold text-gray-400">Question</label>
+                   <input
+                     type="text"
+                     id="question"
+                     value={faqPairs.find(f => f.id === aiRefineTargetId)?.question || ''}
+                     className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+                     readOnly
+                   />
+                 </div>
                 <div className="space-y-2 mb-4">
                   <label htmlFor="instructions" className="text-sm font-semibold text-gray-400">Instructions</label>
                   <textarea
