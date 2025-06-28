@@ -361,7 +361,7 @@ export default function FAQManagement() {
               color="primary"
               onClick={() => handleGenerateQuestions('faq')}
               disabled={generatingQuestions || pendingBatches.length === 0}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
             >
               {generatingQuestions ? (
                 <span className="flex items-center gap-2">
@@ -424,7 +424,7 @@ export default function FAQManagement() {
               color="secondary"
               onClick={() => handleGenerateQuestions('conversational')}
               disabled={generatingQuestions || pendingBatches.length === 0}
-              className="w-full bg-purple-600 hover:bg-purple-700"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
             >
               {generatingQuestions ? (
                 <span className="flex items-center gap-2">
@@ -632,7 +632,7 @@ export default function FAQManagement() {
                         <div className="flex items-center justify-between">
                           <Chip 
                             label={getStatusText(faq.question_status)} 
-                            className={`${getStatusColor(faq.question_status)} text-xs`} 
+                            className={`${getStatusColor(faq.question_status)} text-xs text-white`} 
                             size="small" 
                           />
                           {faq.question_status !== 'question_approved' && (
@@ -697,7 +697,7 @@ export default function FAQManagement() {
                             <div className="flex items-center justify-between">
                               <Chip 
                                 label={getStatusText(faq.answer_status)} 
-                                className={`${getStatusColor(faq.answer_status)} text-xs`} 
+                                className={`${getStatusColor(faq.answer_status)} text-xs text-white`} 
                                 size="small" 
                               />
                               {faq.ai_response_answers && faq.answer_status !== 'approved' && (
