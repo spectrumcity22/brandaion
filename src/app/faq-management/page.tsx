@@ -793,7 +793,7 @@ export default function FAQManagement() {
                                  <div className="space-y-2 mb-4">
                    <label htmlFor="instructions" className="text-sm font-semibold text-gray-400">Instructions</label>
                    <p className="text-sm text-gray-600 mb-2">
-                     Describe how you'd like the AI to improve this question. For example: "Make it more concise", "Make it more engaging", "Focus on business benefits", etc.
+                     Describe how you&apos;d like the AI to improve this question. For example: &quot;Make it more concise&quot;, &quot;Make it more engaging&quot;, &quot;Focus on business benefits&quot;, etc.
                    </p>
                  </div>
                  <div className="space-y-2 mb-4">
@@ -803,7 +803,7 @@ export default function FAQManagement() {
                      value={aiRefinePrompt}
                      onChange={(e) => setAiRefinePrompt(e.target.value)}
                      className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm h-24"
-                     placeholder="Describe how you'd like the AI to improve this question..."
+                     placeholder="Describe how you&apos;d like the AI to improve this question..."
                    />
                  </div>
                 <div className="mt-4 flex gap-2">
