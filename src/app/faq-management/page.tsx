@@ -790,40 +790,68 @@ export default function FAQManagement() {
                      readOnly
                    />
                  </div>
-                <div className="space-y-2 mb-4">
-                  <label htmlFor="instructions" className="text-sm font-semibold text-gray-400">Instructions</label>
-                  <textarea
-                    id="instructions"
-                    value={aiRefinePrompt}
-                    onChange={(e) => setAiRefinePrompt(e.target.value)}
-                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
-                    placeholder="Enter instructions for the AI"
-                  />
-                </div>
-                <div className="space-y-2 mb-4">
-                  <label htmlFor="prompt" className="text-sm font-semibold text-gray-400">Prompt</label>
-                  <textarea
-                    id="prompt"
-                    value={aiRefinePrompt}
-                    onChange={(e) => setAiRefinePrompt(e.target.value)}
-                    className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
-                    placeholder="Enter the prompt for the AI"
-                  />
-                </div>
+                                 <div className="space-y-2 mb-4">
+                   <label htmlFor="instructions" className="text-sm font-semibold text-gray-400">Instructions</label>
+                   <p className="text-sm text-gray-600 mb-2">
+                     Describe how you'd like the AI to improve this question. For example: "Make it more concise", "Make it more engaging", "Focus on business benefits", etc.
+                   </p>
+                 </div>
+                 <div className="space-y-2 mb-4">
+                   <label htmlFor="prompt" className="text-sm font-semibold text-gray-400">Your Feedback</label>
+                   <textarea
+                     id="prompt"
+                     value={aiRefinePrompt}
+                     onChange={(e) => setAiRefinePrompt(e.target.value)}
+                     className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm h-24"
+                     placeholder="Describe how you'd like the AI to improve this question..."
+                   />
+                 </div>
                 <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => {
-                      setAiRefineLoading(true);
-                      setTimeout(() => {
-                        if (aiRefineTargetId !== null) setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId]: 'Mock improved question' }));
-                        setAiRefineModalOpen(false);
-                        setAiRefineLoading(false);
-                      }, 1000);
-                    }}
-                    className="bg-blue-500 text-white px-3 py-2 rounded text-sm"
-                  >
-                    Request AI Refinement
-                  </button>
+                                     <button
+                     onClick={async () => {
+                       setAiRefineLoading(true);
+                       try {
+                         const { data: { session } } = await supabase.auth.getSession();
+                         if (!session) throw new Error("No active session");
+
+                         const currentFaq = faqPairs.find(f => f.id === aiRefineTargetId);
+                         if (!currentFaq) throw new Error("FAQ not found");
+
+                         const response = await fetch("https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/refinement_agent", {
+                           method: "POST",
+                           headers: {
+                             "Content-Type": "application/json",
+                             "Authorization": `Bearer ${session.access_token}`,
+                             "x-client-info": "supabase-js/2.39.3",
+                             "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+                           },
+                           body: JSON.stringify({
+                             topic: currentFaq.topic,
+                             question: currentFaq.question,
+                             userFeedback: aiRefinePrompt
+                           }),
+                         });
+
+                         if (!response.ok) {
+                           const errorData = await response.json();
+                           throw new Error(`API Error: ${errorData.error || response.statusText}`);
+                         }
+
+                         const result = await response.json();
+                         setAiRefineImprovedQuestion(result.improvedQuestion || result.question || 'No improved question returned');
+                         setAiRefineStep('result');
+                                               } catch (error) {
+                          console.error('Error calling refinement agent:', error);
+                          setError(`Failed to refine question: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                        } finally {
+                         setAiRefineLoading(false);
+                       }
+                     }}
+                     className="bg-blue-500 text-white px-3 py-2 rounded text-sm"
+                     disabled={aiRefineLoading || !aiRefinePrompt.trim()}
+                   >
+                     {aiRefineLoading ? 'Refining...' : 'Request AI Refinement'}
+                   </button>
                   <button
                     onClick={() => setAiRefineModalOpen(false)}
                     className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
@@ -845,25 +873,30 @@ export default function FAQManagement() {
                   />
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => {
-                      setAiRefineLoading(true);
-                      setTimeout(() => {
-                        if (aiRefineTargetId !== null) setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId]: aiRefineImprovedQuestion }));
-                        setAiRefineModalOpen(false);
-                        setAiRefineLoading(false);
-                      }, 1000);
-                    }}
-                    className="bg-blue-500 text-white px-3 py-2 rounded text-sm"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => setAiRefineModalOpen(false)}
-                    className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
-                  >
-                    Request Another
-                  </button>
+                                     <button
+                     onClick={() => {
+                       if (aiRefineTargetId !== null) {
+                         setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId]: aiRefineImprovedQuestion }));
+                       }
+                       setAiRefineModalOpen(false);
+                       setAiRefineStep('prompt');
+                       setAiRefinePrompt('');
+                       setAiRefineImprovedQuestion('');
+                     }}
+                     className="bg-green-500 text-white px-3 py-2 rounded text-sm"
+                   >
+                     Accept
+                   </button>
+                                     <button
+                     onClick={() => {
+                       setAiRefineStep('prompt');
+                       setAiRefinePrompt('');
+                       setAiRefineImprovedQuestion('');
+                     }}
+                     className="bg-orange-500 text-white px-3 py-2 rounded text-sm"
+                   >
+                     Request Another
+                   </button>
                 </div>
               </>
             )}
