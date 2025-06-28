@@ -323,8 +323,8 @@ export default function FAQManagement() {
                 </svg>
               </div>
               <Chip 
-                label="Standard" 
-                className="bg-blue-500/20 text-blue-400 border-blue-500/30" 
+                label="Product Discovery" 
+                className="bg-blue-600/80 text-white border-blue-400/80" 
                 size="small" 
               />
             </div>
@@ -386,8 +386,8 @@ export default function FAQManagement() {
                 </svg>
               </div>
               <Chip 
-                label="Advanced" 
-                className="bg-purple-500/20 text-purple-400 border-purple-500/30" 
+                label="Brand Discovery" 
+                className="bg-purple-600/80 text-white border-purple-400/80" 
                 size="small" 
               />
             </div>
@@ -546,7 +546,7 @@ export default function FAQManagement() {
                   {batch.faqPairs.map((faq) => (
                     <div key={faq.id} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       {/* Topic Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Topic</h4>
                           <button
@@ -589,7 +589,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Question Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
@@ -648,7 +648,7 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Answer Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4">
+                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-between h-full">
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Answer</h4>
                           {faq.ai_response_answers && (
@@ -669,7 +669,7 @@ export default function FAQManagement() {
                             <textarea
                               value={editingAnswer[faq.id]}
                               onChange={(e) => setEditingAnswer(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm min-h-[80px]"
+                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm min-h-[180px]"
                             />
                             <div className="flex gap-2">
                               <button
