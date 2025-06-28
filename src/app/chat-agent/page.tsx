@@ -76,14 +76,13 @@ export default function ChatAgentPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: inputMessage,
-          agentId: PERPLEXITY_AGENT_ID,
-          userId: user?.id
+          message: inputMessage
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response from AI agent');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get response from AI agent');
       }
 
       const data = await response.json();
