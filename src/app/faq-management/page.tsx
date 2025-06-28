@@ -550,7 +550,7 @@ export default function FAQManagement() {
                   {batch.faqPairs.map((faq) => (
                     <div key={faq.id} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       {/* Topic Card */}
-                      <div className="bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full">
+                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 text-left h-full ${faq.ai_response_answers ? 'h-[480px]' : 'h-[160px]'}`}>
                         <div className="flex items-start justify-between mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Topic</h4>
                           <button
@@ -570,7 +570,7 @@ export default function FAQManagement() {
                               type="text"
                               value={editingTopic[faq.id]}
                               onChange={(e) => setEditingTopic(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm"
+                              className={`w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm ${faq.ai_response_answers ? 'h-[340px]' : 'h-[100px]'}`}
                             />
                             <div className="flex gap-2">
                               <button
@@ -593,8 +593,8 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Question Card */}
-                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full ${faq.ai_response_answers ? 'h-[480px]' : 'h-[160px]'}`}>
-                        <div className="flex flex-row items-start justify-between w-full mb-3">
+                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 text-left h-full ${faq.ai_response_answers ? 'h-[480px]' : 'h-[160px]'}`}>
+                        <div className="flex items-start justify-between w-full mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
                             onClick={() => setEditingQuestion(prev => ({ ...prev, [faq.id]: faq.question }))}
@@ -608,11 +608,11 @@ export default function FAQManagement() {
                         </div>
                         
                         {editingQuestion[faq.id] !== undefined ? (
-                          <div className="flex flex-col flex-1 w-full">
+                          <div className="flex flex-col w-full">
                             <textarea
                               value={editingQuestion[faq.id]}
                               onChange={(e) => setEditingQuestion(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0 h-full"
+                              className={`w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm ${faq.ai_response_answers ? 'h-[340px]' : 'h-[100px]'}`}
                             />
                             <div className="flex gap-2 mt-2">
                               <button
@@ -633,7 +633,7 @@ export default function FAQManagement() {
                           <p className="text-white text-sm mb-4">{faq.question}</p>
                         )}
 
-                        <div className="flex flex-row items-start justify-between w-full mt-auto">
+                        <div className="flex items-start justify-between w-full mt-auto">
                           <Chip 
                             label={getStatusText(faq.question_status)} 
                             className={`${getStatusColor(faq.question_status)} text-xs text-white`} 
@@ -654,8 +654,8 @@ export default function FAQManagement() {
                       </div>
 
                       {/* Answer Card */}
-                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 flex flex-col justify-start items-start text-left h-full ${faq.ai_response_answers ? 'h-[480px]' : 'h-[160px]'}`}>
-                        <div className="flex flex-row items-start justify-between w-full mb-3">
+                      <div className={`bg-gray-800/50 border border-gray-600/50 rounded-lg p-4 text-left h-full ${faq.ai_response_answers ? 'h-[480px]' : 'h-[160px]'}`}>
+                        <div className="flex items-start justify-between w-full mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Answer</h4>
                           {faq.ai_response_answers && (
                             <button
@@ -671,11 +671,11 @@ export default function FAQManagement() {
                         </div>
                         
                         {editingAnswer[faq.id] !== undefined ? (
-                          <div className="flex-1 flex flex-col w-full h-full">
+                          <div className="flex-1 flex flex-col w-full">
                             <textarea
                               value={editingAnswer[faq.id]}
                               onChange={(e) => setEditingAnswer(prev => ({ ...prev, [faq.id]: e.target.value }))}
-                              className="w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm flex-1 resize-none min-h-0 h-full"
+                              className={`w-full bg-gray-700 text-white border border-gray-600 rounded px-3 py-2 text-sm ${faq.ai_response_answers ? 'h-[340px]' : 'h-[100px]'}`}
                             />
                             <div className="flex gap-2">
                               <button
@@ -700,7 +700,7 @@ export default function FAQManagement() {
                               <p className="text-gray-500 text-sm italic">No answer generated yet</p>
                             )}
                             
-                            <div className="flex flex-row items-start justify-between w-full mt-auto">
+                            <div className="flex items-start justify-between w-full mt-auto">
                               <Chip 
                                 label={getStatusText(faq.answer_status)} 
                                 className={`${getStatusColor(faq.answer_status)} text-xs text-white`} 
