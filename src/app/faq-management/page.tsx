@@ -55,6 +55,10 @@ export default function FAQManagement() {
   const [approvingQuestions, setApprovingQuestions] = useState<Record<number, boolean>>({});
   const [approvingAnswers, setApprovingAnswers] = useState<Record<number, boolean>>({});
   const [batchApproving, setBatchApproving] = useState<Record<string, boolean>>({});
+  const [aiRefineModalOpen, setAiRefineModalOpen] = useState(false);
+  const [aiRefinePrompt, setAiRefinePrompt] = useState('');
+  const [aiRefineTargetId, setAiRefineTargetId] = useState<number | null>(null);
+  const [aiRefineLoading, setAiRefineLoading] = useState(false);
 
   useEffect(() => {
     fetchFaqPairs();
@@ -597,7 +601,11 @@ export default function FAQManagement() {
                         <div className="flex items-start justify-between w-full mb-3">
                           <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Question</h4>
                           <button
-                            onClick={() => setEditingQuestion(prev => ({ ...prev, [faq.id]: faq.question }))}
+                            onClick={() => {
+                              setAiRefineModalOpen(true);
+                              setAiRefineTargetId(faq.id);
+                              setAiRefinePrompt('');
+                            }}
                             className="text-gray-400 hover:text-white transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -742,6 +750,41 @@ export default function FAQManagement() {
           <p className="text-sm text-gray-500">
             Use the generation panel above to create FAQs or conversational questions from your pending batches.
           </p>
+        </div>
+      )}
+
+      {/* AI Refine Modal */}
+      {aiRefineModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-lg">
+            <h2 className="text-2xl font-bold mb-4">AI Refine Prompt</h2>
+            <textarea
+              value={aiRefinePrompt}
+              onChange={(e) => setAiRefinePrompt(e.target.value)}
+              className="w-full bg-gray-200 text-black border border-gray-300 rounded px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => {
+                  setAiRefineLoading(true);
+                  setTimeout(() => {
+                    if (aiRefineTargetId !== null) setEditingQuestion(prev => ({ ...prev, [aiRefineTargetId]: 'Mock improved question' }));
+                    setAiRefineModalOpen(false);
+                    setAiRefineLoading(false);
+                  }, 1000);
+                }}
+                className="bg-blue-500 text-white px-3 py-2 rounded text-sm"
+              >
+                Refine with AI
+              </button>
+              <button
+                onClick={() => setAiRefineModalOpen(false)}
+                className="bg-gray-500 text-white px-3 py-2 rounded text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
