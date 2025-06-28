@@ -86,8 +86,6 @@ Please consider this context when providing your response.`;
         temperature: 0.7,
         top_p: 0.9,
         top_k: 50,
-        presence_penalty: 0.1,
-        frequency_penalty: 0.1,
         stream: false,
         // Add collection ID if you want to use a specific collection
         // collection_id: 'WuQ4cNvyQy2fwY04r1Q2Sg'
