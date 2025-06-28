@@ -8,6 +8,16 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+interface Industry {
+  id: string;
+  name: string;
+}
+
+interface Subcategory {
+  id: string;
+  name: string;
+}
+
 interface Product {
   id: string;
   auth_user_id: string;
@@ -51,6 +61,8 @@ export default function ClientProducts() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -104,6 +116,12 @@ export default function ClientProducts() {
         .eq('auth_user_id', user.id);
       setBrands(brandsData || []);
 
+      // Load industries and subcategories
+      await Promise.all([
+        loadIndustries(),
+        loadSubcategories(formData.industry || '')
+      ]);
+
       // Fetch subscription info
       const { data: subscriptionData } = await supabase
         .from('user_monthly_schedule')
@@ -124,6 +142,29 @@ export default function ClientProducts() {
       setError('Failed to load data.');
       setLoading(false);
     }
+  };
+
+  const loadIndustries = async () => {
+    const { data } = await supabase.from('industries').select('*');
+    if (data) setIndustries(data);
+  };
+
+  const loadSubcategories = async (selectedIndustryName: string) => {
+    if (!selectedIndustryName) {
+      setSubcategories([]);
+      return;
+    }
+    // Find the industry ID for the selected name
+    const selectedIndustry = industries.find((ind) => ind.name === selectedIndustryName);
+    if (!selectedIndustry) {
+      setSubcategories([]);
+      return;
+    }
+    const { data } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('industry_id', selectedIndustry.id);
+    if (data) setSubcategories(data);
   };
 
   const getPackageLimits = (packageTier: string) => {
@@ -184,6 +225,10 @@ export default function ClientProducts() {
         brand_id: value,
         organisation: selectedBrand ? selectedBrand.organisation_name : prev.organisation,
       }));
+    } else if (name === 'industry') {
+      setFormData(prev => ({ ...prev, [name]: value }));
+      loadSubcategories(value);
+      setFormData(prev => ({ ...prev, subcategory: '' })); // Reset subcategory when industry changes
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -802,13 +847,40 @@ export default function ClientProducts() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Category</label>
+                  <label className="block text-gray-300 mb-2 font-medium">User Defined Category</label>
                   <input 
                     name="category" 
                     className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
                     value={formData.category || ''} 
                     onChange={handleChange} 
                   />
+                  <small className="text-gray-400">Define your own category for this product (e.g., SaaS, Mobile App, Enterprise Tool)</small>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2 font-medium">Industry</label>
+                  <select name="industry" value={formData.industry || ''} onChange={handleChange} className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
+                    <option value="">Select Industry</option>
+                    {industries.map((ind) => (
+                      <option key={ind.id} value={ind.name}>
+                        {ind.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-gray-400">Choose the main industry that best fits your product</small>
+                </div>
+
+                <div>
+                  <label className="block text-gray-300 mb-2 font-medium">Industry Subcategory</label>
+                  <select name="subcategory" value={formData.subcategory || ''} onChange={handleChange} className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
+                    <option value="">{formData.industry ? 'Select Subcategory' : 'Select Industry First'}</option>
+                    {subcategories.map((sub) => (
+                      <option key={sub.id} value={sub.name}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="text-gray-400">Select a subcategory for the chosen industry to further describe your product&apos;s focus</small>
                 </div>
 
                 <div className="md:col-span-2">
@@ -820,6 +892,7 @@ export default function ClientProducts() {
                     onChange={handleChange} 
                     rows={3} 
                   />
+                  <small className="text-gray-400">Provide a clear, detailed description of your product and its key features</small>
                 </div>
 
                 <div>
@@ -830,7 +903,7 @@ export default function ClientProducts() {
                     value={formData.keywords || ''} 
                     onChange={handleChange} 
                   />
-                  <small className="text-gray-400">Enter keywords separated by commas (e.g., AI, automation, SaaS).</small>
+                  <small className="text-gray-400">Enter keywords separated by commas (e.g., AI, automation, SaaS, productivity)</small>
                 </div>
 
                 <div>
@@ -841,6 +914,7 @@ export default function ClientProducts() {
                     value={formData.url || ''} 
                     onChange={handleChange} 
                   />
+                  <small className="text-gray-400">Enter the full URL including http:// or https:// (e.g., https://yourproduct.com)</small>
                 </div>
 
                 <div className="md:col-span-2">
@@ -867,38 +941,6 @@ export default function ClientProducts() {
                       </p>
                     </div>
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Industry</label>
-                  <select name="industry" value={formData.industry || ''} onChange={handleChange} className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
-                    <option value="">Select Industry</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Retail">Retail</option>
-                    <option value="Education">Education</option>
-                  </select>
-                  <small className="text-gray-400">Choose the main industry that best fits your product. This list is tailored to your organisation.</small>
-                </div>
-
-                <div>
-                  <label className="block text-gray-300 mb-2 font-medium">Industry Subcategory</label>
-                  <select name="subcategory" value={formData.subcategory || ''} onChange={handleChange} className="w-full p-3 rounded-lg bg-gray-800/50 border border-gray-600/50 text-white">
-                    <option value="">Select Subcategory</option>
-                    {/* Example subcategories, can be dynamic */}
-                    {formData.industry === 'Technology' && <>
-                      <option value="SaaS">SaaS</option>
-                      <option value="AI">AI</option>
-                      <option value="Cloud">Cloud</option>
-                    </>}
-                    {formData.industry === 'Healthcare' && <>
-                      <option value="MedTech">MedTech</option>
-                      <option value="Pharma">Pharma</option>
-                    </>}
-                    {/* Add more as needed */}
-                  </select>
-                  <small className="text-gray-400">Select a subcategory for the chosen industry to further describe your product&apos;s focus.</small>
                 </div>
               </div>
 
