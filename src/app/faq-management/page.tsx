@@ -59,6 +59,8 @@ export default function FAQManagement() {
   const [aiRefinePrompt, setAiRefinePrompt] = useState('');
   const [aiRefineTargetId, setAiRefineTargetId] = useState<number | null>(null);
   const [aiRefineLoading, setAiRefineLoading] = useState(false);
+  const [aiRefineImprovedQuestion, setAiRefineImprovedQuestion] = useState('');
+  const [aiRefineStep, setAiRefineStep] = useState<'prompt' | 'result'>('prompt');
 
   useEffect(() => {
     fetchFaqPairs();
