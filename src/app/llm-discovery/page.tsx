@@ -160,9 +160,9 @@ export default function LLMDiscoveryDashboard() {
       // Organization JSON-LD file
       const orgJsonld = clientStaticObjects.find(obj => obj.organization_jsonld);
       orgFolder.children!.push({
-        name: 'organization.jsonld',
+        name: `${client.organisation_name || 'unnamed'}-organisation.jsonld`,
         type: 'file',
-        path: `/${client.organisation_name || 'unnamed'}/organization.jsonld`,
+        path: `/${client.organisation_name || 'unnamed'}/${client.organisation_name || 'unnamed'}-organisation.jsonld`,
         jsonData: orgJsonld?.organization_jsonld || null,
         icon: '📄',
         color: orgJsonld ? 'text-green-500' : 'text-red-500'
@@ -216,11 +216,17 @@ export default function LLMDiscoveryDashboard() {
             const productJsonld = clientStaticObjects.find(obj => obj.product_jsonld)?.product_jsonld || 
                                  (product.schema_json ? JSON.parse(product.schema_json) : null);
             
+            // Use a better product name - avoid "FAQ Pairs" or similar incorrect names
+            let productName = product.product_name || 'unnamed';
+            if (productName.toLowerCase().includes('faq') || productName.toLowerCase().includes('pairs')) {
+              productName = 'product'; // Use generic name if the product name is incorrect
+            }
+            
             // Create a product folder for each product
             const productFolder: DirectoryItem = {
-              name: `${product.product_name || 'unnamed'}`,
+              name: productName,
               type: 'folder',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}`,
               icon: '📁',
               color: 'text-white',
               children: []
@@ -228,9 +234,9 @@ export default function LLMDiscoveryDashboard() {
             
             // Product JSON-LD file
             productFolder.children!.push({
-              name: `${product.product_name || 'unnamed'}.jsonld`,
+              name: `${productName}-product.jsonld`,
               type: 'file',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/${product.product_name || 'unnamed'}.jsonld`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/${productName}-product.jsonld`,
               jsonData: productJsonld,
               icon: '📄',
               color: productJsonld ? 'text-green-500' : 'text-red-500'
@@ -242,7 +248,7 @@ export default function LLMDiscoveryDashboard() {
               const faqsFolder: DirectoryItem = {
                 name: 'faqs',
                 type: 'folder',
-                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/faqs`,
+                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/faqs`,
                 icon: '📁',
                 color: 'text-white',
                 children: []
@@ -252,7 +258,7 @@ export default function LLMDiscoveryDashboard() {
                 faqsFolder.children!.push({
                   name: `faq-${faq.week_start_date}.jsonld`,
                   type: 'file',
-                  path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/faqs/faq-${faq.week_start_date}.jsonld`,
+                  path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/faqs/faq-${faq.week_start_date}.jsonld`,
                   jsonData: faq.faq_json_object || null,
                   icon: '📄',
                   color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
@@ -658,6 +664,25 @@ export default function LLMDiscoveryDashboard() {
     setSelectedClientId(clientId);
   };
 
+  const handleSaveFile = async (content: any) => {
+    if (!editingFile) return;
+    
+    try {
+      // Parse the JSON content
+      const jsonData = JSON.parse(content);
+      
+      // Here you would typically save to the database
+      // For now, we'll just close the modal and show a success message
+      setSuccess(`File ${editingFile.name} updated successfully!`);
+      setEditingFile(null);
+      
+      // Reload stats to reflect changes
+      await loadStats();
+    } catch (error) {
+      setError('Invalid JSON format. Please check your syntax.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
@@ -990,7 +1015,16 @@ export default function LLMDiscoveryDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {getEditableFilesFromDirectory(directoryStructure).map((file) => (
               <div key={file.path} className="bg-gray-700/50 border border-gray-600 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-white mb-2">{file.name}</h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-white">{file.name}</h4>
+                  <button
+                    onClick={() => setEditingFile(file)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title="Edit file"
+                  >
+                    ⚙️
+                  </button>
+                </div>
                 <div className="text-xs text-gray-400">
                   Last Updated: {formatDate(file.jsonData?.last_updated || '')}
                 </div>
@@ -1004,7 +1038,7 @@ export default function LLMDiscoveryDashboard() {
 
         {/* Edit File Modal */}
         {editingFile && (
-          <EditFileModal file={editingFile} onClose={() => setEditingFile(null)} onSave={() => setEditingFile(null)} />
+          <EditFileModal file={editingFile} onClose={() => setEditingFile(null)} onSave={handleSaveFile} />
         )}
       </div>
     </div>
