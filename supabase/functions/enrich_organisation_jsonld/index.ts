@@ -134,9 +134,32 @@ serve(async (req) => {
     });
     const uniqueTopics = Array.from(topicSet);
 
-    // Build enriched object
+    // Filter out FAQ Q&As from base organization JSON-LD
+    const { 
+      "@context": context,
+      "@type": type,
+      "name": name,
+      "industry": industry,
+      "subcategory": subcategory,
+      // Explicitly exclude FAQ-related fields
+      "faqs": _faqs,
+      "faq": _faq,
+      "questions": _questions,
+      "answers": _answers,
+      "faq_pairs": _faq_pairs,
+      "batch_faq_pairs": _batch_faq_pairs,
+      // Keep all other fields except FAQ-related ones
+      ...otherFields
+    } = baseOrgJsonld;
+
+    // Build enriched object without FAQ Q&As
     const enrichedOrgJsonld = {
-      ...baseOrgJsonld,
+      "@context": context,
+      "@type": type,
+      "name": name,
+      "industry": industry || "",
+      "subcategory": subcategory || "",
+      ...otherFields,
       "brands": brands?.map(brand => ({
         "@type": "Brand",
         "name": brand.brand_name,
@@ -147,7 +170,8 @@ serve(async (req) => {
         "@type": "Product",
         "name": product.product_name,
         "productId": product.id,
-        "productJsonld": safeJsonParse(product.schema_json)
+        "url": safeJsonParse(product.schema_json)?.url || "",
+        "description": safeJsonParse(product.schema_json)?.description || ""
       })) || [],
       "topics": uniqueTopics,
       "topicCount": uniqueTopics.length,
@@ -166,7 +190,7 @@ serve(async (req) => {
         organisation_jsonld_enriched: enrichedOrgJsonld,
         last_generated: new Date().toISOString()
       }, {
-        onConflict: 'auth_user_id'
+        onConflict: 'auth_user_id,client_organisation_id'
       });
 
     if (updateError) {
