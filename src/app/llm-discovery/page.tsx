@@ -92,7 +92,28 @@ function EditFileModal({ file, onClose, onSave }: { file: DirectoryItem | null, 
         />
         <div className="flex justify-end mt-4 gap-2">
           <button onClick={onClose} className="px-4 py-2 rounded bg-gray-700 text-gray-300 hover:bg-gray-600">Cancel</button>
-          <button onClick={() => onSave(content)} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Save</button>
+          <button
+            onClick={async () => {
+              const res = await fetch('/api/write-to-github', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  filePath: file.path.replace(/^\//, ''),
+                  fileContent: content,
+                  commitMessage: `Edit ${file.name} via LLM Discovery UI`
+                })
+              });
+              const result = await res.json();
+              if (result.success) {
+                alert('File written to GitHub!');
+              } else {
+                alert('Error writing file: ' + (result.error || 'Unknown error'));
+              }
+            }}
+            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 ml-2"
+          >
+            Write to Directory
+          </button>
         </div>
       </div>
     </div>
@@ -181,9 +202,9 @@ export default function LLMDiscoveryDashboard() {
       console.log(`Final org JSON-LD being used:`, orgJsonld);
       
       orgFolder.children!.push({
-        name: `${client.organisation_name || 'unnamed'}-organisation.jsonld`,
+        name: `organisation.jsonld`,
         type: 'file',
-        path: `/${client.organisation_name || 'unnamed'}/${client.organisation_name || 'unnamed'}-organisation.jsonld`,
+        path: `/${client.organisation_name || 'unnamed'}/organisation.jsonld`,
         jsonData: orgJsonld,
         icon: '📄',
         color: orgJsonld ? 'text-green-500' : 'text-red-500'
@@ -204,7 +225,7 @@ export default function LLMDiscoveryDashboard() {
         const brandJsonld = clientStaticObjects.find(obj => obj.brand_jsonld_enriched)?.brand_jsonld_enriched || 
                            clientStaticObjects.find(obj => obj.brand_jsonld)?.brand_jsonld;
         const brandFolder: DirectoryItem = {
-          name: `${brand.brand_name || 'unnamed'}.jsonld`,
+          name: `${brand.brand_name || 'unnamed'}`,
           type: 'folder',
           path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}`,
           icon: '🏷️',
@@ -214,9 +235,9 @@ export default function LLMDiscoveryDashboard() {
         
         // Brand JSON-LD file - use enriched version if available
         brandFolder.children!.push({
-          name: `${brand.brand_name || 'unnamed'}.jsonld`,
+          name: `brand.jsonld`,
           type: 'file',
-          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/${brand.brand_name || 'unnamed'}.jsonld`,
+          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/brand.jsonld`,
           jsonData: brandJsonld,
           icon: '📄',
           color: brandJsonld ? 'text-green-500' : 'text-red-500'
@@ -257,9 +278,9 @@ export default function LLMDiscoveryDashboard() {
             
             // Product JSON-LD file
             productFolder.children!.push({
-              name: `${productName}-product.jsonld`,
+              name: `product.jsonld`,
               type: 'file',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/${productName}-product.jsonld`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/product.jsonld`,
               jsonData: productJsonld,
               icon: '📄',
               color: productJsonld ? 'text-green-500' : 'text-red-500'
@@ -1052,9 +1073,50 @@ export default function LLMDiscoveryDashboard() {
                 <div className="text-xs text-gray-400">
                   Path: {file.path}
                 </div>
+                <button
+                  onClick={async () => {
+                    const res = await fetch('/api/write-to-github', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        filePath: file.path.replace(/^\//, ''),
+                        fileContent: JSON.stringify(file.jsonData, null, 2),
+                        commitMessage: `Add/update ${file.name} via LLM Discovery UI`
+                      })
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                      alert('File written to GitHub!');
+                    } else {
+                      alert('Error writing file: ' + (result.error || 'Unknown error'));
+                    }
+                  }}
+                  className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 ml-2"
+                >
+                  Write to Directory
+                </button>
               </div>
             ))}
           </div>
+          <button
+            onClick={async () => {
+              for (const file of getEditableFilesFromDirectory(directoryStructure)) {
+                await fetch('/api/write-to-github', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    filePath: file.path.replace(/^\//, ''),
+                    fileContent: JSON.stringify(file.jsonData, null, 2),
+                    commitMessage: `Add/update ${file.name} via LLM Discovery UI`
+                  })
+                });
+              }
+              alert('All files written to GitHub!');
+            }}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mt-4"
+          >
+            Add All Files to Directory
+          </button>
         </div>
 
         {/* Edit File Modal */}
