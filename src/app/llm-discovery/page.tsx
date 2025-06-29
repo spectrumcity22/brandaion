@@ -13,8 +13,8 @@ interface DiscoveryObject {
   id: string;
   auth_user_id: string;
   client_organisation_id: string;
-  organization_jsonld: any;
-  organization_jsonld_enriched: any;
+  organisation_jsonld: any;
+  organisation_jsonld_enriched: any;
   brand_jsonld: any;
   brand_jsonld_enriched: any;
   product_jsonld: any;
@@ -31,7 +31,7 @@ interface FAQObject {
   product_id: string | null;
   week_start_date: string;
   faq_json_object: any;
-  organization_jsonld: any;
+  organisation_jsonld: any;
   brand_jsonld: any;
   product_jsonld: any;
   last_generated: string;
@@ -40,7 +40,7 @@ interface FAQObject {
 interface DiscoveryStats {
   total_static_objects: number;
   total_faq_objects: number;
-  organizations_with_jsonld: number;
+  organisations_with_jsonld: number;
   brands_with_jsonld: number;
   products_with_jsonld: number;
   recent_updates: (DiscoveryObject | FAQObject)[];
@@ -71,6 +71,10 @@ function EditFileModal({ file, onClose, onSave }: { file: DirectoryItem | null, 
   useEffect(() => {
     console.log('EditFileModal - file received:', file);
     console.log('EditFileModal - jsonData:', file?.jsonData);
+    console.log('EditFileModal - file name:', file?.name);
+    console.log('EditFileModal - file path:', file?.path);
+    console.log('EditFileModal - jsonData type:', typeof file?.jsonData);
+    console.log('EditFileModal - jsonData keys:', file?.jsonData ? Object.keys(file.jsonData) : 'N/A');
     setContent(file?.jsonData ? JSON.stringify(file.jsonData, null, 2) : '');
   }, [file]);
   
@@ -103,7 +107,7 @@ function getFileStatus(file: DirectoryItem): 'red' | 'amber' | 'green' {
     try {
       const data = typeof file.jsonData === 'string' ? JSON.parse(file.jsonData) : file.jsonData;
       if (!data || Object.keys(data).length === 0) return 'red';
-      if (data['@type'] && data['@type'].toLowerCase().includes('organization') && !data['industry']) return 'amber';
+      if (data['@type'] && data['@type'].toLowerCase().includes('organisation') && !data['industry']) return 'amber';
       if (data['@type'] && data['@type'].toLowerCase().includes('product') && !data['name']) return 'amber';
       // Add more checks as needed
     } catch {
@@ -155,7 +159,7 @@ export default function LLMDiscoveryDashboard() {
       const clientProducts = products.filter(product => product.organisation_id === client.id);
       
       const orgFolder: DirectoryItem = {
-        name: client.organisation_name || 'Unnamed Organization',
+        name: client.organisation_name || 'Unnamed Organisation',
         type: 'folder',
         path: `/${client.organisation_name || 'unnamed'}`,
         icon: '📁',
@@ -163,15 +167,18 @@ export default function LLMDiscoveryDashboard() {
         children: []
       };
       
-      // Organization JSON-LD file - use enriched version if available
-      const orgJsonld = clientStaticObjects.find(obj => obj.organization_jsonld_enriched)?.organization_jsonld_enriched || 
-                       clientStaticObjects.find(obj => obj.organization_jsonld)?.organization_jsonld;
+      // Organisation JSON-LD file - use enriched version if available
+      const orgJsonld = clientStaticObjects.find(obj => obj.organisation_jsonld_enriched)?.organisation_jsonld_enriched || 
+                       clientStaticObjects.find(obj => obj.organisation_jsonld)?.organisation_jsonld;
       
       // Debug logging
       console.log(`Client: ${client.organisation_name}`);
       console.log(`Static objects for this client:`, clientStaticObjects);
-      console.log(`Has enriched org JSON-LD:`, clientStaticObjects.find(obj => obj.organization_jsonld_enriched) ? 'YES' : 'NO');
+      console.log(`Has enriched org JSON-LD:`, clientStaticObjects.find(obj => obj.organisation_jsonld_enriched) ? 'YES' : 'NO');
       console.log(`Using enriched org JSON-LD:`, orgJsonld ? 'YES' : 'NO');
+      console.log(`Enriched org JSON-LD data:`, clientStaticObjects.find(obj => obj.organisation_jsonld_enriched)?.organisation_jsonld_enriched);
+      console.log(`Original org JSON-LD data:`, clientStaticObjects.find(obj => obj.organisation_jsonld)?.organisation_jsonld);
+      console.log(`Final org JSON-LD being used:`, orgJsonld);
       
       orgFolder.children!.push({
         name: `${client.organisation_name || 'unnamed'}-organisation.jsonld`,
@@ -326,7 +333,7 @@ export default function LLMDiscoveryDashboard() {
       let productsFilter = supabase.from('products').select('*');
 
       if (selectedClientId !== 'all') {
-        // Filter by specific client's organization
+        // Filter by specific client's organisation
         const selectedClient = allClients?.find(c => c.auth_user_id === selectedClientId);
         if (selectedClient) {
           staticFilter = staticFilter.eq('client_organisation_id', selectedClient.id);
@@ -355,7 +362,7 @@ export default function LLMDiscoveryDashboard() {
       // Calculate stats
       const totalStaticObjects = staticObjects?.length || 0;
       const totalFaqObjects = faqObjects?.length || 0;
-      const organizationsWithJsonld = staticObjects?.filter(obj => obj.organization_jsonld)?.length || 0;
+      const organisationsWithJsonld = staticObjects?.filter(obj => obj.organisation_jsonld)?.length || 0;
       const brandsWithJsonld = staticObjects?.filter(obj => obj.brand_jsonld)?.length || 0;
       const productsWithJsonld = staticObjects?.filter(obj => obj.product_jsonld)?.length || 0;
 
@@ -367,7 +374,7 @@ export default function LLMDiscoveryDashboard() {
       setStats({
         total_static_objects: totalStaticObjects,
         total_faq_objects: totalFaqObjects,
-        organizations_with_jsonld: organizationsWithJsonld,
+        organisations_with_jsonld: organisationsWithJsonld,
         brands_with_jsonld: brandsWithJsonld,
         products_with_jsonld: productsWithJsonld,
         recent_updates: recentUpdates
@@ -468,15 +475,15 @@ export default function LLMDiscoveryDashboard() {
     children: [
       { name: 'platform-llms.txt', type: 'file' },
       {
-        name: 'organizations',
+        name: 'organisations',
         type: 'folder',
         children: [
           {
             name: '[org-slug]',
             type: 'folder',
             children: [
-              { name: 'organization-llms.txt', type: 'file' },
-              { name: 'organization.jsonld', type: 'file' },
+              { name: 'organisation-llms.txt', type: 'file' },
+              { name: 'organisation.jsonld', type: 'file' },
               {
                 name: 'brands',
                 type: 'folder',
@@ -814,7 +821,7 @@ export default function LLMDiscoveryDashboard() {
             </div>
             
             <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-              <div className="text-3xl font-bold text-green-400 mb-2">{stats.organizations_with_jsonld}</div>
+              <div className="text-3xl font-bold text-green-400 mb-2">{stats.organisations_with_jsonld}</div>
               <div className="text-gray-400">With Org JSON-LD</div>
             </div>
             
@@ -939,7 +946,7 @@ export default function LLMDiscoveryDashboard() {
                       ID
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                      Organization JSON-LD
+                      Organisation JSON-LD
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Brand JSON-LD
@@ -964,8 +971,8 @@ export default function LLMDiscoveryDashboard() {
                         <div className="text-sm text-gray-300 font-mono">{obj.id.slice(0, 8)}...</div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={obj.organization_jsonld ? 'text-green-400' : 'text-red-400'}>
-                          {obj.organization_jsonld ? '✅' : '❌'}
+                        <span className={obj.organisation_jsonld ? 'text-green-400' : 'text-red-400'}>
+                          {obj.organisation_jsonld ? '✅' : '❌'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -1004,23 +1011,21 @@ export default function LLMDiscoveryDashboard() {
             </a>
             
             <a
-              href="/api/llm-discovery/organization/brandaion/organization-llms.txt"
+              href="/api/llm-discovery/organisation/brandaion/organisation-llms.txt"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between p-4 bg-green-500/20 border border-green-500/50 rounded-lg hover:bg-green-500/30 transition-colors"
+              className="text-blue-400 hover:text-blue-300 underline"
             >
-              <span className="text-green-400">Brandaion Index</span>
-              <span className="text-green-400">→</span>
+              organisation-llms.txt
             </a>
 
             <a
-              href="/api/llm-discovery/organization/brandaion/organization.jsonld"
+              href="/api/llm-discovery/organisation/brandaion/organisation.jsonld"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between p-4 bg-purple-500/20 border border-purple-500/50 rounded-lg hover:bg-purple-500/30 transition-colors"
+              className="text-blue-400 hover:text-blue-300 underline"
             >
-              <span className="text-purple-400">Brandaion JSON-LD</span>
-              <span className="text-purple-400">→</span>
+              organisation.jsonld
             </a>
           </div>
         </div>
