@@ -45,6 +45,7 @@ export default function LLMDiscoveryConstruction() {
     populate_static: { id: 'populate_static', name: 'Populate Static Objects', description: 'Create organization, brand, and product JSON-LD', status: 'pending', progress: 0 },
     enrich_org: { id: 'enrich_org', name: 'Enrich Organization JSON-LD', description: 'Add brands, products, and topics to organization JSON-LD', status: 'pending', progress: 0 },
     enrich_brand: { id: 'enrich_brand', name: 'Enrich Brand JSON-LD', description: 'Add products and FAQs to brand JSON-LD for complete knowledge graph', status: 'pending', progress: 0 },
+    enrich_product: { id: 'enrich_product', name: 'Enrich Product JSON-LD', description: 'Add parent references and FAQ links to product JSON-LD', status: 'pending', progress: 0 },
     populate_faq: { id: 'populate_faq', name: 'Populate FAQ Objects', description: 'Create FAQ objects for dispatch-ready batches', status: 'pending', progress: 0 },
     fix_relationships: { id: 'fix_relationships', name: 'Fix Product Relationships', description: 'Link FAQ objects to products and populate missing product data', status: 'pending', progress: 0 },
     validate: { id: 'validate', name: 'Validate Objects', description: 'Verify all objects are properly structured', status: 'pending', progress: 0 },
@@ -491,6 +492,85 @@ export default function LLMDiscoveryConstruction() {
       updateStep('enrich_brand', { 
         status: 'error', 
         error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setCurrentStep(null);
+    }
+  };
+
+  const enrichProductJsonld = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+    try {
+      setCurrentStep('enrich_product');
+      updateStep('enrich_product', { status: 'running', progress: 10 });
+      // Get all products for this client
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, product_name')
+        .eq('auth_user_id', selectedClient.auth_user_id);
+      if (productsError) throw productsError;
+      if (!products || products.length === 0) {
+        updateStep('enrich_product', {
+          status: 'completed',
+          progress: 100,
+          result: { products_processed: 0, message: 'No products found for this client' }
+        });
+        return;
+      }
+      updateStep('enrich_product', { progress: 30 });
+      let processedCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      for (const product of products) {
+        try {
+          // Call the product enrichment API
+          const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/enrich_product_jsonld', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            },
+            body: JSON.stringify({
+              auth_user_id: selectedClient.auth_user_id,
+              product_id: product.id
+            })
+          });
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Failed to enrich product ${product.product_name}:`, response.status, errorText);
+            errors.push(`${product.product_name}: HTTP ${response.status}`);
+            errorCount++;
+            continue;
+          }
+          const result = await response.json();
+          console.log(`Successfully enriched product ${product.product_name}:`, result);
+          processedCount++;
+        } catch (error) {
+          console.error(`Error enriching product ${product.product_name}:`, error);
+          errors.push(`${product.product_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          errorCount++;
+        }
+      }
+      updateStep('enrich_product', {
+        status: errorCount === 0 ? 'completed' : 'error',
+        progress: 100,
+        result: {
+          products_processed: processedCount,
+          products_failed: errorCount,
+          total_products: products.length,
+          errors: errors.length > 0 ? errors : undefined
+        },
+        error: errorCount > 0 ? `${errorCount} products failed to enrich` : undefined
+      });
+    } catch (error) {
+      console.error('Error enriching product JSON-LD:', error);
+      updateStep('enrich_product', {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     } finally {
       setCurrentStep(null);
@@ -998,6 +1078,7 @@ export default function LLMDiscoveryConstruction() {
     await populateStaticObjects();
     await enrichOrganizationJsonld();
     await enrichBrandJsonld();
+    await enrichProductJsonld();
     await populateFAQObjects();
     await fixProductRelationships();
     await validateObjects();
