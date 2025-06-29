@@ -143,6 +143,14 @@ function getFileStatus(file: DirectoryItem): 'red' | 'amber' | 'green' {
   return 'green';
 }
 
+// Helper to make safe file/folder names
+function toSafeName(name: string) {
+  return name
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9-_]/g, '');
+}
+
 export default function LLMDiscoveryDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<DiscoveryStats | null>(null);
@@ -267,10 +275,11 @@ export default function LLMDiscoveryDashboard() {
             }
             
             // Create a product folder for each product
+            const safeProductName = toSafeName(product.product_name || 'unnamed');
             const productFolder: DirectoryItem = {
-              name: productName,
+              name: safeProductName,
               type: 'folder',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}`,
               icon: '📁',
               color: 'text-white',
               children: []
@@ -278,9 +287,9 @@ export default function LLMDiscoveryDashboard() {
             
             // Product JSON-LD file
             productFolder.children!.push({
-              name: `product.jsonld`,
+              name: `${safeProductName}-product.jsonld`,
               type: 'file',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/product.jsonld`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}/${safeProductName}-product.jsonld`,
               jsonData: productJsonld,
               icon: '📄',
               color: productJsonld ? 'text-green-500' : 'text-red-500'
@@ -292,7 +301,7 @@ export default function LLMDiscoveryDashboard() {
               const faqsFolder: DirectoryItem = {
                 name: 'faqs',
                 type: 'folder',
-                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/faqs`,
+                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}/faqs`,
                 icon: '📁',
                 color: 'text-white',
                 children: []
@@ -302,7 +311,7 @@ export default function LLMDiscoveryDashboard() {
                 faqsFolder.children!.push({
                   name: `faq-${faq.week_start_date}.jsonld`,
                   type: 'file',
-                  path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${productName}/faqs/faq-${faq.week_start_date}.jsonld`,
+                  path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}/faqs/faq-${faq.week_start_date}.jsonld`,
                   jsonData: faq.faq_json_object || null,
                   icon: '📄',
                   color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
