@@ -527,7 +527,7 @@ export default function LLMDiscoveryConstruction() {
       for (const product of products) {
         try {
           // Call the product enrichment API
-          const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/enrich_product_jsonld', {
+          const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/product_enrichment', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
