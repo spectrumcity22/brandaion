@@ -304,7 +304,7 @@ export default function LLMDiscoveryConstruction() {
           product_jsonld: productJsonld,
           last_generated: new Date().toISOString()
         }, {
-          onConflict: 'auth_user_id'
+          onConflict: 'auth_user_id,client_organisation_id'
         });
 
       if (upsertError) throw upsertError;
