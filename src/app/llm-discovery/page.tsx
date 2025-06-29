@@ -67,9 +67,13 @@ interface DirectoryItem {
 // Modal for editing file content
 function EditFileModal({ file, onClose, onSave }: { file: DirectoryItem | null, onClose: () => void, onSave: (content: any) => void }) {
   const [content, setContent] = useState(file?.jsonData ? JSON.stringify(file.jsonData, null, 2) : '');
+  
   useEffect(() => {
+    console.log('EditFileModal - file received:', file);
+    console.log('EditFileModal - jsonData:', file?.jsonData);
     setContent(file?.jsonData ? JSON.stringify(file.jsonData, null, 2) : '');
   }, [file]);
+  
   if (!file) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
@@ -159,13 +163,21 @@ export default function LLMDiscoveryDashboard() {
         children: []
       };
       
-      // Organization JSON-LD file
-      const orgJsonld = clientStaticObjects.find(obj => obj.organization_jsonld);
+      // Organization JSON-LD file - use enriched version if available
+      const orgJsonld = clientStaticObjects.find(obj => obj.organization_jsonld_enriched)?.organization_jsonld_enriched || 
+                       clientStaticObjects.find(obj => obj.organization_jsonld)?.organization_jsonld;
+      
+      // Debug logging
+      console.log(`Client: ${client.organisation_name}`);
+      console.log(`Static objects for this client:`, clientStaticObjects);
+      console.log(`Has enriched org JSON-LD:`, clientStaticObjects.find(obj => obj.organization_jsonld_enriched) ? 'YES' : 'NO');
+      console.log(`Using enriched org JSON-LD:`, orgJsonld ? 'YES' : 'NO');
+      
       orgFolder.children!.push({
         name: `${client.organisation_name || 'unnamed'}-organisation.jsonld`,
         type: 'file',
         path: `/${client.organisation_name || 'unnamed'}/${client.organisation_name || 'unnamed'}-organisation.jsonld`,
-        jsonData: orgJsonld?.organization_jsonld || null,
+        jsonData: orgJsonld,
         icon: '📄',
         color: orgJsonld ? 'text-green-500' : 'text-red-500'
       });
