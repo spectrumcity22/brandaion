@@ -147,6 +147,7 @@ export default function LLMDiscoveryDashboard() {
       const clientFaqObjects = faqObjects.filter(obj => obj.client_organisation_id === client.id);
       const clientBrands = brands.filter(brand => brand.organisation_id === client.id);
       const clientProducts = products.filter(product => product.organisation_id === client.id);
+      
       const orgFolder: DirectoryItem = {
         name: client.organisation_name || 'Unnamed Organization',
         type: 'folder',
@@ -155,6 +156,7 @@ export default function LLMDiscoveryDashboard() {
         color: 'text-white',
         children: []
       };
+      
       // Organization JSON-LD file
       const orgJsonld = clientStaticObjects.find(obj => obj.organization_jsonld);
       orgFolder.children!.push({
@@ -165,6 +167,7 @@ export default function LLMDiscoveryDashboard() {
         icon: '📄',
         color: orgJsonld ? 'text-green-500' : 'text-red-500'
       });
+      
       // Brands folder
       const brandsFolder: DirectoryItem = {
         name: 'brands',
@@ -174,16 +177,18 @@ export default function LLMDiscoveryDashboard() {
         color: 'text-white',
         children: []
       };
+      
       for (const brand of clientBrands) {
         const brandJsonld = clientStaticObjects.find(obj => obj.brand_jsonld);
         const brandFolder: DirectoryItem = {
           name: `${brand.brand_name || 'unnamed'}.jsonld`,
           type: 'folder',
           path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}`,
-          icon: '��',
+          icon: '🏷️',
           color: 'text-white',
           children: []
         };
+        
         // Brand JSON-LD file
         brandFolder.children!.push({
           name: `${brand.brand_name || 'unnamed'}.jsonld`,
@@ -193,6 +198,7 @@ export default function LLMDiscoveryDashboard() {
           icon: '📄',
           color: brandJsonld ? 'text-green-500' : 'text-red-500'
         });
+        
         // Products subfolder for this brand
         const brandProducts = clientProducts.filter(product => product.brand_id === brand.id);
         if (brandProducts.length > 0) {
@@ -204,36 +210,59 @@ export default function LLMDiscoveryDashboard() {
             color: 'text-white',
             children: []
           };
+          
           for (const product of brandProducts) {
+            // Get product JSON-LD from static objects first, fallback to schema_json
+            const productJsonld = clientStaticObjects.find(obj => obj.product_jsonld)?.product_jsonld || 
+                                 (product.schema_json ? JSON.parse(product.schema_json) : null);
+            
             // Product JSON-LD file
             productsFolder.children!.push({
               name: `${product.product_name || 'unnamed'}.jsonld`,
               type: 'file',
               path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}.jsonld`,
-              jsonData: product.schema_json ? JSON.parse(product.schema_json) : null,
+              jsonData: productJsonld,
               icon: '📄',
-              color: product.schema_json ? 'text-green-500' : 'text-red-500'
+              color: productJsonld ? 'text-green-500' : 'text-red-500'
             });
-            // FAQ files for this product
+            
+            // FAQ files for this product - place them under the product
             const productFaqs = clientFaqObjects.filter(faq => faq.product_id === product.id);
-            for (const faq of productFaqs) {
-              productsFolder.children!.push({
-                name: `faq-${faq.week_start_date}.jsonld`,
-                type: 'file',
-                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/faq-${faq.week_start_date}.jsonld`,
-                jsonData: faq.faq_json_object || null,
-                icon: '📄',
-                color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
-              });
+            if (productFaqs.length > 0) {
+              const faqsFolder: DirectoryItem = {
+                name: 'faqs',
+                type: 'folder',
+                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/faqs`,
+                icon: '📁',
+                color: 'text-white',
+                children: []
+              };
+              
+              for (const faq of productFaqs) {
+                faqsFolder.children!.push({
+                  name: `faq-${faq.week_start_date}.jsonld`,
+                  type: 'file',
+                  path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/faqs/faq-${faq.week_start_date}.jsonld`,
+                  jsonData: faq.faq_json_object || null,
+                  icon: '📄',
+                  color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
+                });
+              }
+              
+              productsFolder.children!.push(faqsFolder);
             }
           }
+          
           brandFolder.children!.push(productsFolder);
         }
+        
         brandsFolder.children!.push(brandFolder);
       }
+      
       orgFolder.children!.push(brandsFolder);
       structure.push(orgFolder);
     }
+    
     return structure;
   };
 

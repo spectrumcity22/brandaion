@@ -45,6 +45,7 @@ export default function LLMDiscoveryConstruction() {
     populate_static: { id: 'populate_static', name: 'Populate Static Objects', description: 'Create organization, brand, and product JSON-LD', status: 'pending', progress: 0 },
     enrich_org: { id: 'enrich_org', name: 'Enrich Organization JSON-LD', description: 'Add brands, products, and topics to organization JSON-LD', status: 'pending', progress: 0 },
     populate_faq: { id: 'populate_faq', name: 'Populate FAQ Objects', description: 'Create FAQ objects for dispatch-ready batches', status: 'pending', progress: 0 },
+    fix_relationships: { id: 'fix_relationships', name: 'Fix Product Relationships', description: 'Link FAQ objects to products and populate missing product data', status: 'pending', progress: 0 },
     validate: { id: 'validate', name: 'Validate Objects', description: 'Verify all objects are properly structured', status: 'pending', progress: 0 },
     preview: { id: 'preview', name: 'Preview Directory Structure', description: 'Show the final directory structure', status: 'pending', progress: 0 }
   });
@@ -150,37 +151,57 @@ export default function LLMDiscoveryConstruction() {
     }
 
     try {
+      setCurrentStep('scan');
       updateStep('scan', { status: 'running', progress: 10 });
-      
-      // Scan client_organisation for JSON-LD
-      const { data: orgs } = await supabase
+
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+
+      // Scan client_organisation
+      const { data: orgs, error: orgsError } = await supabase
         .from('client_organisation')
         .select('id, organisation_jsonld_object')
         .eq('auth_user_id', selectedClient.auth_user_id);
 
+      if (orgsError) throw orgsError;
+
       updateStep('scan', { progress: 30 });
 
-      // Scan brands for JSON-LD
-      const { data: brands } = await supabase
+      // Scan brands
+      const { data: brands, error: brandsError } = await supabase
         .from('brands')
         .select('id, brand_jsonld_object')
         .eq('auth_user_id', selectedClient.auth_user_id);
 
+      if (brandsError) throw brandsError;
+
       updateStep('scan', { progress: 50 });
 
-      // Scan products for JSON-LD
-      const { data: products } = await supabase
+      // Scan products
+      const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, schema_json')
         .eq('auth_user_id', selectedClient.auth_user_id);
 
+      if (productsError) throw productsError;
+
       updateStep('scan', { progress: 70 });
 
       // Scan batch_faq_pairs
-      const { data: faqBatches } = await supabase
+      const { data: faqBatches, error: faqError } = await supabase
         .from('batch_faq_pairs')
-        .select('id, faq_pairs_object')
-        .eq('auth_user_id', selectedClient.auth_user_id);
+        .select(`
+          id,
+          batch_date,
+          faq_pairs_object,
+          created_at,
+          auth_user_id
+        `)
+        .eq('auth_user_id', selectedClient.auth_user_id)
+        .not('faq_pairs_object', 'is', null)
+        .lte('batch_date', today); // Only batches with dispatch date today or before
+
+      if (faqError) throw faqError;
 
       updateStep('scan', { progress: 90 });
 
@@ -403,7 +424,8 @@ export default function LLMDiscoveryConstruction() {
           batch_date,
           faq_pairs_object,
           created_at,
-          auth_user_id
+          auth_user_id,
+          product
         `)
         .eq('auth_user_id', selectedClient.auth_user_id)
         .not('faq_pairs_object', 'is', null)
@@ -440,6 +462,25 @@ export default function LLMDiscoveryConstruction() {
         .eq('auth_user_id', selectedClient.auth_user_id);
 
       if (brandsError) throw brandsError;
+
+      // Get products data for proper linking
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, product_name, schema_json, brand_id')
+        .eq('auth_user_id', selectedClient.auth_user_id);
+
+      if (productsError) throw productsError;
+
+      // Get client configuration for product linking
+      const { data: clientConfig, error: configError } = await supabase
+        .from('client_configuration')
+        .select('product_id, schema_json')
+        .eq('auth_user_id', selectedClient.auth_user_id)
+        .single();
+
+      if (configError && configError.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.warn('Could not get client configuration:', configError);
+      }
 
       updateStep('populate_faq', { progress: 50 });
 
@@ -490,25 +531,61 @@ export default function LLMDiscoveryConstruction() {
           // Use first organization if available, otherwise null
           const org = orgs && orgs.length > 0 ? orgs[0] : null;
 
+          // Determine product_id - try multiple sources
+          let productId = null;
+          let productJsonld = null;
+
+          // First try to match by product name from batch_faq_pairs
+          if (batch.product && products && products.length > 0) {
+            const matchingProduct = products.find(p => 
+              p.product_name && 
+              p.product_name.toLowerCase() === batch.product.toLowerCase()
+            );
+            if (matchingProduct) {
+              productId = matchingProduct.id;
+              productJsonld = safeJsonParse(matchingProduct.schema_json);
+            }
+          }
+
+          // If no match by name, try client_configuration.product_id
+          if (!productId && clientConfig?.product_id) {
+            productId = clientConfig.product_id;
+            productJsonld = safeJsonParse(clientConfig.schema_json);
+          }
+          // Then try first product from products table as fallback
+          else if (!productId && products && products.length > 0) {
+            productId = products[0].id;
+            productJsonld = safeJsonParse(products[0].schema_json);
+          }
+
+          // Determine brand_id - try to match with product's brand
+          let brandId = null;
+          if (productId && products) {
+            const product = products.find(p => p.id === productId);
+            brandId = product?.brand_id || (brands && brands.length > 0 ? brands[0]?.id : null);
+          } else {
+            brandId = brands && brands.length > 0 ? brands[0]?.id : null;
+          }
+
           const { error: insertError } = await supabase
             .from('llm_discovery_faq_objects')
             .insert({
               batch_faq_pairs_id: batch.id,
               auth_user_id: selectedClient.auth_user_id,
               client_organisation_id: org?.id || null,
-              brand_id: brands && brands.length > 0 ? brands[0]?.id : null,
-              product_id: null, // Will need to be linked properly in future
+              brand_id: brandId,
+              product_id: productId, // Now properly linked!
               week_start_date: weekStart.toISOString().split('T')[0],
               faq_json_object: batch.faq_pairs_object,
               organization_jsonld: org ? safeJsonParse(org.organisation_jsonld_object) : null,
               brand_jsonld: brands && brands.length > 0 ? safeJsonParse(brands[0]?.brand_jsonld_object) : null,
-              product_jsonld: null,
+              product_jsonld: productJsonld, // Now properly populated!
               last_generated: new Date().toISOString()
             });
 
           if (!insertError) {
             processedCount++;
-            console.log(`Successfully processed batch ${batch.id} for dispatch date ${batch.batch_date}`);
+            console.log(`Successfully processed batch ${batch.id} for dispatch date ${batch.batch_date} with product_id: ${productId}`);
           } else {
             errorCount++;
             errors.push(`Batch ${batch.id}: ${insertError.message}`);
@@ -536,6 +613,160 @@ export default function LLMDiscoveryConstruction() {
     } catch (error) {
       console.error('Error populating FAQ objects:', error);
       updateStep('populate_faq', { 
+        status: 'error', 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setCurrentStep(null);
+    }
+  };
+
+  const fixProductRelationships = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
+    try {
+      setCurrentStep('fix_relationships');
+      updateStep('fix_relationships', { status: 'running', progress: 10 });
+
+      // Helper function to safely parse JSON
+      const safeJsonParse = (data: any) => {
+        if (!data) return null;
+        if (typeof data === 'object') return data;
+        if (typeof data === 'string') {
+          try {
+            return JSON.parse(data);
+          } catch (error) {
+            console.warn('Failed to parse JSON string:', error);
+            return null;
+          }
+        }
+        return null;
+      };
+
+      updateStep('fix_relationships', { progress: 20 });
+
+      // Get all FAQ objects that need product relationships fixed
+      const { data: faqObjects, error: faqError } = await supabase
+        .from('llm_discovery_faq_objects')
+        .select(`
+          id,
+          batch_faq_pairs_id,
+          auth_user_id,
+          client_organisation_id,
+          brand_id,
+          product_id,
+          faq_json_object
+        `)
+        .eq('auth_user_id', selectedClient.auth_user_id)
+        .or('product_id.is.null,product_jsonld.is.null');
+
+      if (faqError) throw faqError;
+
+      updateStep('fix_relationships', { progress: 40 });
+
+      // Get products data for matching
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select(`
+          id,
+          product_name,
+          schema_json,
+          brand_id,
+          organisation_id,
+          auth_user_id
+        `)
+        .eq('auth_user_id', selectedClient.auth_user_id);
+
+      if (productsError) throw productsError;
+
+      updateStep('fix_relationships', { progress: 60 });
+
+      // Get batch_faq_pairs data for product name matching
+      const { data: batchFaqPairs, error: batchError } = await supabase
+        .from('batch_faq_pairs')
+        .select(`
+          id,
+          product,
+          auth_user_id
+        `)
+        .eq('auth_user_id', selectedClient.auth_user_id);
+
+      if (batchError) throw batchError;
+
+      updateStep('fix_relationships', { progress: 80 });
+
+      let updatedCount = 0;
+      let productJsonldUpdated = 0;
+
+      // Update each FAQ object with proper product relationships
+      for (const faqObject of faqObjects || []) {
+        let productId = faqObject.product_id;
+        let productJsonld = null;
+
+        // Find the corresponding batch_faq_pairs record
+        const batchRecord = batchFaqPairs?.find(batch => batch.id === faqObject.batch_faq_pairs_id);
+        
+        if (batchRecord?.product && products) {
+          // Try to match by product name
+          const matchingProduct = products.find(p => 
+            p.product_name && 
+            p.product_name.toLowerCase() === batchRecord.product.toLowerCase()
+          );
+          
+          if (matchingProduct) {
+            productId = matchingProduct.id;
+            productJsonld = safeJsonParse(matchingProduct.schema_json);
+          }
+        }
+
+        // If still no product_id, try to get from client_configuration
+        if (!productId) {
+          const { data: clientConfig } = await supabase
+            .from('client_configuration')
+            .select('product_id, schema_json')
+            .eq('auth_user_id', selectedClient.auth_user_id)
+            .single();
+
+          if (clientConfig?.product_id) {
+            productId = clientConfig.product_id;
+            productJsonld = safeJsonParse(clientConfig.schema_json);
+          }
+        }
+
+        // Update the FAQ object if we found product data
+        if (productId || productJsonld) {
+          const updateData: any = {};
+          if (productId) updateData.product_id = productId;
+          if (productJsonld) updateData.product_jsonld = productJsonld;
+
+          const { error: updateError } = await supabase
+            .from('llm_discovery_faq_objects')
+            .update(updateData)
+            .eq('id', faqObject.id);
+
+          if (!updateError) {
+            updatedCount++;
+            if (productJsonld) productJsonldUpdated++;
+          }
+        }
+      }
+
+      updateStep('fix_relationships', { 
+        status: 'completed', 
+        progress: 100,
+        result: {
+          faq_objects_processed: faqObjects?.length || 0,
+          relationships_fixed: updatedCount,
+          product_jsonld_added: productJsonldUpdated
+        }
+      });
+
+    } catch (error) {
+      console.error('Error fixing product relationships:', error);
+      updateStep('fix_relationships', { 
         status: 'error', 
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
@@ -674,6 +905,7 @@ export default function LLMDiscoveryConstruction() {
     await populateStaticObjects();
     await enrichOrganizationJsonld();
     await populateFAQObjects();
+    await fixProductRelationships();
     await validateObjects();
     await previewDirectoryStructure();
   };
@@ -852,6 +1084,7 @@ export default function LLMDiscoveryConstruction() {
                           case 'populate_static': populateStaticObjects(); break;
                           case 'enrich_org': enrichOrganizationJsonld(); break;
                           case 'populate_faq': populateFAQObjects(); break;
+                          case 'fix_relationships': fixProductRelationships(); break;
                           case 'validate': validateObjects(); break;
                           case 'preview': previewDirectoryStructure(); break;
                         }
