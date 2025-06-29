@@ -232,10 +232,11 @@ export default function LLMDiscoveryDashboard() {
         // Use enriched brand JSON-LD if available, fallback to basic brand JSON-LD
         const brandJsonld = clientStaticObjects.find(obj => obj.brand_jsonld_enriched)?.brand_jsonld_enriched || 
                            clientStaticObjects.find(obj => obj.brand_jsonld)?.brand_jsonld;
+        const safeBrandName = toSafeName(brand.brand_name || 'unnamed');
         const brandFolder: DirectoryItem = {
-          name: `${brand.brand_name || 'unnamed'}`,
+          name: safeBrandName,
           type: 'folder',
-          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}`,
+          path: `/${client.organisation_name || 'unnamed'}/brands/${safeBrandName}`,
           icon: '🏷️',
           color: 'text-white',
           children: []
@@ -243,9 +244,9 @@ export default function LLMDiscoveryDashboard() {
         
         // Brand JSON-LD file - use enriched version if available
         brandFolder.children!.push({
-          name: `brand.jsonld`,
+          name: `${safeBrandName}-brand.jsonld`,
           type: 'file',
-          path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/brand.jsonld`,
+          path: `/${client.organisation_name || 'unnamed'}/brands/${safeBrandName}/${safeBrandName}-brand.jsonld`,
           jsonData: brandJsonld,
           icon: '📄',
           color: brandJsonld ? 'text-green-500' : 'text-red-500'
@@ -257,7 +258,7 @@ export default function LLMDiscoveryDashboard() {
           const productsFolder: DirectoryItem = {
             name: 'products',
             type: 'folder',
-            path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products`,
+            path: `/${client.organisation_name || 'unnamed'}/brands/${safeBrandName}/products`,
             icon: '📁',
             color: 'text-white',
             children: []
@@ -279,7 +280,7 @@ export default function LLMDiscoveryDashboard() {
             const productFolder: DirectoryItem = {
               name: safeProductName,
               type: 'folder',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${safeBrandName}/products/${safeProductName}`,
               icon: '📁',
               color: 'text-white',
               children: []
@@ -289,7 +290,7 @@ export default function LLMDiscoveryDashboard() {
             productFolder.children!.push({
               name: `${safeProductName}-product.jsonld`,
               type: 'file',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}/${safeProductName}-product.jsonld`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${safeBrandName}/products/${safeProductName}/${safeProductName}-product.jsonld`,
               jsonData: productJsonld,
               icon: '📄',
               color: productJsonld ? 'text-green-500' : 'text-red-500'
@@ -301,7 +302,7 @@ export default function LLMDiscoveryDashboard() {
               const faqsFolder: DirectoryItem = {
                 name: 'faqs',
                 type: 'folder',
-                path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}/faqs`,
+                path: `/${client.organisation_name || 'unnamed'}/brands/${safeBrandName}/products/${safeProductName}/faqs`,
                 icon: '📁',
                 color: 'text-white',
                 children: []
@@ -311,7 +312,7 @@ export default function LLMDiscoveryDashboard() {
                 faqsFolder.children!.push({
                   name: `faq-${faq.week_start_date}.jsonld`,
                   type: 'file',
-                  path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${safeProductName}/faqs/faq-${faq.week_start_date}.jsonld`,
+                  path: `/${client.organisation_name || 'unnamed'}/brands/${safeBrandName}/products/${safeProductName}/faqs/faq-${faq.week_start_date}.jsonld`,
                   jsonData: faq.faq_json_object || null,
                   icon: '📄',
                   color: faq.faq_json_object ? 'text-green-500' : 'text-red-500'
