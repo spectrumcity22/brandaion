@@ -216,11 +216,21 @@ export default function LLMDiscoveryDashboard() {
             const productJsonld = clientStaticObjects.find(obj => obj.product_jsonld)?.product_jsonld || 
                                  (product.schema_json ? JSON.parse(product.schema_json) : null);
             
+            // Create a product folder for each product
+            const productFolder: DirectoryItem = {
+              name: `${product.product_name || 'unnamed'}`,
+              type: 'folder',
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}`,
+              icon: '📁',
+              color: 'text-white',
+              children: []
+            };
+            
             // Product JSON-LD file
-            productsFolder.children!.push({
+            productFolder.children!.push({
               name: `${product.product_name || 'unnamed'}.jsonld`,
               type: 'file',
-              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}.jsonld`,
+              path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/products/${product.product_name || 'unnamed'}/${product.product_name || 'unnamed'}.jsonld`,
               jsonData: productJsonld,
               icon: '📄',
               color: productJsonld ? 'text-green-500' : 'text-red-500'
@@ -249,8 +259,11 @@ export default function LLMDiscoveryDashboard() {
                 });
               }
               
-              productsFolder.children!.push(faqsFolder);
+              productFolder.children!.push(faqsFolder);
             }
+            
+            // Add the product folder to the products folder
+            productsFolder.children!.push(productFolder);
           }
           
           brandFolder.children!.push(productsFolder);
