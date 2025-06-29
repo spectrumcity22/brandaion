@@ -1,0 +1,2 @@
+[functions.enrich_brand_jsonld]
+verify_jwt = false 

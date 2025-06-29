@@ -44,6 +44,7 @@ export default function LLMDiscoveryConstruction() {
     scan: { id: 'scan', name: 'Scan Existing Data', description: 'Analyze current data structure', status: 'pending', progress: 0 },
     populate_static: { id: 'populate_static', name: 'Populate Static Objects', description: 'Create organization, brand, and product JSON-LD', status: 'pending', progress: 0 },
     enrich_org: { id: 'enrich_org', name: 'Enrich Organization JSON-LD', description: 'Add brands, products, and topics to organization JSON-LD', status: 'pending', progress: 0 },
+    enrich_brand: { id: 'enrich_brand', name: 'Enrich Brand JSON-LD', description: 'Add products and FAQs to brand JSON-LD for complete knowledge graph', status: 'pending', progress: 0 },
     populate_faq: { id: 'populate_faq', name: 'Populate FAQ Objects', description: 'Create FAQ objects for dispatch-ready batches', status: 'pending', progress: 0 },
     fix_relationships: { id: 'fix_relationships', name: 'Fix Product Relationships', description: 'Link FAQ objects to products and populate missing product data', status: 'pending', progress: 0 },
     validate: { id: 'validate', name: 'Validate Objects', description: 'Verify all objects are properly structured', status: 'pending', progress: 0 },
@@ -396,6 +397,98 @@ export default function LLMDiscoveryConstruction() {
     } catch (error) {
       console.error('Error enriching organization JSON-LD:', error);
       updateStep('enrich_org', { 
+        status: 'error', 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    } finally {
+      setCurrentStep(null);
+    }
+  };
+
+  const enrichBrandJsonld = async () => {
+    if (!selectedClient) {
+      alert('Please select a client first');
+      return;
+    }
+
+    try {
+      setCurrentStep('enrich_brand');
+      updateStep('enrich_brand', { status: 'running', progress: 10 });
+
+      // Get all brands for this client
+      const { data: brands, error: brandsError } = await supabase
+        .from('brands')
+        .select('id, brand_name')
+        .eq('auth_user_id', selectedClient.auth_user_id);
+
+      if (brandsError) throw brandsError;
+
+      if (!brands || brands.length === 0) {
+        updateStep('enrich_brand', { 
+          status: 'completed', 
+          progress: 100,
+          result: { brands_processed: 0, message: 'No brands found for this client' }
+        });
+        return;
+      }
+
+      updateStep('enrich_brand', { progress: 30 });
+
+      // Process each brand
+      let processedCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+
+      for (const brand of brands) {
+        try {
+          // Call the brand enrichment API
+          const response = await fetch('https://ifezhvuckifvuracnnhl.supabase.co/functions/v1/enrich_brand_jsonld', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            },
+            body: JSON.stringify({
+              auth_user_id: selectedClient.auth_user_id,
+              brand_id: brand.id
+            })
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Failed to enrich brand ${brand.brand_name}:`, response.status, errorText);
+            errors.push(`${brand.brand_name}: HTTP ${response.status}`);
+            errorCount++;
+            continue;
+          }
+
+          const result = await response.json();
+          console.log(`Successfully enriched brand ${brand.brand_name}:`, result);
+          processedCount++;
+
+        } catch (error) {
+          console.error(`Error enriching brand ${brand.brand_name}:`, error);
+          errors.push(`${brand.brand_name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          errorCount++;
+        }
+      }
+
+      updateStep('enrich_brand', { 
+        status: errorCount === 0 ? 'completed' : 'error', 
+        progress: 100,
+        result: {
+          brands_processed: processedCount,
+          brands_failed: errorCount,
+          total_brands: brands.length,
+          errors: errors.length > 0 ? errors : undefined
+        },
+        error: errorCount > 0 ? `${errorCount} brands failed to enrich` : undefined
+      });
+
+    } catch (error) {
+      console.error('Error enriching brand JSON-LD:', error);
+      updateStep('enrich_brand', { 
         status: 'error', 
         error: error instanceof Error ? error.message : 'Unknown error' 
       });
@@ -904,6 +997,7 @@ export default function LLMDiscoveryConstruction() {
     await scanExistingData();
     await populateStaticObjects();
     await enrichOrganizationJsonld();
+    await enrichBrandJsonld();
     await populateFAQObjects();
     await fixProductRelationships();
     await validateObjects();
@@ -1083,6 +1177,7 @@ export default function LLMDiscoveryConstruction() {
                           case 'scan': scanExistingData(); break;
                           case 'populate_static': populateStaticObjects(); break;
                           case 'enrich_org': enrichOrganizationJsonld(); break;
+                          case 'enrich_brand': enrichBrandJsonld(); break;
                           case 'populate_faq': populateFAQObjects(); break;
                           case 'fix_relationships': fixProductRelationships(); break;
                           case 'validate': validateObjects(); break;

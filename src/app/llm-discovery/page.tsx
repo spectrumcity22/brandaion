@@ -14,7 +14,9 @@ interface DiscoveryObject {
   auth_user_id: string;
   client_organisation_id: string;
   organization_jsonld: any;
+  organization_jsonld_enriched: any;
   brand_jsonld: any;
+  brand_jsonld_enriched: any;
   product_jsonld: any;
   last_generated: string;
   is_active: boolean;
@@ -179,7 +181,9 @@ export default function LLMDiscoveryDashboard() {
       };
       
       for (const brand of clientBrands) {
-        const brandJsonld = clientStaticObjects.find(obj => obj.brand_jsonld);
+        // Use enriched brand JSON-LD if available, fallback to basic brand JSON-LD
+        const brandJsonld = clientStaticObjects.find(obj => obj.brand_jsonld_enriched)?.brand_jsonld_enriched || 
+                           clientStaticObjects.find(obj => obj.brand_jsonld)?.brand_jsonld;
         const brandFolder: DirectoryItem = {
           name: `${brand.brand_name || 'unnamed'}.jsonld`,
           type: 'folder',
@@ -189,12 +193,12 @@ export default function LLMDiscoveryDashboard() {
           children: []
         };
         
-        // Brand JSON-LD file
+        // Brand JSON-LD file - use enriched version if available
         brandFolder.children!.push({
           name: `${brand.brand_name || 'unnamed'}.jsonld`,
           type: 'file',
           path: `/${client.organisation_name || 'unnamed'}/brands/${brand.brand_name || 'unnamed'}/${brand.brand_name || 'unnamed'}.jsonld`,
-          jsonData: brandJsonld?.brand_jsonld || null,
+          jsonData: brandJsonld,
           icon: '📄',
           color: brandJsonld ? 'text-green-500' : 'text-red-500'
         });
